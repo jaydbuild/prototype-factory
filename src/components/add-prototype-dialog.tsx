@@ -9,11 +9,13 @@ import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { TagSelect } from "./tag-select";
 
 type FormData = {
   name: string;
   url: string;
   preview_url: string;
+  tags: string[];
 };
 
 export const AddPrototypeDialog = () => {
@@ -26,6 +28,7 @@ export const AddPrototypeDialog = () => {
       name: "",
       url: "",
       preview_url: "",
+      tags: [],
     },
   });
 
@@ -38,16 +41,33 @@ export const AddPrototypeDialog = () => {
         throw new Error("You must be logged in to create a prototype");
       }
 
-      const { error } = await supabase
+      // Insert the prototype
+      const { data: prototype, error: prototypeError } = await supabase
         .from("prototypes")
         .insert({
           name: data.name,
           url: data.url,
           preview_url: data.preview_url || null,
-          created_by: user.id // Add the user ID
-        });
+          created_by: user.id
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (prototypeError) throw prototypeError;
+
+      // Insert prototype tags if any are selected
+      if (data.tags.length > 0) {
+        const { error: tagError } = await supabase
+          .from("prototype_tags")
+          .insert(
+            data.tags.map(tagId => ({
+              prototype_id: prototype.id,
+              tag_id: tagId
+            }))
+          );
+
+        if (tagError) throw tagError;
+      }
 
       toast({
         title: "Success",
@@ -117,6 +137,22 @@ export const AddPrototypeDialog = () => {
                   <FormLabel>Preview URL (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter preview image URL" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags</FormLabel>
+                  <FormControl>
+                    <TagSelect 
+                      value={field.value} 
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
