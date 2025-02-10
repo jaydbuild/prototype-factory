@@ -1,14 +1,29 @@
 import { useState } from 'react';
-import { Comment } from '../types/supabase';
 import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
 import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
 
+export interface Comment {
+  id: string;
+  prototype_id: string;
+  content: string;
+  position: { x: number; y: number };
+  status: 'open' | 'resolved' | 'needs review';
+  created_by: string;
+  parent_id: string | null;
+}
+
 type CommentStatus = 'open' | 'resolved' | 'needs review';
 
 interface CommentOverlayProps {
   prototypeId: string;
+}
+
+export interface CommentMarkerProps {
+  comment: Comment;
+  onStatusChange: (commentId: string, status: CommentStatus) => void;
+  isSelected?: boolean;
 }
 
 export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
