@@ -54,9 +54,9 @@ export const AddPrototypeDialog = () => {
           name: data.name,
           url: data.url,
           preview_url: data.preview_url || null,
-          preview_title: previewData?.title || null,
-          preview_description: previewData?.description || null,
-          preview_image: previewData?.image || null,
+          preview_title: previewData?.title?.toString() || null,
+          preview_description: previewData?.description?.toString() || null,
+          preview_image: previewData?.image?.toString() || null,
           created_by: user.id
         })
         .select()
