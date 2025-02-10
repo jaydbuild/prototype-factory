@@ -9,24 +9,168 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      calendar_connections: {
+      comments: {
         Row: {
-          account_token: string
-          created_at: string | null
+          content: string
+          created_at: string
+          created_by: string
           id: string
-          user_id: string
+          parent_id: string | null
+          position: Json | null
+          prototype_id: string
+          status: string | null
+          updated_at: string
         }
         Insert: {
-          account_token: string
-          created_at?: string | null
+          content: string
+          created_at?: string
+          created_by: string
           id?: string
-          user_id: string
+          parent_id?: string | null
+          position?: Json | null
+          prototype_id: string
+          status?: string | null
+          updated_at?: string
         }
         Update: {
-          account_token?: string
-          created_at?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string
           id?: string
-          user_id?: string
+          parent_id?: string | null
+          position?: Json | null
+          prototype_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_prototype_id_fkey"
+            columns: ["prototype_id"]
+            isOneToOne: false
+            referencedRelation: "prototypes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      prototype_tags: {
+        Row: {
+          prototype_id: string
+          tag_id: string
+        }
+        Insert: {
+          prototype_id: string
+          tag_id: string
+        }
+        Update: {
+          prototype_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prototype_tags_prototype_id_fkey"
+            columns: ["prototype_id"]
+            isOneToOne: false
+            referencedRelation: "prototypes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prototype_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prototypes: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          preview_url: string | null
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          preview_url?: string | null
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          preview_url?: string | null
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prototypes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tags: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
