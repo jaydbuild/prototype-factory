@@ -124,6 +124,9 @@ export type Database = {
           created_by: string
           id: string
           name: string
+          preview_description: string | null
+          preview_image: string | null
+          preview_title: string | null
           preview_url: string | null
           updated_at: string
           url: string
@@ -133,6 +136,9 @@ export type Database = {
           created_by: string
           id?: string
           name: string
+          preview_description?: string | null
+          preview_image?: string | null
+          preview_title?: string | null
           preview_url?: string | null
           updated_at?: string
           url: string
@@ -142,6 +148,9 @@ export type Database = {
           created_by?: string
           id?: string
           name?: string
+          preview_description?: string | null
+          preview_image?: string | null
+          preview_title?: string | null
           preview_url?: string | null
           updated_at?: string
           url?: string

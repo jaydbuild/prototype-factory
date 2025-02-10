@@ -33,6 +33,9 @@ export const PrototypeGrid = () => {
             name,
             url,
             preview_url,
+            preview_title,
+            preview_description,
+            preview_image,
             created_at
           `);
 
@@ -143,6 +146,9 @@ export const PrototypeGrid = () => {
               timestamp={new Date(prototype.created_at)}
               commentCount={0}
               tags={[]}
+              previewTitle={prototype.preview_title}
+              previewDescription={prototype.preview_description}
+              previewImage={prototype.preview_image}
             />
           ))}
         </div>

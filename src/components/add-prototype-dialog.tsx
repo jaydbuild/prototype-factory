@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { TagSelect } from "./tag-select";
+import { fetchPreview } from "@/lib/preview";
 
 type FormData = {
   name: string;
@@ -20,6 +21,7 @@ type FormData = {
 
 export const AddPrototypeDialog = () => {
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -34,12 +36,16 @@ export const AddPrototypeDialog = () => {
 
   const onSubmit = async (data: FormData) => {
     try {
+      setIsLoading(true);
       // Get the current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error("You must be logged in to create a prototype");
       }
+
+      // Fetch preview data
+      const previewData = await fetchPreview(data.url);
 
       // Insert the prototype
       const { data: prototype, error: prototypeError } = await supabase
@@ -48,6 +54,9 @@ export const AddPrototypeDialog = () => {
           name: data.name,
           url: data.url,
           preview_url: data.preview_url || null,
+          preview_title: previewData?.title || null,
+          preview_description: previewData?.description || null,
+          preview_image: previewData?.image || null,
           created_by: user.id
         })
         .select()
@@ -86,6 +95,8 @@ export const AddPrototypeDialog = () => {
         title: "Error",
         description: error.message,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -162,7 +173,9 @@ export const AddPrototypeDialog = () => {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Add Prototype</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Adding..." : "Add Prototype"}
+              </Button>
             </div>
           </form>
         </Form>

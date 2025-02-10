@@ -5,11 +5,14 @@ import { formatDistanceToNow } from "date-fns";
 
 interface PrototypeCardProps {
   title: string;
-  previewUrl: string;
+  previewUrl: string | null;
   sourceUrl: string;
   timestamp: Date;
   commentCount: number;
   tags: string[];
+  previewTitle?: string | null;
+  previewDescription?: string | null;
+  previewImage?: string | null;
 }
 
 export const PrototypeCard = ({
@@ -18,6 +21,9 @@ export const PrototypeCard = ({
   sourceUrl,
   timestamp,
   commentCount,
+  previewTitle,
+  previewDescription,
+  previewImage,
 }: PrototypeCardProps) => {
   const handleCardClick = () => {
     window.open(sourceUrl, '_blank');
@@ -30,17 +36,41 @@ export const PrototypeCard = ({
     >
       <CardHeader className="p-0">
         <div className="relative aspect-video overflow-hidden bg-muted">
-          <iframe
-            src={previewUrl}
-            className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin"
-            loading="lazy"
-          />
+          {previewImage ? (
+            <img 
+              src={previewImage} 
+              alt={previewTitle || title}
+              className="w-full h-full object-cover"
+            />
+          ) : previewUrl ? (
+            <iframe
+              src={previewUrl}
+              className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <LinkIcon className="w-8 h-8 text-muted-foreground" />
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-medium text-lg line-clamp-1">{title}</h3>
+        <div className="space-y-2">
+          <h3 className="font-medium text-lg line-clamp-1">
+            {title}
+          </h3>
+          {previewTitle && previewTitle !== title && (
+            <h4 className="text-sm text-muted-foreground line-clamp-1">
+              {previewTitle}
+            </h4>
+          )}
+          {previewDescription && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {previewDescription}
+            </p>
+          )}
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0 text-sm text-muted-foreground flex items-center justify-between">
