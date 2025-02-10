@@ -8,12 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Grid2X2, List, Plus, Search } from "lucide-react";
+import { Grid2X2, List, Search } from "lucide-react";
 import { PrototypeCard } from "./prototype-card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "./ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { AddPrototypeDialog } from "./add-prototype-dialog";
 
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -71,10 +72,7 @@ export const PrototypeGrid = () => {
     <div className="container py-8 max-w-7xl mx-auto px-4 animate-fade-in">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-semibold">Prototypes</h1>
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Prototype
-        </Button>
+        <AddPrototypeDialog />
       </div>
 
       <div className="flex flex-col gap-6">
@@ -131,7 +129,7 @@ export const PrototypeGrid = () => {
               previewUrl={prototype.preview_url || 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b'}
               sourceUrl={prototype.url}
               timestamp={new Date(prototype.created_at)}
-              commentCount={0} // We'll implement this later when we add comments
+              commentCount={0}
               tags={prototype.prototype_tags.map(pt => pt.tags.name)}
               onClick={() => console.log("Clicked:", prototype.id)}
             />
