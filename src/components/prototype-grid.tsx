@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> first commit
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -140,6 +143,10 @@ export const PrototypeGrid = () => {
           {prototypes.map((prototype) => (
             <PrototypeCard
               key={prototype.id}
+<<<<<<< HEAD
+=======
+              id={prototype.id}
+>>>>>>> first commit
               title={prototype.name}
               previewUrl={prototype.preview_url}
               sourceUrl={prototype.url}

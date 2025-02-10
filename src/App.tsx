@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> first commit
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +12,10 @@ import { supabase } from "./integrations/supabase/client";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+<<<<<<< HEAD
+=======
+import { PrototypeDetail } from "@/components/PrototypeDetail";
+>>>>>>> first commit
 
 const queryClient = new QueryClient();
 
@@ -58,6 +65,10 @@ const App = () => (
             }
           />
           <Route path="/auth" element={<Auth />} />
+<<<<<<< HEAD
+=======
+          <Route path="/prototype/:id" element={<ProtectedRoute><PrototypeDetail /></ProtectedRoute>} />
+>>>>>>> first commit
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
