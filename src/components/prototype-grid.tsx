@@ -32,7 +32,7 @@ export const PrototypeGrid = () => {
           url,
           preview_url,
           created_at,
-          prototype_tags!inner (
+          prototype_tags (
             tags (
               name
             )
@@ -130,7 +130,7 @@ export const PrototypeGrid = () => {
               sourceUrl={prototype.url}
               timestamp={new Date(prototype.created_at)}
               commentCount={0}
-              tags={prototype.prototype_tags.map(pt => pt.tags.name)}
+              tags={prototype.prototype_tags?.map(pt => pt.tags.name) || []}
               onClick={() => console.log("Clicked:", prototype.id)}
             />
           ))}
