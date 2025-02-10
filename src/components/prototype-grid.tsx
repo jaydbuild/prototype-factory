@@ -22,7 +22,7 @@ export const PrototypeGrid = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  const { data: prototypes, isLoading } = useQuery({
+  const { data: prototypes = [], isLoading } = useQuery({
     queryKey: ['prototypes', sortBy, searchTerm],
     queryFn: async () => {
       try {
@@ -64,7 +64,7 @@ export const PrototypeGrid = () => {
           throw error;
         }
 
-        return data;
+        return data || [];
       } catch (error) {
         console.error('Error fetching prototypes:', error);
         toast({
@@ -141,7 +141,7 @@ export const PrototypeGrid = () => {
             ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" 
             : "grid-cols-1"
         }`}>
-          {prototypes?.map((prototype) => (
+          {prototypes.map((prototype) => (
             <PrototypeCard
               key={prototype.id}
               title={prototype.name}
