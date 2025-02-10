@@ -19,44 +19,61 @@ import { AddPrototypeDialog } from "./add-prototype-dialog";
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("recent");
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const { data: prototypes, isLoading } = useQuery({
-    queryKey: ['prototypes', sortBy],
+    queryKey: ['prototypes', sortBy, searchTerm],
     queryFn: async () => {
-      let query = supabase
-        .from('prototypes')
-        .select(`
-          id,
-          name,
-          url,
-          preview_url,
-          created_at,
-          prototype_tags (
-            tags (
-              name
+      try {
+        let query = supabase
+          .from('prototypes')
+          .select(`
+            id,
+            name,
+            url,
+            preview_url,
+            created_at,
+            prototype_tags (
+              tags (
+                name
+              )
             )
-          )
-        `);
+          `);
 
-      if (sortBy === 'recent') {
-        query = query.order('created_at', { ascending: false });
-      } else if (sortBy === 'name') {
-        query = query.order('name');
-      }
+        // Add search filter if searchTerm exists
+        if (searchTerm) {
+          query = query.ilike('name', `%${searchTerm}%`);
+        }
 
-      const { data, error } = await query;
+        // Add sorting
+        if (sortBy === 'recent') {
+          query = query.order('created_at', { ascending: false });
+        } else if (sortBy === 'name') {
+          query = query.order('name');
+        }
 
-      if (error) {
+        const { data, error } = await query;
+
+        if (error) {
+          toast({
+            variant: "destructive",
+            title: "Error fetching prototypes",
+            description: error.message
+          });
+          throw error;
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Error fetching prototypes:', error);
         toast({
           variant: "destructive",
           title: "Error fetching prototypes",
-          description: error.message
+          description: "Failed to load prototypes. Please try again."
         });
-        throw error;
+        return [];
       }
-
-      return data;
     }
   });
 
@@ -82,6 +99,8 @@ export const PrototypeGrid = () => {
             <Input
               placeholder="Search prototypes..."
               className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
