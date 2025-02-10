@@ -33,20 +33,13 @@ export const PrototypeGrid = () => {
             name,
             url,
             preview_url,
-            created_at,
-            prototype_tags (
-              tags (
-                name
-              )
-            )
+            created_at
           `);
 
-        // Add search filter if searchTerm exists
         if (searchTerm) {
           query = query.ilike('name', `%${searchTerm}%`);
         }
 
-        // Add sorting
         if (sortBy === 'recent') {
           query = query.order('created_at', { ascending: false });
         } else if (sortBy === 'name') {
@@ -145,12 +138,11 @@ export const PrototypeGrid = () => {
             <PrototypeCard
               key={prototype.id}
               title={prototype.name}
-              previewUrl={prototype.preview_url || 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b'}
+              previewUrl={prototype.preview_url}
               sourceUrl={prototype.url}
               timestamp={new Date(prototype.created_at)}
               commentCount={0}
-              tags={prototype.prototype_tags?.map(pt => pt.tags.name) || []}
-              onClick={() => console.log("Clicked:", prototype.id)}
+              tags={[]}
             />
           ))}
         </div>
