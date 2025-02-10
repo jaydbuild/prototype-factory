@@ -10,7 +10,6 @@ interface PrototypeCardProps {
   timestamp: Date;
   commentCount: number;
   tags: string[];
-  onClick: () => void;
 }
 
 export const PrototypeCard = ({
