@@ -47,7 +47,7 @@ export const AddPrototypeDialog = () => {
       // Fetch preview data
       const previewData = await fetchPreview(data.url);
 
-      // Insert the prototype
+      // Insert the prototype with type-safe values
       const { data: prototype, error: prototypeError } = await supabase
         .from("prototypes")
         .insert({
