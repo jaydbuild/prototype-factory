@@ -31,12 +31,20 @@ export const AddPrototypeDialog = () => {
 
   const onSubmit = async (data: FormData) => {
     try {
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("You must be logged in to create a prototype");
+      }
+
       const { error } = await supabase
         .from("prototypes")
         .insert({
           name: data.name,
           url: data.url,
           preview_url: data.preview_url || null,
+          created_by: user.id // Add the user ID
         });
 
       if (error) throw error;
