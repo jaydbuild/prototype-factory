@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Comment } from '@/types/comment';
+import { Comment, CommentStatus } from '@/types/comment';
+import { Json } from '@/integrations/supabase/types';
 
 export const useComments = (prototypeId: string) => {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -21,12 +22,12 @@ export const useComments = (prototypeId: string) => {
 
       if (error) throw error;
       
-      // Ensure position is properly typed
       const typedComments = data?.map(comment => ({
         ...comment,
         position: typeof comment.position === 'string' 
           ? JSON.parse(comment.position) 
-          : comment.position
+          : comment.position,
+        status: (comment.status || 'open') as CommentStatus
       })) as Comment[];
       
       setComments(typedComments || []);
@@ -40,20 +41,25 @@ export const useComments = (prototypeId: string) => {
 
   const addComment = async (newComment: Omit<Comment, 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      const commentData = {
+        ...newComment,
+        position: newComment.position as Json
+      };
+
       const { data, error } = await supabase
         .from('comments')
-        .insert([newComment])
+        .insert([commentData])
         .select('*, profiles:created_by(name, avatar_url)')
         .single();
 
       if (error) throw error;
 
-      // Ensure position is properly typed
       const typedComment = {
         ...data,
         position: typeof data.position === 'string' 
           ? JSON.parse(data.position) 
-          : data.position
+          : data.position,
+        status: (data.status || 'open') as CommentStatus
       } as Comment;
 
       setComments(prev => [...prev, typedComment]);
@@ -66,9 +72,14 @@ export const useComments = (prototypeId: string) => {
 
   const updateComment = async (commentId: string, updates: Partial<Comment>) => {
     try {
+      const updateData = {
+        ...updates,
+        position: updates.position ? updates.position as Json : undefined
+      };
+
       const { data, error } = await supabase
         .from('comments')
-        .update(updates)
+        .update(updateData)
         .eq('id', commentId)
         .select('*, profiles:created_by(name, avatar_url)')
         .single();
@@ -79,7 +90,8 @@ export const useComments = (prototypeId: string) => {
         ...data,
         position: typeof data.position === 'string' 
           ? JSON.parse(data.position) 
-          : data.position
+          : data.position,
+        status: (data.status || 'open') as CommentStatus
       } as Comment;
 
       setComments(prev => 
@@ -111,8 +123,8 @@ export const useComments = (prototypeId: string) => {
     }
   };
 
-  const updateCommentStatus = async (commentId: string, status: Comment['status']) => {
-    return updateComment(commentId, { status });
+  const updateCommentStatus = async (commentId: string, status: CommentStatus): Promise<void> => {
+    await updateComment(commentId, { status });
   };
 
   const addReply = async (parentId: string, content: string) => {

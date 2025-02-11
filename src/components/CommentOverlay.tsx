@@ -4,7 +4,7 @@ import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
 import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
-import { Comment } from '@/types/supabase';
+import { Comment } from '@/types/comment';
 import { MessageCircle, MessageCircleOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
@@ -17,7 +17,7 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
   const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
   const [isCommentMode, setIsCommentMode] = useState(false);
-  const { comments, loading, error, addComment, updateCommentStatus } = useComments(prototypeId);
+  const { comments, loading, error, addComment, updateCommentStatus, addReply, updateComment, deleteComment } = useComments(prototypeId);
   const { toast } = useToast();
 
   const handleClick = (e: React.MouseEvent) => {
@@ -68,7 +68,6 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
   return (
     <div className="absolute inset-0 flex">
       <div className="flex-1 relative" onClick={handleClick}>
-        {/* Comment Mode Toggle Button */}
         <div className="absolute top-4 left-4 z-50">
           <Button
             variant="outline"
@@ -100,7 +99,6 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
           </Button>
         </div>
 
-        {/* Comment Markers */}
         {comments.map((comment) => (
           <CommentMarker
             key={comment.id}
@@ -110,7 +108,6 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
           />
         ))}
 
-        {/* Add Comment Form */}
         {selectedPosition && (
           <AddCommentForm
             position={selectedPosition}
@@ -119,7 +116,6 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
           />
         )}
 
-        {/* Loading Overlay */}
         {loading && (
           <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -127,13 +123,15 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
         )}
       </div>
 
-      {/* Comment List Sidebar */}
       <CommentList
         comments={comments}
         onStatusChange={updateCommentStatus}
         onCommentSelect={setSelectedComment}
         selectedComment={selectedComment}
         isLoading={loading}
+        onReply={addReply}
+        onEdit={updateComment}
+        onDelete={deleteComment}
       />
     </div>
   );
