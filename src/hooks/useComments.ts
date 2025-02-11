@@ -10,6 +10,9 @@ export const useComments = (prototypeId: string) => {
 
   const fetchComments = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
       const { data, error } = await supabase
         .from('comments')
         .select('*')
@@ -29,6 +32,7 @@ export const useComments = (prototypeId: string) => {
       setComments(typedComments || []);
     } catch (err) {
       setError(err as Error);
+      console.error('Error fetching comments:', err);
     } finally {
       setLoading(false);
     }
@@ -55,8 +59,8 @@ export const useComments = (prototypeId: string) => {
       setComments(prev => [...prev, typedComment]);
       return typedComment;
     } catch (err) {
-      setError(err as Error);
-      return null;
+      console.error('Error adding comment:', err);
+      throw err;
     }
   };
 
@@ -85,7 +89,8 @@ export const useComments = (prototypeId: string) => {
         )
       );
     } catch (err) {
-      setError(err as Error);
+      console.error('Error updating comment status:', err);
+      throw err;
     }
   };
 

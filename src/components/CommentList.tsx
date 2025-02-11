@@ -1,4 +1,6 @@
+
 import { Comment } from '../types/supabase';
+import { Skeleton } from './ui/skeleton';
 
 type CommentStatus = 'open' | 'resolved' | 'needs review';
 
@@ -7,13 +9,39 @@ interface CommentListProps {
   onStatusChange: (id: string, status: CommentStatus) => void;
   onCommentSelect: (comment: Comment) => void;
   selectedComment?: Comment | null;
+  isLoading?: boolean;
 }
 
-export const CommentList = ({ comments, onStatusChange, onCommentSelect, selectedComment }: CommentListProps) => {
+export const CommentList = ({ 
+  comments, 
+  onStatusChange, 
+  onCommentSelect, 
+  selectedComment,
+  isLoading 
+}: CommentListProps) => {
+  if (isLoading) {
+    return (
+      <div className="w-80 bg-white border-l border-gray-200 h-full p-4">
+        <Skeleton className="h-8 w-3/4 mb-4" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (!comments || comments.length === 0) {
     return (
       <div className="w-80 bg-white border-l border-gray-200 h-full">
-        <div className="p-4">No comments available</div>
+        <div className="p-4">
+          <h3 className="text-lg font-semibold mb-2">Comments</h3>
+          <p className="text-gray-500">No comments available</p>
+        </div>
       </div>
     );
   }
