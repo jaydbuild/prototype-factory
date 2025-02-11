@@ -5,7 +5,7 @@ import { CommentMarker } from './CommentMarker';
 import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
 import { Comment, CommentFilter, CommentPosition } from '@/types/comment';
-import { useToast } from './ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentOverlayProps {
   prototypeId: string;
@@ -148,10 +148,11 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   }
 
   return (
-    <div className="absolute inset-0 flex">
+    <div className="absolute inset-0 flex pointer-events-none">
       <div 
         ref={overlayRef}
-        className={`absolute inset-0 z-20 ${isCommentMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+        style={{ cursor: isCommentMode ? 'crosshair' : 'default' }}
+        className={`absolute inset-0 ${isCommentMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

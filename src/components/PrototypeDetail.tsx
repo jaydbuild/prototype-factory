@@ -74,7 +74,7 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 z-10">
         <PreviewIframe 
           url={prototype.preview_url || prototype.url}
           title={prototype.name}
@@ -84,11 +84,11 @@ export const PrototypeDetail = () => {
       <Tabs 
         value={activeTab} 
         onValueChange={handleTabChange} 
-        className="relative h-full z-10"
+        className="relative h-full"
       >
         {showUI && (
           <>
-            <div className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center p-2 gap-2">
+            <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-center p-2 gap-2">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -119,19 +119,21 @@ export const PrototypeDetail = () => {
               </div>
             </div>
 
+            <div className="absolute inset-0 z-20">
+              {id && <CommentOverlay prototypeId={id} isCommentMode={activeTab === "comments"} />}
+            </div>
+
             <TabsContent 
               value="comments"
-              className="absolute top-16 right-2 w-96 max-h-[calc(100vh-5rem)] bg-background/80 backdrop-blur-sm rounded-lg shadow-lg transform transition-transform m-0"
-            >
-              {id && <CommentOverlay prototypeId={id} isCommentMode={activeTab === "comments"} />}
-            </TabsContent>
+              className="absolute top-16 right-2 z-30 w-96 max-h-[calc(100vh-5rem)] bg-background/80 backdrop-blur-sm rounded-lg shadow-lg transform transition-transform m-0"
+            />
           </>
         )}
 
         <Button
           variant="ghost"
           size="icon"
-          className="absolute bottom-4 right-4 z-50 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+          className="absolute bottom-4 right-4 z-30 bg-background/80 backdrop-blur-sm hover:bg-background/90"
           onClick={() => setShowUI(!showUI)}
         >
           {showUI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
