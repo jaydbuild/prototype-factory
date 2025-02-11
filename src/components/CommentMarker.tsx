@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Popover } from '@headlessui/react';
 
@@ -9,6 +10,7 @@ interface CommentMarkerProps {
     status: 'open' | 'resolved' | 'needs review';
   };
   onStatusChange: (id: string, status: string) => void;
+  isSelected?: boolean;
 }
 
 const statusColors = {
@@ -17,7 +19,7 @@ const statusColors = {
   'needs review': 'bg-yellow-500'
 };
 
-export const CommentMarker = ({ comment, onStatusChange }: CommentMarkerProps) => {
+export const CommentMarker = ({ comment, onStatusChange, isSelected }: CommentMarkerProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -31,7 +33,7 @@ export const CommentMarker = ({ comment, onStatusChange }: CommentMarkerProps) =
           <Popover.Button
             className={`group relative w-6 h-6 rounded-full ${statusColors[comment.status]} 
               shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl
-              ${open || isHovered ? 'ring-2 ring-white' : ''}`}
+              ${open || isHovered || isSelected ? 'ring-2 ring-white' : ''}`}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >

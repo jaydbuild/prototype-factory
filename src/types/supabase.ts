@@ -1,3 +1,4 @@
+
 export interface Database {
   public: {
     Tables: {
@@ -20,3 +21,5 @@ export interface Database {
     }
   }
 }
+
+export type Comment = Database['public']['Tables']['comments']['Row'];

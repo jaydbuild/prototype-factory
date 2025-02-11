@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Database } from '../types/supabase';
 
-type Comment = Database['public']['Tables']['comments']['Row'];
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Comment } from '@/types/supabase';
 
 export const useComments = (prototypeId: string) => {
   const [comments, setComments] = useState<Comment[]>([]);
