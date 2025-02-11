@@ -20,7 +20,11 @@ export interface Comment {
   updated_at: string;
   profiles?: {
     name: string;
-    avatar_url?: string;
+    avatar_url?: string | null;
   } | null;
 }
 
+export interface CommentUpdate {
+  content?: string;
+  status?: CommentStatus;
+}

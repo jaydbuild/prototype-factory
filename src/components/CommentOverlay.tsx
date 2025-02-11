@@ -57,6 +57,38 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
     }
   };
 
+  const handleEditComment = async (commentId: string, content: string) => {
+    try {
+      await updateComment(commentId, { content });
+      toast({
+        title: "Comment updated",
+        description: "Your comment has been successfully updated.",
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update comment. Please try again.",
+      });
+    }
+  };
+
+  const handleReplyToComment = async (parentId: string, content: string) => {
+    try {
+      await addReply(parentId, content);
+      toast({
+        title: "Reply added",
+        description: "Your reply has been successfully added.",
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add reply. Please try again.",
+      });
+    }
+  };
+
   if (error) {
     return (
       <div className="absolute inset-0 flex items-center justify-center">
@@ -129,8 +161,8 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
         onCommentSelect={setSelectedComment}
         selectedComment={selectedComment}
         isLoading={loading}
-        onReply={addReply}
-        onEdit={updateComment}
+        onReply={handleReplyToComment}
+        onEdit={handleEditComment}
         onDelete={deleteComment}
       />
     </div>
