@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
@@ -150,7 +151,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
     <div className="absolute inset-0 flex">
       <div 
         ref={overlayRef}
-        className={`flex-1 relative ${isCommentMode ? 'cursor-crosshair' : ''}`}
+        className={`absolute inset-0 z-20 ${isCommentMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
