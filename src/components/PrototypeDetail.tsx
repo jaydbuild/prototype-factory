@@ -15,6 +15,7 @@ export const PrototypeDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showUI, setShowUI] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>("preview");
 
   const { data: prototype, isLoading } = useQuery({
     queryKey: ['prototype', id],
@@ -37,6 +38,15 @@ export const PrototypeDetail = () => {
       return data;
     }
   });
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (value === "comments") {
+      toast({
+        description: "Click and drag to highlight an area for commenting",
+      });
+    }
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -64,7 +74,6 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      {/* Preview iframe is now outside Tabs, always visible */}
       <div className="absolute inset-0">
         <PreviewIframe 
           url={prototype.preview_url || prototype.url}
@@ -72,10 +81,13 @@ export const PrototypeDetail = () => {
         />
       </div>
 
-      <Tabs defaultValue="preview" className="relative h-full z-10">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={handleTabChange} 
+        className="relative h-full z-10"
+      >
         {showUI && (
           <>
-            {/* Floating UI overlay */}
             <div className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center p-2 gap-2">
               <div className="flex items-center gap-2">
                 <Button
@@ -111,12 +123,11 @@ export const PrototypeDetail = () => {
               value="comments"
               className="absolute top-16 right-2 w-96 max-h-[calc(100vh-5rem)] bg-background/80 backdrop-blur-sm rounded-lg shadow-lg transform transition-transform m-0"
             >
-              {id && <CommentOverlay prototypeId={id} />}
+              {id && <CommentOverlay prototypeId={id} isCommentMode={activeTab === "comments"} />}
             </TabsContent>
           </>
         )}
 
-        {/* UI Toggle Button */}
         <Button
           variant="ghost"
           size="icon"

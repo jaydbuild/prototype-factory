@@ -1,24 +1,21 @@
-
 import { useState, useRef } from 'react';
 import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
 import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
 import { Comment, CommentFilter, CommentPosition } from '@/types/comment';
-import { MessageCircle, MessageCircleOff } from 'lucide-react';
-import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
 
 interface CommentOverlayProps {
   prototypeId: string;
+  isCommentMode: boolean;
 }
 
-export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
+export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayProps) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<CommentPosition | null>(null);
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
-  const [isCommentMode, setIsCommentMode] = useState(false);
   const [filter, setFilter] = useState<CommentFilter>({ sortBy: 'newest' });
   const overlayRef = useRef<HTMLDivElement>(null);
   
@@ -164,38 +161,6 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
         role="region"
         aria-label="Prototype preview with comments"
       >
-        <div className="absolute top-4 left-4 z-50">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsCommentMode(!isCommentMode);
-              if (!isCommentMode) {
-                toast({
-                  description: "Click and drag to highlight an area for commenting",
-                });
-              }
-            }}
-            className={`${
-              isCommentMode ? 'bg-blue-100 hover:bg-blue-200' : 'bg-white'
-            } flex items-center gap-2 transition-colors duration-200`}
-            aria-pressed={isCommentMode}
-          >
-            {isCommentMode ? (
-              <>
-                <MessageCircleOff className="h-4 w-4" />
-                Disable Comments
-              </>
-            ) : (
-              <>
-                <MessageCircle className="h-4 w-4" />
-                Enable Comments
-              </>
-            )}
-          </Button>
-        </div>
-
         {/* Drawing overlay */}
         {isDrawing && selectedPosition && (
           <div 
@@ -234,18 +199,20 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
         )}
       </div>
 
-      <CommentList
-        comments={comments}
-        onStatusChange={updateCommentStatus}
-        onCommentSelect={setSelectedComment}
-        selectedComment={selectedComment}
-        isLoading={loading}
-        onReply={handleReplyToComment}
-        onEdit={handleEditComment}
-        onDelete={deleteComment}
-        filter={filter}
-        onFilterChange={setFilter}
-      />
+      {isCommentMode && (
+        <CommentList
+          comments={comments}
+          onStatusChange={updateCommentStatus}
+          onCommentSelect={setSelectedComment}
+          selectedComment={selectedComment}
+          isLoading={loading}
+          onReply={handleReplyToComment}
+          onEdit={handleEditComment}
+          onDelete={deleteComment}
+          filter={filter}
+          onFilterChange={setFilter}
+        />
+      )}
     </div>
   );
 };
