@@ -1,6 +1,4 @@
 
-import { Json } from "@/integrations/supabase/types";
-
 export type CommentStatus = 'open' | 'resolved' | 'needs review';
 
 export interface CommentPosition {
@@ -19,7 +17,7 @@ export interface Comment {
   created_at: string;
   updated_at: string;
   profiles?: {
-    name: string;
+    name: string | null;
     avatar_url: string | null;
   } | null;
 }

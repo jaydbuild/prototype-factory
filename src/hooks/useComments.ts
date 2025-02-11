@@ -18,7 +18,7 @@ export const useComments = (prototypeId: string) => {
         .from('comments')
         .select(`
           *,
-          profiles:created_by (
+          profiles (
             name,
             avatar_url
           )
@@ -34,7 +34,6 @@ export const useComments = (prototypeId: string) => {
           ? JSON.parse(comment.position) 
           : comment.position,
         status: (comment.status || 'open') as CommentStatus,
-        profiles: comment.profiles || { name: '', avatar_url: null }
       })) as Comment[];
       
       setComments(typedComments || []);
@@ -57,7 +56,13 @@ export const useComments = (prototypeId: string) => {
       const { data, error } = await supabase
         .from('comments')
         .insert([commentData])
-        .select('*, profiles:created_by(name, avatar_url)')
+        .select(`
+          *,
+          profiles (
+            name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
@@ -68,7 +73,6 @@ export const useComments = (prototypeId: string) => {
           ? JSON.parse(data.position) 
           : data.position,
         status: (data.status || 'open') as CommentStatus,
-        profiles: data.profiles || { name: '', avatar_url: null }
       } as Comment;
 
       setComments(prev => [...prev, typedComment]);
@@ -85,7 +89,13 @@ export const useComments = (prototypeId: string) => {
         .from('comments')
         .update(updates)
         .eq('id', commentId)
-        .select('*, profiles:created_by(name, avatar_url)')
+        .select(`
+          *,
+          profiles (
+            name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
@@ -96,7 +106,6 @@ export const useComments = (prototypeId: string) => {
           ? JSON.parse(data.position) 
           : data.position,
         status: (data.status || 'open') as CommentStatus,
-        profiles: data.profiles || { name: '', avatar_url: null }
       } as Comment;
 
       setComments(prev => 
