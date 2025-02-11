@@ -28,3 +28,9 @@ export interface CommentUpdate {
   content?: string;
   status?: CommentStatus;
 }
+
+export interface CommentFilter {
+  status?: CommentStatus[];
+  sortBy: 'newest' | 'oldest';
+}
+

@@ -4,7 +4,7 @@ import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
 import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
-import { Comment } from '@/types/comment';
+import { Comment, CommentFilter } from '@/types/comment';
 import { MessageCircle, MessageCircleOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
@@ -17,6 +17,7 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
   const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
   const [isCommentMode, setIsCommentMode] = useState(false);
+  const [filter, setFilter] = useState<CommentFilter>({ sortBy: 'newest' });
   const { comments, loading, error, addComment, updateCommentStatus, addReply, updateComment, deleteComment } = useComments(prototypeId);
   const { toast } = useToast();
 
@@ -33,7 +34,7 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
     if (!selectedPosition) return;
 
     try {
-      await addComment({
+      const newComment = await addComment({
         prototype_id: prototypeId,
         content,
         position: selectedPosition,
@@ -48,12 +49,14 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
       });
 
       setSelectedPosition(null);
+      return newComment;
     } catch (err) {
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to add comment. Please try again.",
       });
+      throw err;
     }
   };
 
@@ -75,7 +78,18 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
 
   const handleReplyToComment = async (parentId: string, content: string) => {
     try {
-      await addReply(parentId, content);
+      const parentComment = comments.find(c => c.id === parentId);
+      if (!parentComment) throw new Error("Parent comment not found");
+
+      await addComment({
+        prototype_id: prototypeId,
+        content,
+        parent_id: parentId,
+        position: parentComment.position,
+        status: 'open',
+        created_by: 'current-user', // Replace with actual user ID
+      });
+
       toast({
         title: "Reply added",
         description: "Your reply has been successfully added.",
@@ -99,7 +113,12 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
 
   return (
     <div className="absolute inset-0 flex">
-      <div className="flex-1 relative" onClick={handleClick}>
+      <div 
+        className="flex-1 relative"
+        onClick={handleClick}
+        role="region"
+        aria-label="Prototype preview with comments"
+      >
         <div className="absolute top-4 left-4 z-50">
           <Button
             variant="outline"
@@ -115,7 +134,8 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
             }}
             className={`${
               isCommentMode ? 'bg-blue-100 hover:bg-blue-200' : 'bg-white'
-            } flex items-center gap-2`}
+            } flex items-center gap-2 transition-colors duration-200`}
+            aria-pressed={isCommentMode}
           >
             {isCommentMode ? (
               <>
@@ -137,6 +157,7 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
             comment={comment}
             onStatusChange={updateCommentStatus}
             isSelected={selectedComment?.id === comment.id}
+            onSelect={() => setSelectedComment(comment)}
           />
         ))}
 
@@ -164,6 +185,8 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
         onReply={handleReplyToComment}
         onEdit={handleEditComment}
         onDelete={deleteComment}
+        filter={filter}
+        onFilterChange={setFilter}
       />
     </div>
   );

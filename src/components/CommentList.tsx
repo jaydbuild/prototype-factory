@@ -1,7 +1,9 @@
 
-import { Comment } from '../types/comment';
+import { Comment, CommentFilter } from '../types/comment';
 import { Skeleton } from './ui/skeleton';
 import { CommentThreadView } from './comments/CommentThreadView';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
 
 interface CommentListProps {
   comments: Comment[];
@@ -12,18 +14,30 @@ interface CommentListProps {
   onDelete: (commentId: string) => Promise<void>;
   selectedComment?: Comment | null;
   isLoading?: boolean;
+  filter: CommentFilter;
+  onFilterChange: (filter: CommentFilter) => void;
 }
 
-export const CommentList = ({ 
-  comments, 
-  onStatusChange, 
+export const CommentList = ({
+  comments,
+  onStatusChange,
   onCommentSelect,
   onReply,
   onEdit,
   onDelete,
   selectedComment,
-  isLoading 
+  isLoading,
+  filter,
+  onFilterChange
 }: CommentListProps) => {
+  const filteredComments = comments
+    .filter(comment => !filter.status || filter.status.includes(comment.status))
+    .sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return filter.sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
   if (isLoading) {
     return (
       <div className="w-80 bg-white border-l border-gray-200 h-full p-4">
@@ -40,59 +54,62 @@ export const CommentList = ({
     );
   }
 
-  if (!comments || comments.length === 0) {
-    return (
-      <div className="w-80 bg-white border-l border-gray-200 h-full">
-        <div className="p-4">
-          <h3 className="text-lg font-semibold mb-2">Comments</h3>
-          <p className="text-gray-500">No comments available</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Organize comments into threads
-  const threads = comments.reduce((acc, comment) => {
-    if (!comment.parent_id) {
-      if (!acc[comment.id]) {
-        acc[comment.id] = {
-          comment,
-          replies: []
-        };
-      } else {
-        acc[comment.id].comment = comment;
-      }
-    } else {
-      if (!acc[comment.parent_id]) {
-        acc[comment.parent_id] = {
-          replies: [comment]
-        };
-      } else {
-        acc[comment.parent_id].replies.push(comment);
-      }
-    }
-    return acc;
-  }, {} as Record<string, { comment?: Comment; replies: Comment[] }>);
-
   return (
     <div className="w-80 bg-white border-l border-gray-200 h-full overflow-y-auto" role="complementary">
       <div className="p-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold">Comments ({comments.length})</h3>
+        <h3 className="text-lg font-semibold mb-4">Comments ({filteredComments.length})</h3>
+        <div className="flex items-center gap-2">
+          <Select
+            value={filter.sortBy}
+            onValueChange={(value: 'newest' | 'oldest') => 
+              onFilterChange({ ...filter, sortBy: value })
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">
+                <div className="flex items-center gap-2">
+                  <ArrowDownNarrowWide className="w-4 h-4" />
+                  Newest first
+                </div>
+              </SelectItem>
+              <SelectItem value="oldest">
+                <div className="flex items-center gap-2">
+                  <ArrowUpNarrowWide className="w-4 h-4" />
+                  Oldest first
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
       <div className="p-4 space-y-6">
-        {Object.values(threads)
-          .filter(thread => thread.comment) // Only show threads with parent comments
-          .map(({ comment, replies }) => (
-            <CommentThreadView
-              key={comment!.id}
-              comment={comment!}
-              replies={replies}
-              onReply={onReply}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
-            />
-          ))}
+        {filteredComments
+          .filter(comment => !comment.parent_id)
+          .map(comment => {
+            const replies = comments.filter(c => c.parent_id === comment.id);
+            return (
+              <CommentThreadView
+                key={comment.id}
+                comment={comment}
+                replies={replies}
+                onReply={onReply}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onStatusChange={onStatusChange}
+                isSelected={selectedComment?.id === comment.id}
+              />
+            );
+          })}
+
+        {filteredComments.length === 0 && (
+          <div className="text-center text-gray-500 py-8">
+            <p>No comments yet</p>
+          </div>
+        )}
       </div>
     </div>
   );
