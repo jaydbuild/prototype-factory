@@ -20,7 +20,7 @@ export interface Comment {
   updated_at: string;
   profiles?: {
     name: string;
-    avatar_url?: string | null;
+    avatar_url: string | null;
   } | null;
 }
 
@@ -33,4 +33,3 @@ export interface CommentFilter {
   status?: CommentStatus[];
   sortBy: 'newest' | 'oldest';
 }
-

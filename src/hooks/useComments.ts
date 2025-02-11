@@ -16,7 +16,13 @@ export const useComments = (prototypeId: string) => {
       
       const { data, error } = await supabase
         .from('comments')
-        .select('*, profiles:created_by(name, avatar_url)')
+        .select(`
+          *,
+          profiles:created_by (
+            name,
+            avatar_url
+          )
+        `)
         .eq('prototype_id', prototypeId)
         .order('created_at', { ascending: true });
 
