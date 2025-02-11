@@ -64,14 +64,15 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <Tabs defaultValue="preview" className="h-full">
-        <TabsContent value="preview" className="absolute inset-0 m-0 p-0">
-          <PreviewIframe 
-            url={prototype.preview_url || prototype.url}
-            title={prototype.name}
-          />
-        </TabsContent>
+      {/* Preview iframe is now outside Tabs, always visible */}
+      <div className="absolute inset-0">
+        <PreviewIframe 
+          url={prototype.preview_url || prototype.url}
+          title={prototype.name}
+        />
+      </div>
 
+      <Tabs defaultValue="preview" className="relative h-full z-10">
         {showUI && (
           <>
             {/* Floating UI overlay */}
