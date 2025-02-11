@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
@@ -148,7 +147,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   }
 
   return (
-    <div className="absolute inset-0 flex pointer-events-none">
+    <div className="absolute inset-0 flex flex-row-reverse pointer-events-none">
       <div 
         ref={overlayRef}
         style={{ cursor: isCommentMode ? 'crosshair' : 'default' }}

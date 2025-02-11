@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Comment } from '@/types/comment';
 import { useToast } from '@/hooks/use-toast';
@@ -84,22 +83,22 @@ export const CommentThreadView: React.FC<CommentThreadViewProps> = ({
   };
 
   return (
-    <div className={`space-y-4 ${isSelected ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}>
-      <div className="bg-white rounded-lg shadow-sm p-4">
+    <div className={`space-y-3 ${isSelected ? 'ring-1 ring-primary/20 bg-primary/5 rounded-lg' : ''}`}>
+      <div className="bg-background/50 rounded-lg p-3 shadow-sm transition-all duration-200 hover:bg-background/80">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <MessageCircle className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium">
+            <MessageCircle className="w-3 h-3 text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground/80">
               {comment.profiles?.name || 'Anonymous'}
             </span>
-            <span className="text-xs text-gray-500">
+            <span className="text-[10px] text-muted-foreground">
               {format(new Date(comment.created_at), 'MMM d, yyyy')}
             </span>
           </div>
           <select
             value={comment.status}
             onChange={(e) => onStatusChange(comment.id, e.target.value as Comment['status'])}
-            className="text-xs border rounded px-2 py-1"
+            className="text-[10px] bg-background/50 border border-border/50 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="open">Open</option>
             <option value="resolved">Resolved</option>
