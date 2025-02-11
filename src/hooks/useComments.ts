@@ -17,7 +17,16 @@ export const useComments = (prototypeId: string) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setComments(data || []);
+      
+      // Ensure position is properly typed
+      const typedComments = data?.map(comment => ({
+        ...comment,
+        position: typeof comment.position === 'string' 
+          ? JSON.parse(comment.position) 
+          : comment.position
+      })) as Comment[];
+      
+      setComments(typedComments || []);
     } catch (err) {
       setError(err as Error);
     } finally {
@@ -34,8 +43,17 @@ export const useComments = (prototypeId: string) => {
         .single();
 
       if (error) throw error;
-      setComments(prev => [...prev, data]);
-      return data;
+
+      // Ensure position is properly typed
+      const typedComment = {
+        ...data,
+        position: typeof data.position === 'string' 
+          ? JSON.parse(data.position) 
+          : data.position
+      } as Comment;
+
+      setComments(prev => [...prev, typedComment]);
+      return typedComment;
     } catch (err) {
       setError(err as Error);
       return null;
@@ -52,9 +70,18 @@ export const useComments = (prototypeId: string) => {
         .single();
 
       if (error) throw error;
+
+      // Ensure position is properly typed
+      const typedComment = {
+        ...data,
+        position: typeof data.position === 'string' 
+          ? JSON.parse(data.position) 
+          : data.position
+      } as Comment;
+
       setComments(prev => 
         prev.map(comment => 
-          comment.id === commentId ? data : comment
+          comment.id === commentId ? typedComment : comment
         )
       );
     } catch (err) {
