@@ -14,6 +14,7 @@ interface CommentThreadViewProps {
   onEdit: (commentId: string, content: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
   onStatusChange: (commentId: string, status: Comment['status']) => Promise<void>;
+  isSelected?: boolean; // Added isSelected prop
 }
 
 export const CommentThreadView: React.FC<CommentThreadViewProps> = ({
@@ -23,6 +24,7 @@ export const CommentThreadView: React.FC<CommentThreadViewProps> = ({
   onEdit,
   onDelete,
   onStatusChange,
+  isSelected = false, // Add default value
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
@@ -82,7 +84,7 @@ export const CommentThreadView: React.FC<CommentThreadViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${isSelected ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}>
       <div className="bg-white rounded-lg shadow-sm p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
