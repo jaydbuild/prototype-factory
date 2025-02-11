@@ -19,34 +19,61 @@ const statusColors = {
 export const CommentMarker = ({ comment, onStatusChange, isSelected, onSelect }: CommentMarkerProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
+  const hasRectangle = comment.position.width && comment.position.height;
+
   return (
     <Popover className="absolute" style={{
       left: `${comment.position.x}%`,
       top: `${comment.position.y}%`,
-      transform: 'translate(-50%, -50%)'
+      width: hasRectangle ? `${comment.position.width}%` : 'auto',
+      height: hasRectangle ? `${comment.position.height}%` : 'auto',
+      transform: hasRectangle ? 'none' : 'translate(-50%, -50%)'
     }}>
       {({ open }) => (
         <>
-          <Popover.Button
-            className={`group relative w-6 h-6 rounded-full ${statusColors[comment.status]} 
-              shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-              ${open || isHovered || isSelected ? 'ring-2 ring-white' : ''}`}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect();
-            }}
-            aria-label={`Comment by ${comment.profiles?.name || 'Unknown user'}: ${comment.content.substring(0, 50)}${comment.content.length > 50 ? '...' : ''}`}
-          >
-            {(open || isHovered) && (
-              <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 
-                bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap z-50
-                animate-fade-in">
-                {comment.content.substring(0, 20)}...
-              </span>
-            )}
-          </Popover.Button>
+          {hasRectangle ? (
+            <div 
+              className={`absolute inset-0 border-2 ${
+                isSelected || open || isHovered 
+                  ? `border-${statusColors[comment.status].replace('bg-', '')}` 
+                  : 'border-transparent'
+              } transition-colors duration-200`}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect();
+              }}
+            >
+              <Popover.Button
+                className={`absolute -top-3 -left-3 w-6 h-6 rounded-full ${statusColors[comment.status]} 
+                  shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                  ${open || isHovered || isSelected ? 'ring-2 ring-white' : ''}`}
+                aria-label={`Comment by ${comment.profiles?.name || 'Unknown user'}: ${comment.content.substring(0, 50)}${comment.content.length > 50 ? '...' : ''}`}
+              />
+            </div>
+          ) : (
+            <Popover.Button
+              className={`w-6 h-6 rounded-full ${statusColors[comment.status]} 
+                shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                ${open || isHovered || isSelected ? 'ring-2 ring-white' : ''}`}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect();
+              }}
+              aria-label={`Comment by ${comment.profiles?.name || 'Unknown user'}: ${comment.content.substring(0, 50)}${comment.content.length > 50 ? '...' : ''}`}
+            />
+          )}
+          
+          {(open || isHovered) && (
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 
+              bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap z-50
+              animate-fade-in">
+              {comment.content.substring(0, 20)}...
+            </span>
+          )}
           
           <Popover.Panel className="absolute z-10 w-64 px-4 mt-2 transform -translate-x-1/2 left-1/2">
             <div className="bg-white rounded-lg shadow-lg p-4 animate-fade-in">

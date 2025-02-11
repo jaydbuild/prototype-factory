@@ -1,10 +1,10 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useComments } from '../hooks/useComments';
 import { CommentMarker } from './CommentMarker';
 import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
-import { Comment, CommentFilter } from '@/types/comment';
+import { Comment, CommentFilter, CommentPosition } from '@/types/comment';
 import { MessageCircle, MessageCircleOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
@@ -14,20 +14,58 @@ interface CommentOverlayProps {
 }
 
 export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
-  const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<CommentPosition | null>(null);
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [filter, setFilter] = useState<CommentFilter>({ sortBy: 'newest' });
+  const overlayRef = useRef<HTMLDivElement>(null);
+  
   const { comments, loading, error, addComment, updateCommentStatus, addReply, updateComment, deleteComment } = useComments(prototypeId);
   const { toast } = useToast();
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     if (!isCommentMode) return;
+    
+    const rect = overlayRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setSelectedPosition({ x, y });
+    
+    setDrawStart({ x, y });
+    setIsDrawing(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || !drawStart || !overlayRef.current) return;
+
+    const rect = overlayRef.current.getBoundingClientRect();
+    const currentX = ((e.clientX - rect.left) / rect.width) * 100;
+    const currentY = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setSelectedPosition({
+      x: Math.min(drawStart.x, currentX),
+      y: Math.min(drawStart.y, currentY),
+      width: Math.abs(currentX - drawStart.x),
+      height: Math.abs(currentY - drawStart.y),
+      scrollPosition: window.scrollY
+    });
+  };
+
+  const handleMouseUp = () => {
+    if (isDrawing && selectedPosition) {
+      // Only open comment form if the rectangle has meaningful dimensions
+      if (selectedPosition.width > 1 && selectedPosition.height > 1) {
+        setIsDrawing(false);
+      } else {
+        // Reset if the rectangle is too small
+        setSelectedPosition(null);
+      }
+    }
+    setIsDrawing(false);
+    setDrawStart(null);
   };
 
   const handleAddComment = async (content: string) => {
@@ -114,8 +152,15 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
   return (
     <div className="absolute inset-0 flex">
       <div 
-        className="flex-1 relative"
-        onClick={handleClick}
+        ref={overlayRef}
+        className={`flex-1 relative ${isCommentMode ? 'cursor-crosshair' : ''}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          setIsDrawing(false);
+          setDrawStart(null);
+        }}
         role="region"
         aria-label="Prototype preview with comments"
       >
@@ -128,7 +173,7 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
               setIsCommentMode(!isCommentMode);
               if (!isCommentMode) {
                 toast({
-                  description: "Click anywhere on the prototype to add a comment",
+                  description: "Click and drag to highlight an area for commenting",
                 });
               }
             }}
@@ -151,6 +196,19 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
           </Button>
         </div>
 
+        {/* Drawing overlay */}
+        {isDrawing && selectedPosition && (
+          <div 
+            className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none"
+            style={{
+              left: `${selectedPosition.x}%`,
+              top: `${selectedPosition.y}%`,
+              width: `${selectedPosition.width}%`,
+              height: `${selectedPosition.height}%`,
+            }}
+          />
+        )}
+
         {comments.map((comment) => (
           <CommentMarker
             key={comment.id}
@@ -161,7 +219,7 @@ export const CommentOverlay = ({ prototypeId }: CommentOverlayProps) => {
           />
         ))}
 
-        {selectedPosition && (
+        {selectedPosition && !isDrawing && (
           <AddCommentForm
             position={selectedPosition}
             onSubmit={handleAddComment}

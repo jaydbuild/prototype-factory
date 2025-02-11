@@ -4,6 +4,9 @@ export type CommentStatus = 'open' | 'resolved' | 'needs review';
 export interface CommentPosition {
   x: number;
   y: number;
+  width?: number;
+  height?: number;
+  scrollPosition?: number;
 }
 
 export interface Comment {
