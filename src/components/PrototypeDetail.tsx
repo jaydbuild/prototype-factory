@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import { PreviewIframe } from "./PreviewIframe";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
+import { CommentOverlay } from "./CommentOverlay";
 
 export const PrototypeDetail = () => {
   const { id } = useParams();
@@ -62,8 +64,8 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <Tabs defaultValue="preview">
-        <TabsContent value="preview" className="absolute inset-0">
+      <Tabs defaultValue="preview" className="h-full">
+        <TabsContent value="preview" className="absolute inset-0 m-0 p-0">
           <PreviewIframe 
             url={prototype.preview_url || prototype.url}
             title={prototype.name}
@@ -106,11 +108,9 @@ export const PrototypeDetail = () => {
 
             <TabsContent 
               value="comments"
-              className="absolute top-16 right-2 w-96 max-h-[calc(100vh-5rem)] bg-background/80 backdrop-blur-sm rounded-lg shadow-lg transform transition-transform"
+              className="absolute top-16 right-2 w-96 max-h-[calc(100vh-5rem)] bg-background/80 backdrop-blur-sm rounded-lg shadow-lg transform transition-transform m-0"
             >
-              <div className="p-4">
-                Comments coming soon...
-              </div>
+              {id && <CommentOverlay prototypeId={id} />}
             </TabsContent>
           </>
         )}
