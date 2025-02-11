@@ -5,6 +5,7 @@ import { AddCommentForm } from './AddCommentForm';
 import { CommentList } from './CommentList';
 import { Comment, CommentFilter, CommentPosition } from '@/types/comment';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabase } from '@/lib/supabase-provider';
 
 interface CommentOverlayProps {
   prototypeId: string;
@@ -21,9 +22,10 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   
   const { comments, loading, error, addComment, updateCommentStatus, addReply, updateComment, deleteComment } = useComments(prototypeId);
   const { toast } = useToast();
+  const { session } = useSupabase();
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isCommentMode) return;
+    if (!isCommentMode || selectedPosition || e.button !== 0) return; // Only proceed if in comment mode and left click
     
     const rect = overlayRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -36,7 +38,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing || !drawStart || !overlayRef.current) return;
+    if (!isDrawing || !drawStart || !isCommentMode) return; // Only move if in drawing mode
 
     const rect = overlayRef.current.getBoundingClientRect();
     const currentX = ((e.clientX - rect.left) / rect.width) * 100;
@@ -66,7 +68,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   };
 
   const handleAddComment = async (content: string) => {
-    if (!selectedPosition) return;
+    if (!selectedPosition || !session?.user) return;
 
     try {
       const newComment = await addComment({
@@ -74,24 +76,27 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
         content,
         position: selectedPosition,
         status: 'open',
-        created_by: 'current-user', // Replace with actual user ID
+        created_by: session.user.id,
         parent_id: null
       });
 
+      setSelectedPosition(null);
+      setSelectedComment(newComment); // Select the newly added comment
+
       toast({
-        title: "Comment added",
-        description: "Your comment has been successfully added.",
+        title: "Success",
+        description: "Comment added successfully",
       });
 
-      setSelectedPosition(null);
       return newComment;
-    } catch (err) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add comment';
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add comment. Please try again.",
+        description: message,
       });
-      throw err;
+      throw error; // Re-throw to let AddCommentForm handle UI state
     }
   };
 
@@ -112,6 +117,15 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   };
 
   const handleReplyToComment = async (parentId: string, content: string) => {
+    if (!session?.user) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You must be logged in to reply",
+      });
+      return;
+    }
+
     try {
       const parentComment = comments.find(c => c.id === parentId);
       if (!parentComment) throw new Error("Parent comment not found");
@@ -122,7 +136,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
         parent_id: parentId,
         position: parentComment.position,
         status: 'open',
-        created_by: 'current-user', // Replace with actual user ID
+        created_by: session.user.id,
       });
 
       toast({
@@ -150,7 +164,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
     <div className="absolute inset-0 flex flex-row-reverse pointer-events-none">
       <div 
         ref={overlayRef}
-        style={{ cursor: isCommentMode ? 'crosshair' : 'default' }}
+        style={{ cursor: isCommentMode && !selectedPosition ? 'crosshair' : 'default' }}
         className={`absolute inset-0 ${isCommentMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -163,7 +177,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
         aria-label="Prototype preview with comments"
       >
         {/* Drawing overlay */}
-        {isDrawing && selectedPosition && (
+        {isDrawing && selectedPosition && !selectedComment && (
           <div 
             className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none"
             style={{

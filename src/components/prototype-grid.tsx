@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,8 +74,11 @@ export const PrototypeGrid = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading prototypes...</div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-foreground"></div>
+          <p className="text-sm text-muted-foreground">Loading prototypes...</p>
+        </div>
       </div>
     );
   }

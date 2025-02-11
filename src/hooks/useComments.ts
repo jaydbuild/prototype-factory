@@ -1,13 +1,14 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Comment, CommentStatus, CommentPosition, CommentUpdate } from '@/types/comment';
 import { Json } from '@/integrations/supabase/types';
+import { useSupabase } from '@/lib/supabase-provider';
 
 export const useComments = (prototypeId: string) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { session } = useSupabase();
 
   const fetchComments = async () => {
     try {
@@ -46,11 +47,16 @@ export const useComments = (prototypeId: string) => {
   };
 
   const addComment = async (newComment: Omit<Comment, 'id' | 'created_at' | 'updated_at' | 'profiles'>) => {
+    if (!session?.user) {
+      throw new Error('You must be logged in to add comments');
+    }
+
     try {
       const position = newComment.position as unknown as Json;
       const commentData = {
         ...newComment,
-        position
+        position,
+        created_by: session.user.id // Ensure we're using the authenticated user's ID
       };
 
       const { data, error } = await supabase
@@ -65,7 +71,9 @@ export const useComments = (prototypeId: string) => {
         `)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Failed to add comment. Please try again.');
+      }
 
       const typedComment = {
         ...data,
@@ -78,8 +86,9 @@ export const useComments = (prototypeId: string) => {
       setComments(prev => [...prev, typedComment]);
       return typedComment;
     } catch (err) {
-      console.error('Error adding comment:', err);
-      throw err;
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add comment';
+      console.error('Error adding comment:', errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -158,8 +167,9 @@ export const useComments = (prototypeId: string) => {
   useEffect(() => {
     fetchComments();
     
+    const channelName = `comments-${prototypeId}`;
     const subscription = supabase
-      .channel(`comments:${prototypeId}`)
+      .channel(channelName)
       .on('postgres_changes', 
         { 
           event: '*', 
@@ -167,14 +177,41 @@ export const useComments = (prototypeId: string) => {
           table: 'comments',
           filter: `prototype_id=eq.${prototypeId}` 
         }, 
-        () => {
-          fetchComments();
+        async (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const { data: newComment, error } = await supabase
+              .from('comments')
+              .select(`
+                *,
+                profiles (
+                  name,
+                  avatar_url
+                )
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (!error && newComment) {
+              const typedComment = {
+                ...newComment,
+                position: typeof newComment.position === 'string' 
+                  ? JSON.parse(newComment.position) 
+                  : newComment.position,
+                status: (newComment.status || 'open') as CommentStatus,
+              } as Comment;
+              
+              setComments(prev => [...prev, typedComment]);
+            }
+          } else {
+            // For updates and deletes, fetch all comments to ensure consistency
+            fetchComments();
+          }
         }
       )
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(subscription);
     };
   }, [prototypeId]);
 

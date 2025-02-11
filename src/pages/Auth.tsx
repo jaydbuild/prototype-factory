@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +20,18 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate('/', { replace: true });
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +69,17 @@ export default function Auth() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error signing in:', error);
     }
   };
 
@@ -133,6 +155,13 @@ export default function Auth() {
                 : "Need an account? Sign up"}
             </Button>
           </form>
+          <Button
+            type="button"
+            className="w-full mt-4"
+            onClick={handleSignIn}
+          >
+            Sign in with GitHub
+          </Button>
         </CardContent>
       </Card>
     </div>
