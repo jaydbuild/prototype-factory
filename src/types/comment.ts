@@ -1,4 +1,5 @@
-export type CommentStatus = 'open' | 'closed';
+
+export type CommentStatus = 'open' | 'resolved' | 'needs review';
 
 export interface CommentPosition {
   x: number;
@@ -12,7 +13,7 @@ export interface Comment {
   content: string;
   position: CommentPosition;
   status: CommentStatus;
-  parent_id?: string;
+  parent_id?: string | null;
   created_at: string;
   updated_at?: string;
   profiles?: {

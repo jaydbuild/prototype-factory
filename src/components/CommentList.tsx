@@ -1,13 +1,15 @@
 
-import { Comment } from '../types/supabase';
+import { Comment } from '../types/comment';
 import { Skeleton } from './ui/skeleton';
-
-type CommentStatus = 'open' | 'resolved' | 'needs review';
+import { CommentThreadView } from './comments/CommentThreadView';
 
 interface CommentListProps {
   comments: Comment[];
-  onStatusChange: (id: string, status: CommentStatus) => void;
+  onStatusChange: (id: string, status: Comment['status']) => Promise<void>;
   onCommentSelect: (comment: Comment) => void;
+  onReply: (parentId: string, content: string) => Promise<void>;
+  onEdit: (commentId: string, content: string) => Promise<void>;
+  onDelete: (commentId: string) => Promise<void>;
   selectedComment?: Comment | null;
   isLoading?: boolean;
 }
@@ -15,7 +17,10 @@ interface CommentListProps {
 export const CommentList = ({ 
   comments, 
   onStatusChange, 
-  onCommentSelect, 
+  onCommentSelect,
+  onReply,
+  onEdit,
+  onDelete,
   selectedComment,
   isLoading 
 }: CommentListProps) => {
@@ -46,39 +51,48 @@ export const CommentList = ({
     );
   }
 
+  // Organize comments into threads
+  const threads = comments.reduce((acc, comment) => {
+    if (!comment.parent_id) {
+      if (!acc[comment.id]) {
+        acc[comment.id] = {
+          comment,
+          replies: []
+        };
+      } else {
+        acc[comment.id].comment = comment;
+      }
+    } else {
+      if (!acc[comment.parent_id]) {
+        acc[comment.parent_id] = {
+          replies: [comment]
+        };
+      } else {
+        acc[comment.parent_id].replies.push(comment);
+      }
+    }
+    return acc;
+  }, {} as Record<string, { comment?: Comment; replies: Comment[] }>);
+
   return (
     <div className="w-80 bg-white border-l border-gray-200 h-full overflow-y-auto" role="complementary">
       <div className="p-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold">Comments ({comments.length})</h3>
       </div>
-      <div className="divide-y divide-gray-200">
-        {comments.map((comment) => (
-          <div
-            key={comment.id}
-            className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-              selectedComment?.id === comment.id ? 'bg-blue-50' : ''
-            }`}
-            onClick={() => onCommentSelect(comment)}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-900">
-                {comment.created_by}
-              </span>
-              <select
-                value={comment.status}
-                onChange={(e) => onStatusChange(comment.id, e.target.value as CommentStatus)}
-                className="text-xs border rounded px-2 py-1"
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Change comment status"
-              >
-                <option value="open">Open</option>
-                <option value="resolved">Resolved</option>
-                <option value="needs review">Needs Review</option>
-              </select>
-            </div>
-            <p className="text-sm text-gray-600">{comment.content}</p>
-          </div>
-        ))}
+      <div className="p-4 space-y-6">
+        {Object.values(threads)
+          .filter(thread => thread.comment) // Only show threads with parent comments
+          .map(({ comment, replies }) => (
+            <CommentThreadView
+              key={comment!.id}
+              comment={comment!}
+              replies={replies}
+              onReply={onReply}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onStatusChange={onStatusChange}
+            />
+          ))}
       </div>
     </div>
   );
