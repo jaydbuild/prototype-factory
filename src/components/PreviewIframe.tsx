@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, AlertCircle } from "lucide-react";
@@ -67,7 +68,7 @@ export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full overflow-hidden">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted">
           <div className="flex flex-col items-center gap-2">
@@ -85,6 +86,7 @@ export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
         onLoad={handleLoad}
         onError={handleError}
         referrerPolicy="no-referrer"
+        scrolling="yes"
       />
     </div>
   );
