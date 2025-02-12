@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -72,22 +73,15 @@ export const PrototypeDetail = () => {
   };
 
   return (
-    <div className="fixed inset-0 overflow-auto">
-      <div className="absolute inset-0 z-10">
-        <PreviewIframe 
-          url={prototype.preview_url || prototype.url}
-          title={prototype.name}
-        />
-      </div>
-
+    <div className="fixed inset-0 flex flex-col overflow-hidden">
       <Tabs 
         value={activeTab} 
         onValueChange={handleTabChange} 
-        className="relative h-full"
+        className="flex-1 flex flex-col min-h-0"
       >
         {showUI && (
           <>
-            <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-center p-2 gap-2">
+            <div className="flex justify-between items-center p-2 gap-2 shrink-0">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -118,7 +112,7 @@ export const PrototypeDetail = () => {
               </div>
             </div>
 
-            <div className="absolute inset-0 z-20">
+            <div className="absolute inset-0 top-[3.5rem] z-20">
               {id && <CommentOverlay prototypeId={id} isCommentMode={activeTab === "comments"} />}
             </div>
 
@@ -128,6 +122,13 @@ export const PrototypeDetail = () => {
             />
           </>
         )}
+
+        <div className="flex-1 min-h-0 relative">
+          <PreviewIframe 
+            url={prototype.preview_url || prototype.url}
+            title={prototype.name}
+          />
+        </div>
 
         <Button
           variant="ghost"

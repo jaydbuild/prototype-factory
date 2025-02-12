@@ -15,8 +15,8 @@ export const PreviewWindow = ({ url, onShare }: PreviewWindowProps) => {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+    <div className="flex flex-col h-screen">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 shrink-0">
         <div className="flex space-x-2">
           <div className="w-3 h-3 rounded-full bg-red-500" />
           <div className="w-3 h-3 rounded-full bg-yellow-500" />
@@ -38,13 +38,15 @@ export const PreviewWindow = ({ url, onShare }: PreviewWindowProps) => {
           </button>
         </div>
       </div>
-      <div className="flex-1 bg-white overflow-auto">
+      <div className="flex-1 min-h-0">
         <iframe
           key={key}
           src={url}
-          className="w-full h-full border-0"
+          className="w-full h-full"
+          style={{ height: '100%', width: '100%', display: 'block' }}
           title="Preview"
-          scrolling="yes"
+          scrolling="auto"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         />
       </div>
     </div>

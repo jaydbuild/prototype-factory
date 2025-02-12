@@ -68,7 +68,7 @@ export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full flex flex-col min-h-0">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted">
           <div className="flex flex-col items-center gap-2">
@@ -80,13 +80,14 @@ export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
       <iframe
         src={sanitizedUrl}
         title={title}
-        className="w-full h-full border-0 overflow-auto"
+        className="flex-1 w-full"
+        style={{ height: '100%', width: '100%', display: 'block' }}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         loading="lazy"
         onLoad={handleLoad}
         onError={handleError}
         referrerPolicy="no-referrer"
-        scrolling="yes"
+        scrolling="auto"
       />
     </div>
   );
