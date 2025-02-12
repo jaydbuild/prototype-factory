@@ -1,13 +1,14 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { Database } from '@/types/supabase';
 import { Session } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
@@ -25,20 +26,20 @@ export interface SupabaseProviderProps {
 
 export function SupabaseProvider({ children, session: initialSession }: SupabaseProviderProps) {
   const [session, setSession] = useState<Session | null>(initialSession);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      router.refresh();
+      navigate(0); // Using navigate(0) instead of router.refresh() for React Router
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [navigate]);
 
   const value = {
     session,
