@@ -7,8 +7,15 @@ import { useNavigate } from 'react-router-dom';
 import { Database } from '@/types/supabase';
 import { Session } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+if (!import.meta.env.VITE_SUPABASE_URL) {
+  throw new Error('Missing environment variable: VITE_SUPABASE_URL');
+}
+if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  throw new Error('Missing environment variable: VITE_SUPABASE_ANON_KEY');
+}
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
