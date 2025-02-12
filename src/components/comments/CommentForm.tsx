@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { useSupabase } from '@/lib/supabase-provider';
 import { CommentPosition } from '@/types/comment';
+import { Json } from '@/integrations/supabase/types';
 
 interface CommentFormProps {
   prototypeId: string;
@@ -32,13 +34,22 @@ export const CommentForm: React.FC<CommentFormProps> = ({
 
     setIsLoading(true);
     try {
+      // Convert position to Json type
+      const positionJson: Json = {
+        x: position.x,
+        y: position.y,
+        width: position.width,
+        height: position.height,
+        scrollPosition: position.scrollPosition
+      };
+
       const { error } = await supabase
         .from('comments')
         .insert({
           content,
           prototype_id: prototypeId,
           created_by: session.user.id,
-          position,
+          position: positionJson,
           status: 'open',
         });
 

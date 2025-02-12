@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState } from 'react';
-import { Comment } from '@/types/comment';
+import { Comment, isCommentPosition } from '@/types/comment';
 import { useSupabase } from '@/lib/supabase-provider';
 import { CommentMarker } from './CommentMarker';
 import { CommentThread } from './CommentThread';
@@ -17,12 +18,17 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ prototypeId }) =
   const fetchComments = async () => {
     const { data, error } = await supabase
       .from('comments')
-      .select('*')
+      .select('*, profiles(name, avatar_url)')
       .eq('prototype_id', prototypeId)
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      setComments(data);
+      const typedComments = data.map(comment => ({
+        ...comment,
+        position: isCommentPosition(comment.position) ? comment.position : { x: 0, y: 0 },
+        profiles: comment.profiles
+      })) as Comment[];
+      setComments(typedComments);
     }
   };
 
@@ -60,7 +66,6 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ prototypeId }) =
 
     if (error) {
       console.error('Error creating comment:', error);
-      // Add your error handling/notification here
       return;
     }
 

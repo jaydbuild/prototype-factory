@@ -1,6 +1,8 @@
+
 import { useState } from 'react';
 import { useSupabase } from '@/lib/supabase-provider';
 import { Comment, CommentPosition } from '@/types/comment';
+import { Json } from '@/integrations/supabase/types';
 
 export const useCommentManagement = (comment: Comment, onUpdate: () => void) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -83,6 +85,15 @@ export const useCommentManagement = (comment: Comment, onUpdate: () => void) => 
 
     setIsLoading(true);
     try {
+      // Convert position to Json type
+      const positionJson: Json = {
+        x: comment.position.x,
+        y: comment.position.y,
+        width: comment.position.width,
+        height: comment.position.height,
+        scrollPosition: comment.position.scrollPosition
+      };
+
       const { error } = await supabase
         .from('comments')
         .insert({
@@ -91,7 +102,7 @@ export const useCommentManagement = (comment: Comment, onUpdate: () => void) => 
           prototype_id: comment.prototype_id,
           created_by: session.user.id,
           status: 'open',
-          position: comment.position, // Use parent comment's position for replies
+          position: positionJson,
         });
 
       if (error) throw error;
