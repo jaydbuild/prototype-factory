@@ -15,7 +15,7 @@ const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined
 
 export interface SupabaseProviderProps {
   children: React.ReactNode;
-  session: Session | null;
+  session: Session;
 }
 
 export function SupabaseProvider({ children, session: initialSession }: SupabaseProviderProps) {
@@ -23,11 +23,17 @@ export function SupabaseProvider({ children, session: initialSession }: Supabase
   const navigate = useNavigate();
 
   useEffect(() => {
+    setSession(initialSession);
+  }, [initialSession]);
+
+  useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      navigate(0); // Using navigate(0) instead of router.refresh() for React Router
+      if (!session) {
+        navigate('/auth');
+      }
     });
 
     return () => {

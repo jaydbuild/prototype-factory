@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { PrototypeDetail } from "@/components/PrototypeDetail";
+import { SupabaseProvider } from "@/lib/supabase-provider";
+import { Session } from "@supabase/supabase-js";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,8 +22,12 @@ const queryClient = new QueryClient({
   },
 });
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const [session, setSession] = useState<any>(null);
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,37 +73,47 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/auth" replace />;
   }
 
-  return children;
+  return (
+    <SupabaseProvider session={session}>
+      {children}
+    </SupabaseProvider>
+  );
+};
+
+const AppContent = () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Index />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/prototype/:id"
+          element={
+            <ProtectedRoute>
+              <PrototypeDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <Toaster />
+      <Sonner />
+    </BrowserRouter>
+  );
 };
 
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/prototype/:id"
-              element={
-                <ProtectedRoute>
-                  <PrototypeDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        <Toaster />
-        <Sonner />
+        <AppContent />
       </TooltipProvider>
     </QueryClientProvider>
   );
