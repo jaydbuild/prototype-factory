@@ -1,81 +1,63 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { CommentPosition } from '@/types/comment';
+import { Card } from './ui/card';
+import { X } from 'lucide-react';
 
 interface AddCommentFormProps {
-  position: CommentPosition;
-  onSubmit: (content: string) => Promise<any>;
+  onSubmit: (content: string) => void;
   onCancel: () => void;
 }
 
-export const AddCommentForm = ({ position, onSubmit, onCancel }: AddCommentFormProps) => {
+export const AddCommentForm = ({ onSubmit, onCancel }: AddCommentFormProps) => {
   const [content, setContent] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) {
-      setError('Comment cannot be empty');
-      return;
-    }
-
-    try {
-      setError(null);
-      setIsSubmitting(true);
-      await onSubmit(content);
-      setContent('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add comment');
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!content.trim()) return;
+    onSubmit(content);
+    setContent('');
   };
 
   return (
-    <form 
-      onSubmit={handleSubmit}
-      onClick={(e) => e.stopPropagation()} // Add this to stop click propagation
-      onMouseDown={(e) => e.stopPropagation()} // Add this to stop mousedown propagation
-      onMouseUp={(e) => e.stopPropagation()} // Add this to stop mouseup propagation
-      onMouseMove={(e) => e.stopPropagation()} // Add this to stop mousemove propagation
-      className="absolute bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-50" // Added z-50 to ensure form stays on top
-      style={{
-        left: `${position.x}%`,
-        top: `${position.y + position.height}%`,
-        minWidth: '300px',
-      }}
-    >
-      <Textarea
-        value={content}
-        onChange={(e) => {
-          setContent(e.target.value);
-          setError(null);
-        }}
-        placeholder="Add your comment..."
-        className={`min-h-[100px] mb-2 ${error ? 'border-red-500' : ''}`}
-        disabled={isSubmitting}
-      />
-      {error && (
-        <p className="text-sm text-red-500 mb-2">{error}</p>
-      )}
-      <div className="flex justify-end gap-2">
+    <Card className="w-72 p-3 shadow-lg">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-sm font-medium">Add Comment</h3>
         <Button
-          type="button"
-          variant="outline"
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
           onClick={onCancel}
-          disabled={isSubmitting}
         >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={!content.trim() || isSubmitting}
-        >
-          {isSubmitting ? 'Adding...' : 'Add Comment'}
+          <X className="h-4 w-4" />
         </Button>
       </div>
-    </form>
+      <form onSubmit={handleSubmit}>
+        <Textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Type your comment here..."
+          className="min-h-[80px] mb-2"
+          autoFocus
+        />
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!content.trim()}
+          >
+            Add
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 };

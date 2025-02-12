@@ -1,15 +1,17 @@
-
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { CommentOverlay } from "./CommentOverlay";
 
 interface PreviewIframeProps {
   url: string;
   title: string;
+  prototypeId: string;
 }
 
-export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
+const PreviewIframe = forwardRef<HTMLIFrameElement, PreviewIframeProps>(
+  ({ url, title, prototypeId }, ref) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -68,27 +70,39 @@ export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
   }
 
   return (
-    <div className="relative w-full h-full flex flex-col min-h-0">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-foreground"></div>
-            <p className="text-sm text-muted-foreground">Loading preview...</p>
+    <CommentOverlay prototypeId={prototypeId}>
+      <div className="relative w-full h-full flex flex-col min-h-0 pointer-events-auto">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted">
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-sm text-muted-foreground">Loading preview...</p>
+            </div>
           </div>
-        </div>
-      )}
-      <iframe
-        src={sanitizedUrl}
-        title={title}
-        className="flex-1 w-full"
-        style={{ height: '100%', width: '100%', display: 'block' }}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        loading="lazy"
-        onLoad={handleLoad}
-        onError={handleError}
-        referrerPolicy="no-referrer"
-        scrolling="auto"
-      />
-    </div>
+        )}
+        <iframe
+          ref={ref}
+          src={sanitizedUrl}
+          title={title}
+          className="flex-1 w-full"
+          style={{ 
+            height: '100%',
+            width: '100%',
+            display: 'block',
+            border: 'none',
+            pointerEvents: 'auto' // Always allow interactions
+          }}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-top-navigation"
+          loading="lazy"
+          onLoad={handleLoad}
+          onError={handleError}
+          referrerPolicy="no-referrer"
+          scrolling="auto"
+        />
+      </div>
+    </CommentOverlay>
   );
-};
+});
+
+PreviewIframe.displayName = 'PreviewIframe';
+
+export { PreviewIframe };

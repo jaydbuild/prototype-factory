@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Popover } from '@headlessui/react';
-import { Comment } from '@/types/comment';
+import { Comment, CommentStatus } from '@/types/comment';
 import clsx from 'clsx';
 
 interface CommentMarkerProps {
   comment: Comment;
-  onStatusChange: (id: string, status: Comment['status']) => void;
+  scrollOffset: { x: number; y: number };
+  onStatusChange: (commentId: string, status: CommentStatus) => Promise<void>;
   isSelected?: boolean;
   onSelect: () => void;
 }
@@ -16,20 +17,27 @@ const statusColors = {
   'needs review': 'bg-yellow-500'
 };
 
-export const CommentMarker = ({ comment, onStatusChange, isSelected, onSelect }: CommentMarkerProps) => {
+export const CommentMarker = ({ comment, scrollOffset, onStatusChange, isSelected, onSelect }: CommentMarkerProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
+  const adjustedPosition = {
+    x: comment.position.x - scrollOffset.x,
+    y: comment.position.y - scrollOffset.y,
+    width: comment.position.width,
+    height: comment.position.height
+  };
+
   const hasValidPosition = 
-    typeof comment.position?.x === 'number' &&
-    typeof comment.position?.y === 'number' &&
-    (comment.position.width ?? 0) > 0 && 
-    (comment.position.height ?? 0) > 0;
+    typeof adjustedPosition.x === 'number' &&
+    typeof adjustedPosition.y === 'number' &&
+    (adjustedPosition.width ?? 0) > 0 && 
+    (adjustedPosition.height ?? 0) > 0;
 
   const positionStyle = {
-    left: `${comment.position.x}%`,
-    top: `${comment.position.y}%`,
-    width: hasValidPosition ? `${comment.position.width}%` : 'auto',
-    height: hasValidPosition ? `${comment.position.height}%` : 'auto',
+    left: `${adjustedPosition.x}%`,
+    top: `${adjustedPosition.y}%`,
+    width: hasValidPosition ? `${adjustedPosition.width}%` : 'auto',
+    height: hasValidPosition ? `${adjustedPosition.height}%` : 'auto',
     transform: hasValidPosition ? 'none' : 'translate(-50%, -50%)',
     zIndex: isSelected ? 50 : isHovered ? 40 : 30
   };
@@ -96,7 +104,7 @@ export const CommentMarker = ({ comment, onStatusChange, isSelected, onSelect }:
               <div className="flex gap-2">
                 <select
                   value={comment.status}
-                  onChange={(e) => onStatusChange(comment.id, e.target.value as Comment['status'])}
+                  onChange={(e) => onStatusChange(comment.id, e.target.value as CommentStatus)}
                   className="text-xs border rounded px-2 py-1"
                 >
                   <option value="open">Open</option>

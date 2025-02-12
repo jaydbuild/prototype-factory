@@ -1,9 +1,7 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PreviewIframe } from "./PreviewIframe";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff, Share2 } from "lucide-react";
@@ -15,7 +13,6 @@ export const PrototypeDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showUI, setShowUI] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>("preview");
 
   const { data: prototype, isLoading } = useQuery({
     queryKey: ['prototype', id],
@@ -38,15 +35,6 @@ export const PrototypeDetail = () => {
       return data;
     }
   });
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    if (value === "comments") {
-      toast({
-        description: "Click and drag to highlight an area for commenting",
-      });
-    }
-  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -74,20 +62,30 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden">
-      <Tabs 
-        value={activeTab} 
-        onValueChange={handleTabChange} 
-        className="flex-1 flex flex-col min-h-0"
-      >
+      <div className="flex-1 min-h-0 relative">
+        {/* Preview with Comments */}
+        <div className="absolute inset-0">
+          {id && (
+            <CommentOverlay prototypeId={id}>
+              <PreviewIframe 
+                url={prototype.preview_url || prototype.url}
+                title={prototype.name}
+                prototypeId={id}
+              />
+            </CommentOverlay>
+          )}
+        </div>
+
+        {/* UI Layer */}
         {showUI && (
-          <>
+          <div className="absolute inset-0 pointer-events-none">
             <div className="flex justify-between items-center p-2 gap-2 shrink-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pointer-events-auto">
                 <Button
                   variant="ghost"
                   size="icon"
                   className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate(-1)}
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -96,7 +94,7 @@ export const PrototypeDetail = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pointer-events-auto">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -105,40 +103,21 @@ export const PrototypeDetail = () => {
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
-                <TabsList className="bg-background/80 backdrop-blur-sm px-2 rounded-lg">
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                  <TabsTrigger value="comments">Comments</TabsTrigger>
-                </TabsList>
               </div>
             </div>
-
-            <div className="absolute inset-0 top-[3.5rem] z-20">
-              {id && <CommentOverlay prototypeId={id} isCommentMode={activeTab === "comments"} />}
-            </div>
-
-            <TabsContent 
-              value="comments"
-              className="absolute top-16 right-2 z-30 w-96 max-h-[calc(100vh-5rem)] bg-background/80 backdrop-blur-sm rounded-lg shadow-lg transform transition-transform m-0"
-            />
-          </>
+          </div>
         )}
+      </div>
 
-        <div className="flex-1 min-h-0 relative">
-          <PreviewIframe 
-            url={prototype.preview_url || prototype.url}
-            title={prototype.name}
-          />
-        </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute bottom-4 right-4 z-30 bg-background/80 backdrop-blur-sm hover:bg-background/90"
-          onClick={() => setShowUI(!showUI)}
-        >
-          {showUI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </Button>
-      </Tabs>
+      {/* Toggle UI Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+        onClick={() => setShowUI(!showUI)}
+      >
+        {showUI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </Button>
     </div>
   );
 };

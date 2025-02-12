@@ -1,13 +1,14 @@
-
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import React, { useState } from 'react';
+import { PreviewIframe } from './PreviewIframe';
 
 interface PreviewWindowProps {
   url: string;
   onShare: () => void;
+  prototypeId: string;
 }
 
-export const PreviewWindow = ({ url, onShare }: PreviewWindowProps) => {
+export const PreviewWindow = ({ url, onShare, prototypeId }: PreviewWindowProps) => {
   const [key, setKey] = useState(0);
 
   const handleRefresh = () => {
@@ -39,14 +40,11 @@ export const PreviewWindow = ({ url, onShare }: PreviewWindowProps) => {
         </div>
       </div>
       <div className="flex-1 min-h-0">
-        <iframe
+        <PreviewIframe
           key={key}
-          src={url}
-          className="w-full h-full"
-          style={{ height: '100%', width: '100%', display: 'block' }}
+          url={url}
           title="Preview"
-          scrolling="auto"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          prototypeId={prototypeId}
         />
       </div>
     </div>
