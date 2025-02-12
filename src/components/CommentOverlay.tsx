@@ -6,6 +6,7 @@ import { CommentList } from './CommentList';
 import { Comment, CommentFilter, CommentPosition } from '@/types/comment';
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/lib/supabase-provider';
+import clsx from 'clsx';
 
 interface CommentOverlayProps {
   prototypeId: string;
@@ -25,7 +26,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   const { session } = useSupabase();
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isCommentMode || selectedPosition || e.button !== 0) return; // Only proceed if in comment mode and left click
+    if (!isCommentMode || selectedPosition || e.button !== 0) return;
     
     const rect = overlayRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -38,7 +39,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing || !drawStart || !isCommentMode) return; // Only move if in drawing mode
+    if (!isDrawing || !drawStart || !isCommentMode) return;
 
     const rect = overlayRef.current.getBoundingClientRect();
     const currentX = ((e.clientX - rect.left) / rect.width) * 100;
@@ -55,11 +56,9 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
 
   const handleMouseUp = () => {
     if (isDrawing && selectedPosition) {
-      // Only open comment form if the rectangle has meaningful dimensions
       if (selectedPosition.width > 1 && selectedPosition.height > 1) {
         setIsDrawing(false);
       } else {
-        // Reset if the rectangle is too small
         setSelectedPosition(null);
       }
     }
@@ -81,7 +80,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
       });
 
       setSelectedPosition(null);
-      setSelectedComment(newComment); // Select the newly added comment
+      setSelectedComment(newComment);
 
       toast({
         title: "Success",
@@ -96,7 +95,7 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
         title: "Error",
         description: message,
       });
-      throw error; // Re-throw to let AddCommentForm handle UI state
+      throw error;
     }
   };
 
@@ -161,61 +160,58 @@ export const CommentOverlay = ({ prototypeId, isCommentMode }: CommentOverlayPro
   }
 
   return (
-    <div className="absolute inset-0 flex flex-row-reverse pointer-events-none">
-      <div 
-        ref={overlayRef}
-        style={{ cursor: isCommentMode && !selectedPosition ? 'crosshair' : 'default' }}
-        className={`absolute inset-0 ${isCommentMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          setIsDrawing(false);
-          setDrawStart(null);
-        }}
-        role="region"
-        aria-label="Prototype preview with comments"
-      >
-        {/* Drawing overlay */}
-        {isDrawing && selectedPosition && !selectedComment && (
-          <div 
-            className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none"
-            style={{
-              left: `${selectedPosition.x}%`,
-              top: `${selectedPosition.y}%`,
-              width: `${selectedPosition.width}%`,
-              height: `${selectedPosition.height}%`,
-            }}
-          />
-        )}
-
-        {comments.map((comment) => (
-          <CommentMarker
-            key={comment.id}
-            comment={comment}
-            onStatusChange={updateCommentStatus}
-            isSelected={selectedComment?.id === comment.id}
-            onSelect={() => setSelectedComment(comment)}
-          />
-        ))}
-
-        {selectedPosition && !isDrawing && (
-          <AddCommentForm
-            position={selectedPosition}
-            onSubmit={handleAddComment}
-            onCancel={() => setSelectedPosition(null)}
-          />
-        )}
-
-        {loading && (
-          <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        )}
+    <div className="relative h-full flex flex-col">
+      <div className="flex-1 overflow-auto">
+        <div 
+          ref={overlayRef}
+          className={clsx(
+            'absolute inset-0 contain-strict will-change-transform',
+            isCommentMode ? 'pointer-events-auto' : 'pointer-events-none',
+            isCommentMode && !selectedPosition && 'cursor-crosshair'
+          )}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          role="region"
+          aria-label="Prototype preview with comments"
+        >
+          {isDrawing && selectedPosition && !selectedComment && (
+            <div 
+              className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none"
+              style={{
+                left: `${selectedPosition.x}%`,
+                top: `${selectedPosition.y}%`,
+                width: `${selectedPosition.width}%`,
+                height: `${selectedPosition.height}%`,
+              }}
+            />
+          )}
+          {comments.map((comment) => (
+            <CommentMarker
+              key={comment.id}
+              comment={comment}
+              onStatusChange={updateCommentStatus}
+              isSelected={selectedComment?.id === comment.id}
+              onSelect={() => setSelectedComment(comment)}
+            />
+          ))}
+          {selectedPosition && !isDrawing && (
+            <AddCommentForm
+              position={selectedPosition}
+              onSubmit={handleAddComment}
+              onCancel={() => setSelectedPosition(null)}
+            />
+          )}
+          {loading && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          )}
+        </div>
       </div>
-
       {isCommentMode && (
         <CommentList
+          prototypeId={prototypeId}
           comments={comments}
           onStatusChange={updateCommentStatus}
           onCommentSelect={setSelectedComment}

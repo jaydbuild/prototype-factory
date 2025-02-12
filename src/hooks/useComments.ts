@@ -164,6 +164,21 @@ export const useComments = (prototypeId: string) => {
     });
   };
 
+  const resolveAllComments = async () => {
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ status: 'resolved' })
+        .eq('prototype_id', prototypeId)
+        .eq('status', 'open');
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchComments();
     
@@ -224,6 +239,7 @@ export const useComments = (prototypeId: string) => {
     deleteComment,
     updateCommentStatus,
     addReply,
+    resolveAllComments,
     refreshComments: fetchComments
   };
 };

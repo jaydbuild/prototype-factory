@@ -37,7 +37,7 @@ export const PreviewWindow = ({ url, onShare }: PreviewWindowProps) => {
           </button>
         </div>
       </div>
-      <div className="flex-1 bg-white">
+      <div className="flex-1 bg-white overflow-auto">
         <iframe
           key={key}
           src={url}

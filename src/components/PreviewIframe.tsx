@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, AlertCircle } from "lucide-react";
@@ -80,7 +79,7 @@ export const PreviewIframe = ({ url, title }: PreviewIframeProps) => {
       <iframe
         src={sanitizedUrl}
         title={title}
-        className="w-full h-full border-0"
+        className="w-full h-full border-0 overflow-auto"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         loading="lazy"
         onLoad={handleLoad}

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -73,7 +72,7 @@ export const PrototypeDetail = () => {
   };
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <div className="fixed inset-0 overflow-auto">
       <div className="absolute inset-0 z-10">
         <PreviewIframe 
           url={prototype.preview_url || prototype.url}

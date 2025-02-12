@@ -1,7 +1,7 @@
-
 import { useState } from 'react';
 import { Popover } from '@headlessui/react';
 import { Comment } from '@/types/comment';
+import clsx from 'clsx';
 
 interface CommentMarkerProps {
   comment: Comment;
@@ -19,25 +19,34 @@ const statusColors = {
 export const CommentMarker = ({ comment, onStatusChange, isSelected, onSelect }: CommentMarkerProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  const hasRectangle = comment.position.width && comment.position.height;
+  const hasValidPosition = 
+    typeof comment.position?.x === 'number' &&
+    typeof comment.position?.y === 'number' &&
+    (comment.position.width ?? 0) > 0 && 
+    (comment.position.height ?? 0) > 0;
+
+  const positionStyle = {
+    left: `${comment.position.x}%`,
+    top: `${comment.position.y}%`,
+    width: hasValidPosition ? `${comment.position.width}%` : 'auto',
+    height: hasValidPosition ? `${comment.position.height}%` : 'auto',
+    transform: hasValidPosition ? 'none' : 'translate(-50%, -50%)',
+    zIndex: isSelected ? 50 : isHovered ? 40 : 30
+  };
 
   return (
-    <Popover className="absolute" style={{
-      left: `${comment.position.x}%`,
-      top: `${comment.position.y}%`,
-      width: hasRectangle ? `${comment.position.width}%` : 'auto',
-      height: hasRectangle ? `${comment.position.height}%` : 'auto',
-      transform: hasRectangle ? 'none' : 'translate(-50%, -50%)'
-    }}>
+    <Popover className="absolute" style={positionStyle}>
       {({ open }) => (
         <>
-          {hasRectangle ? (
+          {hasValidPosition ? (
             <div 
-              className={`absolute inset-0 border-2 ${
+              className={clsx(
+                'absolute inset-0 border-2',
                 isSelected || open || isHovered 
                   ? `border-${statusColors[comment.status].replace('bg-', '')}` 
-                  : 'border-transparent'
-              } transition-colors duration-200`}
+                  : 'border-transparent',
+                'transition-colors duration-200'
+              )}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               onClick={(e) => {
@@ -46,17 +55,25 @@ export const CommentMarker = ({ comment, onStatusChange, isSelected, onSelect }:
               }}
             >
               <Popover.Button
-                className={`absolute -top-3 -left-3 w-6 h-6 rounded-full ${statusColors[comment.status]} 
-                  shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                  ${open || isHovered || isSelected ? 'ring-2 ring-white' : ''}`}
+                className={clsx(
+                  'absolute -top-3 -left-3 w-6 h-6 rounded-full',
+                  statusColors[comment.status],
+                  'shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl',
+                  'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
+                  (open || isHovered || isSelected) && 'ring-2 ring-white'
+                )}
                 aria-label={`Comment by ${comment.profiles?.name || 'Unknown user'}: ${comment.content.substring(0, 50)}${comment.content.length > 50 ? '...' : ''}`}
               />
             </div>
           ) : (
             <Popover.Button
-              className={`w-6 h-6 rounded-full ${statusColors[comment.status]} 
-                shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                ${open || isHovered || isSelected ? 'ring-2 ring-white' : ''}`}
+              className={clsx(
+                'w-6 h-6 rounded-full',
+                statusColors[comment.status],
+                'shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl',
+                'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
+                (open || isHovered || isSelected) && 'ring-2 ring-white'
+              )}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               onClick={(e) => {
@@ -68,9 +85,7 @@ export const CommentMarker = ({ comment, onStatusChange, isSelected, onSelect }:
           )}
           
           {(open || isHovered) && (
-            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 
-              bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap z-50
-              animate-fade-in">
+            <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap z-50 animate-fade-in">
               {comment.content.substring(0, 20)}...
             </span>
           )}
