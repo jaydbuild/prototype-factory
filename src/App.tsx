@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +11,8 @@ import NotFound from "./pages/NotFound";
 import { PrototypeDetail } from "@/components/PrototypeDetail";
 import { SupabaseProvider } from "@/lib/supabase-provider";
 import { Session } from "@supabase/supabase-js";
+import LoginPage from './components/login-page';
+import Dashboard from './components/dashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,12 +82,18 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 };
 
 const AppContent = () => {
+  const hasSkippedLogin = localStorage.getItem('skippedLogin') === 'true';
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route
           path="/"
+          element={hasSkippedLogin ? <Navigate to="/dashboard" /> : <LoginPage />}
+        />
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Index />

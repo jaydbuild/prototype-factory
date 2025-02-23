@@ -126,7 +126,7 @@ serve(async (req) => {
       }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing prototype:', error)
 
     // Update prototype status to failed
@@ -143,7 +143,7 @@ serve(async (req) => {
       .eq('id', prototypeId)
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'An unknown error occurred' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,

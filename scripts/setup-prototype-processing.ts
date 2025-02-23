@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
-import { execSync } from 'child_process'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 // Load environment variables
 dotenv.config()
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY
@@ -75,28 +78,14 @@ async function setupPrototypeProcessing() {
     })
     console.log('✅ Created policy for prototype-deployments bucket')
 
-    // 3. Deploy Edge Function
-    console.log('\n🔧 Deploying Edge Function...')
-    
-    // Get the absolute path to the functions directory
-    const functionsDir = path.resolve(__dirname, '../supabase/functions')
-    
-    try {
-      // Deploy the function
-      execSync('supabase functions deploy process-prototype', {
-        cwd: functionsDir,
-        stdio: 'inherit'
-      })
-      console.log('✅ Deployed process-prototype function')
-    } catch (error) {
-      console.error('❌ Failed to deploy function:', error)
-      throw error
-    }
-
-    console.log('\n✨ Setup completed successfully!')
+    console.log('\n✨ Storage setup completed successfully!')
     console.log('\nNext steps:')
-    console.log('1. Make sure your .env file contains VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
-    console.log('2. Restart your development server')
+    console.log('1. Deploy the Edge Function manually through the Supabase Dashboard:')
+    console.log('   - Go to https://app.supabase.com/project/_/functions')
+    console.log('   - Create a new function named "process-prototype"')
+    console.log('   - Copy the contents of supabase/functions/process-prototype/index.ts')
+    console.log('2. Make sure your .env file contains VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
+    console.log('3. Restart your development server')
 
   } catch (error) {
     console.error('\n❌ Setup failed:', error)

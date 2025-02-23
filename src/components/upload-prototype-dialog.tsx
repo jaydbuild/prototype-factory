@@ -15,18 +15,19 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Loader2 } from "lucide-react";
+import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 
-export function UploadPrototypeDialog() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: async (acceptedFiles) => {
-      if (acceptedFiles.length === 0) return;
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    try {
+      const file = acceptedFiles[0];
+      if (!file) return;
+
       if (!name.trim()) {
         toast({
           title: "Error",
@@ -36,110 +37,75 @@ export function UploadPrototypeDialog() {
         return;
       }
 
-      setIsUploading(true);
-      try {
-        // Create a new prototype entry
-        const { data: prototype, error: prototypeError } = await supabase
-          .from("prototypes")
-          .insert({
-            name,
-            deployment_status: "pending",
-          })
-          .select()
-          .single();
-
-        if (prototypeError) throw prototypeError;
-
-        // Upload files to storage
-        const timestamp = new Date().getTime();
-        const folderPath = `prototypes/${prototype.id}_${timestamp}`;
-        
-        // Handle zip file or individual files
-        if (acceptedFiles.length === 1 && acceptedFiles[0].name.endsWith('.zip')) {
-          const { error: uploadError } = await supabase.storage
-            .from('prototype-files')
-            .upload(`${folderPath}/source.zip`, acceptedFiles[0]);
-
-          if (uploadError) throw uploadError;
-        } else {
-          // Upload individual files
-          for (const file of acceptedFiles) {
-            const { error: uploadError } = await supabase.storage
-              .from('prototype-files')
-              .upload(`${folderPath}/${file.name}`, file);
-
-            if (uploadError) throw uploadError;
-          }
-        }
-
-        // Update prototype with files path
-        const { error: updateError } = await supabase
-          .from("prototypes")
-          .update({
-            files_path: folderPath,
-          })
-          .eq("id", prototype.id);
-
-        if (updateError) throw updateError;
-
-        // Trigger processing function
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-prototype`,
+      // Create a new prototype entry
+      const { data: prototype, error: prototypeError } = await supabase
+        .from('prototypes')
+        .insert([
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.auth.session()?.access_token}`,
-            },
-            body: JSON.stringify({
-              prototypeId: prototype.id,
-              folderPath: folderPath,
-            }),
+            name: name,
+            deployment_status: 'pending'
           }
-        );
+        ])
+        .select()
+        .single();
 
-        if (!response.ok) {
-          throw new Error('Failed to trigger prototype processing');
-        }
+      if (prototypeError) throw prototypeError;
 
-        toast({
-          title: "Success",
-          description: "Prototype files uploaded and processing started",
-        });
+      // Upload the file
+      const { error: uploadError } = await supabase.storage
+        .from('prototype-uploads')
+        .upload(`${prototype.id}/${file.name}`, file);
 
-        queryClient.invalidateQueries(["prototypes"]);
-        setIsOpen(false);
-      } catch (error) {
-        console.error("Upload error:", error);
-        toast({
-          title: "Error",
-          description: "Failed to upload prototype files",
-          variant: "destructive",
-        });
-      } finally {
-        setIsUploading(false);
+      if (uploadError) throw uploadError;
+
+      // Trigger the processing function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-prototype`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prototypeId: prototype.id,
+          fileName: file.name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process prototype');
       }
-    },
+
+      toast({
+        title: "Success",
+        description: "Prototype uploaded successfully. Processing will begin shortly.",
+      });
+
+      queryClient.invalidateQueries(["prototypes"]);
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error uploading prototype:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload prototype",
+        variant: "destructive",
+      });
+    }
+  }, [name, onOpenChange, queryClient]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    maxFiles: 1,
     accept: {
-      "text/html": [".html"],
-      "text/css": [".css"],
-      "text/javascript": [".js"],
-      "application/zip": [".zip"],
+      'application/zip': ['.zip'],
+      'text/html': ['.html'],
     },
-    multiple: true,
   });
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload Prototype
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Prototype Files</DialogTitle>
+          <DialogTitle>Upload Prototype</DialogTitle>
           <DialogDescription>
             Upload your HTML, CSS, and JavaScript files or a ZIP package containing your prototype.
           </DialogDescription>
@@ -159,29 +125,29 @@ export function UploadPrototypeDialog() {
           </div>
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive ? "border-primary bg-primary/5" : "border-muted"
-            }`}
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+              ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted'}
+            `}
           >
             <input {...getInputProps()} />
-            {isDragActive ? (
-              <p>Drop the files here...</p>
-            ) : (
-              <p>Drag and drop files here, or click to select files</p>
-            )}
-            <p className="text-sm text-muted-foreground mt-2">
-              Accepts HTML, CSS, JavaScript files or a ZIP package
+            <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isDragActive
+                ? "Drop your prototype here"
+                : "Drag and drop your prototype here, or click to select"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Upload a ZIP file containing your prototype or a single HTML file
             </p>
           </div>
         </div>
         <DialogFooter>
           <Button
             type="submit"
-            disabled={isUploading}
             onClick={() => document.querySelector('input[type="file"]')?.click()}
           >
-            {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isUploading ? "Uploading..." : "Select Files"}
+            Select Files
           </Button>
         </DialogFooter>
       </DialogContent>
