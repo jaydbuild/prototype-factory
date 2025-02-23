@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 interface AddPrototypeDialogProps {
   open: boolean;
@@ -18,24 +19,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const createPrototype = async (prototypeData: {
-    name: string;
-    url?: string;
-    preview_url?: string | null;
-    preview_description?: string | null;
-    preview_image?: string | null;
-    file_path?: string | null;
-  }) => {
-    const { data, error } = await supabase
-      .from('prototypes')
-      .insert([prototypeData])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  };
+  const navigate = useNavigate();
 
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -48,14 +32,28 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       return;
     }
 
+    // Get current user session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      toast({
+        title: 'Error',
+        description: 'Please sign in to upload prototypes',
+        variant: 'destructive',
+      });
+      navigate('/auth');
+      return;
+    }
+
     setIsUploading(true);
     try {
-      // Create prototype entry first
+      // Create prototype entry first with user ID
       const { data: prototype, error: prototypeError } = await supabase
         .from('prototypes')
         .insert([{
           name: name.trim(),
           url: 'pending',
+          created_by: session.user.id // Add the user ID here
         }])
         .select()
         .single();
@@ -69,6 +67,14 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
+
+      // Update prototype with file path
+      const { error: updateError } = await supabase
+        .from('prototypes')
+        .update({ file_path: filePath })
+        .eq('id', prototype.id);
+
+      if (updateError) throw updateError;
 
       // Trigger processing
       const { error: processError } = await supabase.functions
