@@ -37,39 +37,45 @@ export interface Database {
           id: string
           created_at: string
           name: string
-          url: string
+          url: string | null
           created_by: string
           preview_url: string | null
           preview_title: string | null
           preview_description: string | null
           preview_image: string | null
+          file_path: string | null
           updated_at: string
         }
         Insert: {
           id?: string
           created_at?: string
           name: string
-          url: string
-          created_by: string
+          url?: string | null
+          created_by?: string
           preview_url?: string | null
           preview_title?: string | null
           preview_description?: string | null
           preview_image?: string | null
+          file_path?: string | null
           updated_at?: string
         }
         Update: {
           id?: string
           created_at?: string
           name?: string
-          url?: string
+          url?: string | null
           created_by?: string
           preview_url?: string | null
           preview_title?: string | null
           preview_description?: string | null
           preview_image?: string | null
+          file_path?: string | null
           updated_at?: string
         }
       }
+    }
+    Views: {
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never

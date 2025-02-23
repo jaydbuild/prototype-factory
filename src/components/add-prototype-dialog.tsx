@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2 } from 'lucide-react';
+import type { Database } from '@/types/supabase';
 
 const STORAGE_BUCKET = 'prototype-files';
 
@@ -17,12 +18,26 @@ interface AddPrototypeDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type PrototypeInsert = Database['public']['Tables']['prototypes']['Insert'];
+
 export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogProps) {
   const [name, setName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'link' | 'file'>('link');
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const createPrototype = async (data: Omit<PrototypeInsert, 'created_by' | 'url'>) => {
+    return await supabase
+      .from('prototypes')
+      .insert({
+        ...data,
+        created_by: 'anonymous',
+        url: '' // Required by the schema
+      })
+      .select()
+      .single();
+  };
 
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -38,19 +53,14 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     setIsUploading(true);
     try {
       // Create prototype entry first
-      const { data: prototype, error: prototypeError } = await supabase
-        .from('prototypes')
-        .insert({
-          name: name.trim(),
-          url: null,
-          created_by: 'anonymous',
-          preview_url: null,
-          preview_title: null,
-          preview_description: null,
-          preview_image: null
-        })
-        .select()
-        .single();
+      const { data: prototype, error: prototypeError } = await createPrototype({
+        name: name.trim(),
+        preview_url: null,
+        preview_title: null,
+        preview_description: null,
+        preview_image: null,
+        file_path: null
+      });
 
       if (prototypeError) throw prototypeError;
 
@@ -92,7 +102,9 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       // Update prototype with file path
       const { error: updateError } = await supabase
         .from('prototypes')
-        .update({ file_path: filePath })
+        .update({
+          file_path: filePath
+        })
         .eq('id', prototype.id);
 
       if (updateError) throw updateError;
@@ -139,17 +151,14 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
     setIsUploading(true);
     try {
-      const { error } = await supabase
-        .from('prototypes')
-        .insert({
-          name: name.trim(),
-          url: null,
-          created_by: 'anonymous',
-          preview_url: null,
-          preview_title: null,
-          preview_description: null,
-          preview_image: null
-        });
+      const { error } = await createPrototype({
+        name: name.trim(),
+        preview_url: null,
+        preview_title: null,
+        preview_description: null,
+        preview_image: null,
+        file_path: null
+      });
 
       if (error) throw error;
 
