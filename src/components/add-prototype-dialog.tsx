@@ -68,47 +68,24 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       // Upload file with prototype ID in path
       const filePath = `${prototype.id}/${file.name}`;
       const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
+        .from('prototype-uploads')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
 
-      if (uploadError) {
-        // If bucket doesn't exist, try to create it
-        if (uploadError.message.includes('bucket not found')) {
-          const { data: bucket, error: bucketError } = await supabase.storage
-            .createBucket(STORAGE_BUCKET, {
-              public: false,
-              fileSizeLimit: 52428800, // 50MB
-              allowedMimeTypes: ['application/zip', 'text/html']
-            });
+      if (uploadError) throw uploadError;
 
-          if (bucketError) throw bucketError;
+      // Trigger processing
+      const { data: processResult, error: processError } = await supabase.functions
+        .invoke('process-prototype', {
+          body: {
+            prototypeId: prototype.id,
+            fileName: file.name,
+          },
+        });
 
-          // Retry upload after bucket creation
-          const { error: retryError } = await supabase.storage
-            .from(STORAGE_BUCKET)
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (retryError) throw retryError;
-        } else {
-          throw uploadError;
-        }
-      }
-
-      // Update prototype with file path
-      const { error: updateError } = await supabase
-        .from('prototypes')
-        .update({
-          file_path: filePath
-        })
-        .eq('id', prototype.id);
-
-      if (updateError) throw updateError;
+      if (processError) throw processError;
 
       queryClient.invalidateQueries({ queryKey: ['prototypes'] });
       

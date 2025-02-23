@@ -1,32 +1,25 @@
+
 import { format, parseISO } from "date-fns";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, FileUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PrototypeStatusBadge } from "./prototype-status-badge";
+import type { Prototype } from "@/types/prototype";
 
 interface PrototypeCardProps {
-  prototype: {
-    id: string;
-    name: string;
-    type: 'link' | 'file';
-    url?: string;
-    file_path?: string;
-    preview_url?: string;
-    deployment_status: 'pending' | 'deployed' | 'failed';
-    deployment_url?: string;
-    created_at: string;
-  };
+  prototype: Prototype;
 }
 
 export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
   const timestamp = parseISO(prototype.created_at);
+  const previewUrl = prototype.deployment_url || prototype.preview_url || prototype.url;
 
   return (
     <div className="group relative bg-card rounded-lg border shadow-sm hover:shadow-md transition-shadow">
       <Link to={`/prototype/${prototype.id}`} className="block">
         <div className="aspect-video w-full bg-muted rounded-t-lg overflow-hidden relative">
-          {prototype.preview_url ? (
+          {prototype.preview_image ? (
             <img
-              src={prototype.preview_url}
+              src={prototype.preview_image}
               alt={prototype.name}
               className="w-full h-full object-cover"
             />
@@ -48,17 +41,18 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
           </div>
           
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            {prototype.type === 'link' ? (
+            {prototype.file_path ? (
               <span
-                className="px-2 py-1 bg-secondary rounded-full text-xs"
+                className="px-2 py-1 bg-secondary rounded-full text-xs flex items-center gap-1"
               >
-                Link
+                <FileUp className="w-3 h-3" />
+                Uploaded
               </span>
             ) : (
               <span
                 className="px-2 py-1 bg-secondary rounded-full text-xs"
               >
-                File
+                Link
               </span>
             )}
           </div>
@@ -67,27 +61,16 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
             <time dateTime={timestamp.toISOString()}>
               {format(timestamp, "MMM d, yyyy")}
             </time>
-            {prototype.url && (
+            {previewUrl && (
               <a
-                href={prototype.url}
+                href={previewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-primary hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
-                View Source
+                View
                 <ArrowUpRight className="w-4 h-4" />
-              </a>
-            )}
-            {prototype.deployment_url && (
-              <a
-                href={prototype.deployment_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center hover:text-foreground"
-                onClick={(e) => e.stopPropagation()}
-              >
-                View Live <ArrowUpRight className="ml-1 h-3 w-3" />
               </a>
             )}
           </div>

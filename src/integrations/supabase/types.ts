@@ -125,6 +125,9 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          deployment_status: string | null
+          deployment_url: string | null
+          file_path: string | null
           id: string
           name: string
           preview_description: string | null
@@ -137,6 +140,9 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          deployment_status?: string | null
+          deployment_url?: string | null
+          file_path?: string | null
           id?: string
           name: string
           preview_description?: string | null
@@ -149,6 +155,9 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          deployment_status?: string | null
+          deployment_url?: string | null
+          file_path?: string | null
           id?: string
           name?: string
           preview_description?: string | null
