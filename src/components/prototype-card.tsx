@@ -10,7 +10,9 @@ interface PrototypeCardProps {
 }
 
 export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
-  const timestamp = parseISO(prototype.created_at);
+  if (!prototype) return null;
+  
+  const timestamp = prototype.created_at ? parseISO(prototype.created_at) : new Date();
   const previewUrl = prototype.deployment_url || prototype.preview_url || prototype.url;
 
   return (

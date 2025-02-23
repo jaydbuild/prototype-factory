@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,14 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { AddPrototypeDialog } from "./add-prototype-dialog";
+import type { Prototype } from "@/types/prototype";
 import type { Database } from "@/types/supabase";
-
-type Prototype = Database['public']['Tables']['prototypes']['Row'] & {
-  type: 'link' | 'file';
-  deployment_status: 'pending' | 'deployed' | 'failed';
-  deployment_url?: string;
-  file_path?: string;
-};
 
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -52,16 +47,27 @@ export const PrototypeGrid = () => {
 
         if (error) throw error;
         
-        // Transform the data to match the expected Prototype type
         return (data || []).map((item): Prototype => ({
-          ...item,
-          type: item.url ? 'link' : 'file',
-          deployment_status: 'pending',
-          deployment_url: undefined,
-          file_path: undefined
+          id: item.id,
+          name: item.name,
+          created_at: item.created_at,
+          created_by: item.created_by,
+          url: item.url,
+          preview_url: item.preview_url,
+          preview_title: item.preview_title,
+          preview_description: item.preview_description,
+          preview_image: item.preview_image,
+          deployment_status: item.deployment_status as 'pending' | 'deployed' | 'failed' | undefined,
+          deployment_url: item.deployment_url,
+          file_path: item.file_path
         }));
       } catch (error: any) {
         console.error('Error fetching prototypes:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch prototypes",
+          variant: "destructive",
+        });
         return [];
       }
     },

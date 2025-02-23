@@ -1,43 +1,40 @@
-import { useState } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
-import { useDropzone } from 'react-dropzone';
-import { Upload, Loader2 } from 'lucide-react';
-import type { Database } from '@/types/supabase';
 
-// Storage bucket for prototype files (HTML and ZIP archives)
-const STORAGE_BUCKET = 'prototype-files';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AddPrototypeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type PrototypeInsert = Database['public']['Tables']['prototypes']['Insert'];
-
 export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogProps) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'link' | 'file'>('link');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const createPrototype = async (data: Omit<PrototypeInsert, 'created_by' | 'url'>) => {
-    return await supabase
+  const createPrototype = async (prototypeData: {
+    name: string;
+    url?: string;
+    preview_url?: string | null;
+    preview_description?: string | null;
+    preview_image?: string | null;
+    file_path?: string | null;
+  }) => {
+    const { data, error } = await supabase
       .from('prototypes')
-      .insert({
-        ...data,
-        created_by: 'anonymous',
-        url: '' // Required by the schema
-      })
+      .insert([prototypeData])
       .select()
       .single();
+
+    if (error) throw error;
+    return data;
   };
 
   const onDrop = async (acceptedFiles: File[]) => {
@@ -54,35 +51,29 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     setIsUploading(true);
     try {
       // Create prototype entry first
-      const { data: prototype, error: prototypeError } = await createPrototype({
-        name: name.trim(),
-        preview_url: null,
-        preview_title: null,
-        preview_description: null,
-        preview_image: null,
-        file_path: null
-      });
+      const { data: prototype, error: prototypeError } = await supabase
+        .from('prototypes')
+        .insert([{
+          name: name.trim(),
+          url: 'pending',
+        }])
+        .select()
+        .single();
 
       if (prototypeError) throw prototypeError;
 
-      // Upload file with prototype ID in path
+      // Upload file
       const filePath = `${prototype.id}/${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('prototype-uploads')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       // Trigger processing
-      const { data: processResult, error: processError } = await supabase.functions
+      const { error: processError } = await supabase.functions
         .invoke('process-prototype', {
-          body: {
-            prototypeId: prototype.id,
-            fileName: file.name,
-          },
+          body: { prototypeId: prototype.id, fileName: file.name },
         });
 
       if (processError) throw processError;
@@ -108,128 +99,48 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    maxFiles: 1,
     accept: {
-      'application/zip': ['.zip'],
-      'text/html': ['.html']
-    }
+      'text/html': ['.html'],
+      'application/zip': ['.zip']
+    },
+    maxFiles: 1,
+    disabled: isUploading
   });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please provide a name for the prototype',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const { error } = await createPrototype({
-        name: name.trim(),
-        preview_url: null,
-        preview_title: null,
-        preview_description: null,
-        preview_image: null,
-        file_path: null
-      });
-
-      if (error) throw error;
-
-      queryClient.invalidateQueries({ queryKey: ['prototypes'] });
-      
-      toast({
-        title: 'Success',
-        description: 'Prototype added successfully',
-      });
-      onOpenChange(false);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Prototype</DialogTitle>
+          <DialogTitle>Add New Prototype</DialogTitle>
         </DialogHeader>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'link' | 'file')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="link">Link</TabsTrigger>
-            <TabsTrigger value="file">File</TabsTrigger>
-          </TabsList>
-          <TabsContent value="link">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter prototype name"
-                  disabled={isUploading}
-                />
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={isUploading}>
-                  {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add Prototype
-                </Button>
-              </DialogFooter>
-            </form>
-          </TabsContent>
-          <TabsContent value="file">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter prototype name"
-                  disabled={isUploading}
-                />
-              </div>
-              <div
-                {...getRootProps()}
-                className={`
-                  border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-                  ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted'}
-                  ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                <input {...getInputProps()} disabled={isUploading} />
-                <Upload className="w-8 h-8 mx-auto mb-4 text-muted-foreground" />
-                {isUploading ? (
-                  <div className="flex items-center justify-center">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    <p>Uploading...</p>
-                  </div>
-                ) : isDragActive ? (
-                  <p>Drop the file here ...</p>
-                ) : (
-                  <>
-                    <p>Drag & drop a file here, or click to select</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Accepts .zip and .html files
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Input
+              id="name"
+              placeholder="Prototype name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isUploading}
+            />
+          </div>
+          <div {...getRootProps()} className={`
+            border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+            ${isDragActive ? 'border-primary' : 'border-muted'}
+            ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
+          `}>
+            <input {...getInputProps()} />
+            {isUploading ? (
+              <p>Uploading...</p>
+            ) : isDragActive ? (
+              <p>Drop the files here...</p>
+            ) : (
+              <p>Drag 'n' drop a file here, or click to select</p>
+            )}
+            <p className="text-sm text-muted-foreground mt-2">
+              Supports HTML files or ZIP archives
+            </p>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
