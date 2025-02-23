@@ -1,7 +1,7 @@
-
 import { format } from "date-fns";
-import { ArrowUpRight, MessageCircle } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { PrototypeStatusBadge } from "./prototype-status-badge";
 
 interface PrototypeCardProps {
   id: string;
@@ -9,11 +9,12 @@ interface PrototypeCardProps {
   previewUrl: string | null;
   sourceUrl: string;
   timestamp: Date;
-  commentCount: number;
   tags: string[];
   previewTitle?: string | null;
   previewDescription?: string | null;
   previewImage?: string | null;
+  deploymentStatus?: 'pending' | 'deployed' | 'failed' | null;
+  deploymentUrl?: string | null;
 }
 
 export const PrototypeCard = ({
@@ -22,16 +23,17 @@ export const PrototypeCard = ({
   previewUrl,
   sourceUrl,
   timestamp,
-  commentCount,
   tags,
   previewTitle,
   previewDescription,
   previewImage,
+  deploymentStatus,
+  deploymentUrl,
 }: PrototypeCardProps) => {
   return (
     <div className="group relative bg-card rounded-lg border shadow-sm hover:shadow-md transition-shadow">
       <Link to={`/prototype/${id}`} className="block">
-        <div className="aspect-video w-full bg-muted rounded-t-lg overflow-hidden">
+        <div className="aspect-video w-full bg-muted rounded-t-lg overflow-hidden relative">
           {previewImage ? (
             <img
               src={previewImage}
@@ -43,15 +45,16 @@ export const PrototypeCard = ({
               <span className="text-muted-foreground">No preview available</span>
             </div>
           )}
+          {deploymentStatus && (
+            <div className="absolute top-2 right-2">
+              <PrototypeStatusBadge status={deploymentStatus} />
+            </div>
+          )}
         </div>
         
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold group-hover:underline">{title}</h3>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MessageCircle className="w-4 h-4" />
-              <span className="text-sm">{commentCount}</span>
-            </div>
           </div>
           
           {previewDescription && (
@@ -71,7 +74,7 @@ export const PrototypeCard = ({
             ))}
           </div>
           
-          <div className="mt-4 flex items-center justify-between text-sm">
+          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
             <time dateTime={timestamp.toISOString()}>
               {format(timestamp, "MMM d, yyyy")}
             </time>
@@ -85,6 +88,17 @@ export const PrototypeCard = ({
               View Source
               <ArrowUpRight className="w-4 h-4" />
             </a>
+            {deploymentUrl && (
+              <a
+                href={deploymentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center hover:text-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                View Live <ArrowUpRight className="ml-1 h-3 w-3" />
+              </a>
+            )}
           </div>
         </div>
       </Link>

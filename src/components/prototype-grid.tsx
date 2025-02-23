@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { AddPrototypeDialog } from "./add-prototype-dialog";
+import { UploadPrototypeDialog } from "./upload-prototype-dialog";
 
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -35,6 +36,8 @@ export const PrototypeGrid = () => {
             preview_title,
             preview_description,
             preview_image,
+            deployment_status,
+            deployment_url,
             created_at
           `);
 
@@ -85,76 +88,69 @@ export const PrototypeGrid = () => {
 
   return (
     <div className="container py-8 max-w-7xl mx-auto px-4 animate-fade-in">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-semibold">Prototypes</h1>
-        <AddPrototypeDialog />
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <Input
+            placeholder="Search prototypes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-[300px]"
+          />
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Most Recent</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setViewMode("grid")}
+              className={viewMode === "grid" ? "bg-accent" : ""}
+            >
+              <Grid2X2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setViewMode("list")}
+              className={viewMode === "list" ? "bg-accent" : ""}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <UploadPrototypeDialog />
+          <AddPrototypeDialog />
+        </div>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Search prototypes..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex gap-4 w-full sm:w-auto">
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <div className="flex border rounded-md">
-              <Button
-                variant={viewMode === "grid" ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => setViewMode("grid")}
-                className="rounded-r-none"
-              >
-                <Grid2X2 className="w-4 h-4" />
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => setViewMode("list")}
-                className="rounded-l-none"
-              >
-                <List className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className={`grid gap-6 ${
-          viewMode === "grid" 
-            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" 
-            : "grid-cols-1"
-        }`}>
-          {prototypes.map((prototype) => (
-            <PrototypeCard
-              key={prototype.id}
-              id={prototype.id}
-              title={prototype.name}
-              previewUrl={prototype.preview_url}
-              sourceUrl={prototype.url}
-              timestamp={new Date(prototype.created_at)}
-              commentCount={0}
-              tags={[]}
-              previewTitle={prototype.preview_title}
-              previewDescription={prototype.preview_description}
-              previewImage={prototype.preview_image}
-            />
-          ))}
-        </div>
+      <div className={`grid gap-6 ${
+        viewMode === "grid" 
+          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" 
+          : "grid-cols-1"
+      }`}>
+        {prototypes.map((prototype) => (
+          <PrototypeCard
+            key={prototype.id}
+            id={prototype.id}
+            title={prototype.name}
+            previewUrl={prototype.preview_url}
+            sourceUrl={prototype.url}
+            timestamp={new Date(prototype.created_at)}
+            tags={[]}
+            previewTitle={prototype.preview_title}
+            previewDescription={prototype.preview_description}
+            previewImage={prototype.preview_image}
+            deploymentStatus={prototype.deployment_status}
+            deploymentUrl={prototype.deployment_url}
+          />
+        ))}
       </div>
     </div>
   );
