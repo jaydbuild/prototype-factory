@@ -6,7 +6,6 @@ import { PreviewIframe } from "./PreviewIframe";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
-import { CommentOverlay } from "./CommentOverlay";
 
 export const PrototypeDetail = () => {
   const { id } = useParams();
@@ -63,16 +62,14 @@ export const PrototypeDetail = () => {
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 relative">
-        {/* Preview with Comments */}
+        {/* Preview */}
         <div className="absolute inset-0">
           {id && (
-            <CommentOverlay prototypeId={id}>
-              <PreviewIframe 
-                url={prototype.preview_url || prototype.url}
-                title={prototype.name}
-                prototypeId={id}
-              />
-            </CommentOverlay>
+            <PreviewIframe 
+              url={prototype.preview_url || prototype.url}
+              title={prototype.name}
+              prototypeId={id}
+            />
           )}
         </div>
 

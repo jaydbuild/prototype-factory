@@ -7,18 +7,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Grid2X2, List, Search } from "lucide-react";
+import { Grid2X2, List, Plus, Search } from "lucide-react";
 import { PrototypeCard } from "./prototype-card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { AddPrototypeDialog } from "./add-prototype-dialog";
+import type { Database } from "@/types/supabase";
+
+type Prototype = Database['public']['Tables']['prototypes']['Row'] & {
+  type: 'link' | 'file';
+  deployment_status: 'pending' | 'deployed' | 'failed';
+  deployment_url?: string;
+  file_path?: string;
+};
 
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("recent");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: prototypes = [], isLoading } = useQuery({
@@ -27,16 +36,7 @@ export const PrototypeGrid = () => {
       try {
         let query = supabase
           .from('prototypes')
-          .select(`
-            id,
-            name,
-            url,
-            preview_url,
-            preview_title,
-            preview_description,
-            preview_image,
-            created_at
-          `);
+          .select('*');
 
         if (searchTerm) {
           query = query.ilike('name', `%${searchTerm}%`);
@@ -44,118 +44,95 @@ export const PrototypeGrid = () => {
 
         if (sortBy === 'recent') {
           query = query.order('created_at', { ascending: false });
-        } else if (sortBy === 'name') {
+        } else {
           query = query.order('name');
         }
 
         const { data, error } = await query;
 
-        if (error) {
-          toast({
-            variant: "destructive",
-            title: "Error fetching prototypes",
-            description: error.message
-          });
-          throw error;
-        }
-
-        return data || [];
-      } catch (error) {
+        if (error) throw error;
+        
+        // Transform the data to match the expected Prototype type
+        return (data || []).map((item): Prototype => ({
+          ...item,
+          type: item.url ? 'link' : 'file',
+          deployment_status: 'pending',
+          deployment_url: undefined,
+          file_path: undefined
+        }));
+      } catch (error: any) {
         console.error('Error fetching prototypes:', error);
-        toast({
-          variant: "destructive",
-          title: "Error fetching prototypes",
-          description: "Failed to load prototypes. Please try again."
-        });
         return [];
       }
-    }
+    },
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-foreground"></div>
-          <p className="text-sm text-muted-foreground">Loading prototypes...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container py-8 max-w-7xl mx-auto px-4 animate-fade-in">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-semibold">Prototypes</h1>
-        <AddPrototypeDialog />
-      </div>
-
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+    <div className="container mx-auto py-8">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search prototypes..."
-              className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
             />
           </div>
-          
-          <div className="flex gap-4 w-full sm:w-auto">
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <div className="flex border rounded-md">
-              <Button
-                variant={viewMode === "grid" ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => setViewMode("grid")}
-                className="rounded-r-none"
-              >
-                <Grid2X2 className="w-4 h-4" />
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => setViewMode("list")}
-                className="rounded-l-none"
-              >
-                <List className="w-4 h-4" />
-              </Button>
-            </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Recent</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-1 border rounded-md">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("grid")}
+            >
+              <Grid2X2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
           </div>
         </div>
+        <Button onClick={() => setIsAddDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Prototype
+        </Button>
+      </div>
 
-        <div className={`grid gap-6 ${
-          viewMode === "grid" 
-            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" 
-            : "grid-cols-1"
-        }`}>
+      {isLoading ? (
+        <div>Loading...</div>
+      ) : prototypes.length === 0 ? (
+        <div className="text-center text-muted-foreground">
+          No prototypes found
+        </div>
+      ) : (
+        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
           {prototypes.map((prototype) => (
             <PrototypeCard
               key={prototype.id}
-              id={prototype.id}
-              title={prototype.name}
-              previewUrl={prototype.preview_url}
-              sourceUrl={prototype.url}
-              timestamp={new Date(prototype.created_at)}
-              commentCount={0}
-              tags={[]}
-              previewTitle={prototype.preview_title}
-              previewDescription={prototype.preview_description}
-              previewImage={prototype.preview_image}
+              prototype={prototype}
             />
           ))}
         </div>
-      </div>
+      )}
+
+      <AddPrototypeDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+      />
     </div>
   );
 };

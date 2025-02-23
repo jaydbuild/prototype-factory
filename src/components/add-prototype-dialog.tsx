@@ -1,185 +1,259 @@
+import { useState } from 'react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDropzone } from 'react-dropzone';
+import { Upload, Loader2 } from 'lucide-react';
+import type { Database } from '@/types/supabase';
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { TagSelect } from "./tag-select";
-import { fetchPreview } from "@/lib/preview";
+// Storage bucket for prototype files (HTML and ZIP archives)
+const STORAGE_BUCKET = 'prototype-files';
 
-type FormData = {
-  name: string;
-  url: string;
-  preview_url: string;
-  tags: string[];
-};
+interface AddPrototypeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
 
-export const AddPrototypeDialog = () => {
-  const [open, setOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+type PrototypeInsert = Database['public']['Tables']['prototypes']['Insert'];
+
+export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogProps) {
+  const [name, setName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'link' | 'file'>('link');
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  const form = useForm<FormData>({
-    defaultValues: {
-      name: "",
-      url: "",
-      preview_url: "",
-      tags: [],
-    },
-  });
 
-  const onSubmit = async (data: FormData) => {
+  const createPrototype = async (data: Omit<PrototypeInsert, 'created_by' | 'url'>) => {
+    return await supabase
+      .from('prototypes')
+      .insert({
+        ...data,
+        created_by: 'anonymous',
+        url: '' // Required by the schema
+      })
+      .select()
+      .single();
+  };
+
+  const onDrop = async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file || !name.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide both a name and a file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploading(true);
     try {
-      setIsLoading(true);
-      // Get the current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error("You must be logged in to create a prototype");
-      }
-
-      // Fetch preview data
-      const previewData = await fetchPreview(data.url);
-
-      // Insert the prototype with type-safe values
-      const { data: prototype, error: prototypeError } = await supabase
-        .from("prototypes")
-        .insert({
-          name: data.name,
-          url: data.url,
-          preview_url: data.preview_url || null,
-          preview_title: previewData?.title?.toString() || null,
-          preview_description: previewData?.description?.toString() || null,
-          preview_image: previewData?.image?.toString() || null,
-          created_by: user.id
-        })
-        .select()
-        .single();
+      // Create prototype entry first
+      const { data: prototype, error: prototypeError } = await createPrototype({
+        name: name.trim(),
+        preview_url: null,
+        preview_title: null,
+        preview_description: null,
+        preview_image: null,
+        file_path: null
+      });
 
       if (prototypeError) throw prototypeError;
 
-      // Insert prototype tags if any are selected
-      if (data.tags.length > 0) {
-        const { error: tagError } = await supabase
-          .from("prototype_tags")
-          .insert(
-            data.tags.map(tagId => ({
-              prototype_id: prototype.id,
-              tag_id: tagId
-            }))
-          );
+      // Upload file with prototype ID in path
+      const filePath = `${prototype.id}/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-        if (tagError) throw tagError;
+      if (uploadError) {
+        // If bucket doesn't exist, try to create it
+        if (uploadError.message.includes('bucket not found')) {
+          const { data: bucket, error: bucketError } = await supabase.storage
+            .createBucket(STORAGE_BUCKET, {
+              public: false,
+              fileSizeLimit: 52428800, // 50MB
+              allowedMimeTypes: ['application/zip', 'text/html']
+            });
+
+          if (bucketError) throw bucketError;
+
+          // Retry upload after bucket creation
+          const { error: retryError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (retryError) throw retryError;
+        } else {
+          throw uploadError;
+        }
       }
 
-      toast({
-        title: "Success",
-        description: "Prototype added successfully",
-      });
+      // Update prototype with file path
+      const { error: updateError } = await supabase
+        .from('prototypes')
+        .update({
+          file_path: filePath
+        })
+        .eq('id', prototype.id);
 
-      // Reset form and close dialog
-      form.reset();
-      setOpen(false);
-      
-      // Invalidate prototypes query to refetch the list
+      if (updateError) throw updateError;
+
       queryClient.invalidateQueries({ queryKey: ['prototypes'] });
-    } catch (error: any) {
+      
       toast({
-        variant: "destructive",
-        title: "Error",
+        title: 'Success',
+        description: 'Prototype uploaded successfully',
+      });
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error uploading prototype:', error);
+      toast({
+        title: 'Error',
         description: error.message,
+        variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setIsUploading(false);
+    }
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    maxFiles: 1,
+    accept: {
+      'application/zip': ['.zip'],
+      'text/html': ['.html']
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide a name for the prototype',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { error } = await createPrototype({
+        name: name.trim(),
+        preview_url: null,
+        preview_title: null,
+        preview_description: null,
+        preview_image: null,
+        file_path: null
+      });
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['prototypes'] });
+      
+      toast({
+        title: 'Success',
+        description: 'Prototype added successfully',
+      });
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Prototype
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Prototype</DialogTitle>
+          <DialogTitle>Add Prototype</DialogTitle>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter prototype name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter prototype URL" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="preview_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Preview URL (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter preview image URL" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="tags"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tags</FormLabel>
-                  <FormControl>
-                    <TagSelect 
-                      value={field.value} 
-                      onChange={field.onChange}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Adding..." : "Add Prototype"}
-              </Button>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'link' | 'file')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="link">Link</TabsTrigger>
+            <TabsTrigger value="file">File</TabsTrigger>
+          </TabsList>
+          <TabsContent value="link">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter prototype name"
+                  disabled={isUploading}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isUploading}>
+                  {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add Prototype
+                </Button>
+              </DialogFooter>
+            </form>
+          </TabsContent>
+          <TabsContent value="file">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter prototype name"
+                  disabled={isUploading}
+                />
+              </div>
+              <div
+                {...getRootProps()}
+                className={`
+                  border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+                  ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted'}
+                  ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+              >
+                <input {...getInputProps()} disabled={isUploading} />
+                <Upload className="w-8 h-8 mx-auto mb-4 text-muted-foreground" />
+                {isUploading ? (
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <p>Uploading...</p>
+                  </div>
+                ) : isDragActive ? (
+                  <p>Drop the file here ...</p>
+                ) : (
+                  <>
+                    <p>Drag & drop a file here, or click to select</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Accepts .zip and .html files
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
-          </form>
-        </Form>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
-};
+}
