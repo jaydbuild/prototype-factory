@@ -11,6 +11,7 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2 } from 'lucide-react';
 import type { Database } from '@/types/supabase';
 
+// Storage bucket for prototype files (HTML and ZIP archives)
 const STORAGE_BUCKET = 'prototype-files';
 
 interface AddPrototypeDialogProps {
