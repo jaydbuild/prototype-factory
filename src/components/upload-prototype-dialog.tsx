@@ -9,6 +9,7 @@ import { UploadCloud } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { validatePrototypeZip } from '../utils/zip-utils';
 
 export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
@@ -30,6 +31,9 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         });
         return;
       }
+
+      // Validate ZIP structure first
+      await validatePrototypeZip(file);
 
       // Get current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -64,25 +68,13 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         .from('prototype-uploads')
         .upload(filePath, file);
 
-      // Update progress separately using uploadProgress event listener
-      supabase.storage
-        .from('prototype-uploads')
-        .on('uploadProgress', (progress) => {
-          setUploadProgress(progress);
-        });
-
       if (uploadError) throw uploadError;
 
-      // Update prototype with file path
-      const { error: updateError } = await supabase
-        .from('prototypes')
-        .update({ file_path: filePath })
-        .eq('id', prototype.id);
-
-      if (updateError) throw updateError;
+      // Ensure upload is complete before processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Process prototype
-      const { error: processError } = await supabase.functions
+      const { data: processData, error: processError } = await supabase.functions
         .invoke('process-prototype', {
           body: { 
             prototypeId: prototype.id,
@@ -90,7 +82,21 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
           }
         });
 
-      if (processError) throw processError;
+      if (processError) {
+        console.error('Process error details:', processError);
+        throw new Error(processError.message || 'Failed to process prototype');
+      }
+
+      // Update status to reflect processing started
+      const { error: updateError } = await supabase
+        .from('prototypes')
+        .update({ 
+          file_path: filePath,
+          deployment_status: 'processing'
+        })
+        .eq('id', prototype.id);
+
+      if (updateError) throw updateError;
 
       // Use correct invalidate query format
       queryClient.invalidateQueries({
@@ -104,9 +110,14 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error uploading prototype:', error);
+      const errorMessage = error.message || "Failed to upload prototype";
+      const description = error.response?.text 
+        ? await error.response.text()
+        : errorMessage;
+        
       toast({
         title: "Error",
-        description: error.message || "Failed to upload prototype",
+        description: description,
         variant: "destructive",
       });
     }

@@ -1,4 +1,4 @@
-import { serve, createClient, unzip } from '../bundle-prototype/deps.ts';
+import { serve, createClient, unzip, esbuild } from '../bundle-prototype/deps.ts';
 import type { UnzippedFile } from "../types/prototypes.ts";
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 import { crypto } from 'https://deno.land/std@0.140.0/crypto/mod.ts';
@@ -9,8 +9,16 @@ interface PrototypeRequest {
   fileName: string;
 }
 
-// Add logging for module verification
-console.log("Module imports verified")
+interface PrototypeState {
+  id: string;
+  status: 'pending' | 'processing' | 'processed' | 'failed';
+  deployment_url?: string;
+  processed_at?: Date;
+  bundle_path?: string;
+  sandbox_config?: {
+    permissions: string[];
+  };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,28 +52,12 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // First, verify the prototype exists and check its current state
-    const { data: prototypeData, error: prototypeError } = await supabase
+    // Update status to processing
+    await supabase
       .from('prototypes')
-      .select('*')
+      .update({ status: 'processing' })
       .eq('id', prototypeId)
       .single();
-
-    if (prototypeError) {
-      console.error(`[${requestId}] Database error: ${prototypeError.message}`);
-      return new Response(
-        JSON.stringify({ error: 'Failed to verify prototype' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!prototypeData) {
-      console.error(`[${requestId}] No prototype found with ID: ${prototypeId}`);
-      return new Response(
-        JSON.stringify({ error: 'Prototype not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // Download the uploaded file
     console.log(`[${requestId}] Downloading file from storage`);
@@ -77,7 +69,7 @@ serve(async (req) => {
       console.error(`[${requestId}] Download error: ${downloadError.message}`);
       return new Response(
         JSON.stringify({ error: 'Failed to download prototype file' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
