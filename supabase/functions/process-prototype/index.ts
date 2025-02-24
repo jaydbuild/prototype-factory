@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { Unzip } from "https://deno.land/x/zip@v1.2.5/mod.ts";
+import { zipSync, unzipSync } from "https://deno.land/x/zip@v1.2.3/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,45 +38,36 @@ serve(async (req) => {
     
     if (isZip) {
       console.log('Processing ZIP file')
-      // Create a temporary directory for extraction
-      const tempDir = await Deno.makeTempDir()
       
       try {
         // Convert ArrayBuffer to Uint8Array
         const zipData = new Uint8Array(await fileData.arrayBuffer())
         
-        // Write zip file to temp directory
-        const zipPath = `${tempDir}/archive.zip`
-        await Deno.writeFile(zipPath, zipData)
+        // Unzip the content
+        const unzippedFiles = unzipSync(zipData);
         
-        // Extract zip contents
-        const unzip = new Unzip(zipPath)
-        const entries = unzip.getEntries()
-        
-        console.log(`Found ${entries.length} files in ZIP`)
+        console.log(`Found ${Object.keys(unzippedFiles).length} files in ZIP`)
         
         // Process each file in the zip
-        for (const entry of entries) {
-          if (!entry.isDirectory) {
-            const content = await entry.getData()
-            
+        for (const [filename, content] of Object.entries(unzippedFiles)) {
+          if (content.length > 0) { // Skip empty files/directories
             const { error: uploadError } = await supabase.storage
               .from('prototype-deployments')
-              .upload(`${deploymentPath}/${entry.filename}`, content, {
-                contentType: getContentType(entry.filename),
+              .upload(`${deploymentPath}/${filename}`, content, {
+                contentType: getContentType(filename),
                 upsert: true
               })
 
             if (uploadError) {
-              throw new Error(`Failed to upload extracted file ${entry.filename}: ${uploadError.message}`)
+              throw new Error(`Failed to upload extracted file ${filename}: ${uploadError.message}`)
             }
             
-            console.log(`Uploaded ${entry.filename}`)
+            console.log(`Uploaded ${filename}`)
           }
         }
-      } finally {
-        // Clean up temporary directory
-        await Deno.remove(tempDir, { recursive: true })
+      } catch (error) {
+        console.error('Error processing ZIP:', error)
+        throw new Error(`Failed to process ZIP file: ${error.message}`)
       }
     } else {
       // Upload single file directly
