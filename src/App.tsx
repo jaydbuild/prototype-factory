@@ -12,7 +12,6 @@ import { PrototypeDetail } from "@/components/PrototypeDetail";
 import { SupabaseProvider } from "@/lib/supabase-provider";
 import { Session } from "@supabase/supabase-js";
 import LoginPage from './components/login-page';
-import Dashboard from './components/dashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
