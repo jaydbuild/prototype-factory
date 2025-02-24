@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,9 +21,35 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Log initial auth state when component mounts
+  useEffect(() => {
+    const checkAuthState = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('Initial Auth State:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        error: error?.message,
+        timestamp: new Date().toISOString()
+      });
+    };
+    checkAuthState();
+  }, []);
+
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
+    console.log('File Drop Event:', {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileSize: file?.size,
+      timestamp: new Date().toISOString()
+    });
+
     if (!file || !name.trim()) {
+      console.log('Validation Error:', {
+        hasFile: !!file,
+        hasName: !!name.trim(),
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: 'Error',
         description: 'Please provide both a name and a file',
@@ -34,8 +60,18 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
     // Get current user session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Auth Check:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      error: sessionError?.message,
+      timestamp: new Date().toISOString()
+    });
     
     if (sessionError || !session) {
+      console.log('Auth Error:', {
+        error: sessionError?.message,
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: 'Error',
         description: 'Please sign in to upload prototypes',
@@ -48,25 +84,61 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     setIsUploading(true);
     try {
       // Create prototype entry first with user ID
+      console.log('Creating Prototype:', {
+        name: name.trim(),
+        userId: session.user.id,
+        timestamp: new Date().toISOString()
+      });
+
       const { data: prototype, error: prototypeError } = await supabase
         .from('prototypes')
         .insert([{
           name: name.trim(),
           url: 'pending',
-          created_by: session.user.id // Add the user ID here
+          created_by: session.user.id
         }])
         .select()
         .single();
 
-      if (prototypeError) throw prototypeError;
+      if (prototypeError) {
+        console.error('Prototype Creation Error:', {
+          error: prototypeError.message,
+          details: prototypeError,
+          timestamp: new Date().toISOString()
+        });
+        throw prototypeError;
+      }
+
+      console.log('Prototype Created:', {
+        prototypeId: prototype.id,
+        timestamp: new Date().toISOString()
+      });
 
       // Upload file
       const filePath = `${prototype.id}/${file.name}`;
+      console.log('Uploading File:', {
+        filePath,
+        fileSize: file.size,
+        timestamp: new Date().toISOString()
+      });
+
       const { error: uploadError } = await supabase.storage
         .from('prototype-uploads')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('File Upload Error:', {
+          error: uploadError.message,
+          details: uploadError,
+          timestamp: new Date().toISOString()
+        });
+        throw uploadError;
+      }
+
+      console.log('File Uploaded Successfully:', {
+        filePath,
+        timestamp: new Date().toISOString()
+      });
 
       // Update prototype with file path
       const { error: updateError } = await supabase
@@ -74,25 +146,60 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         .update({ file_path: filePath })
         .eq('id', prototype.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Prototype Update Error:', {
+          error: updateError.message,
+          details: updateError,
+          timestamp: new Date().toISOString()
+        });
+        throw updateError;
+      }
+
+      console.log('Prototype Updated:', {
+        prototypeId: prototype.id,
+        filePath,
+        timestamp: new Date().toISOString()
+      });
 
       // Trigger processing
+      console.log('Triggering Processing:', {
+        prototypeId: prototype.id,
+        fileName: file.name,
+        timestamp: new Date().toISOString()
+      });
+
       const { error: processError } = await supabase.functions
         .invoke('process-prototype', {
           body: { prototypeId: prototype.id, fileName: file.name },
         });
 
-      if (processError) throw processError;
+      if (processError) {
+        console.error('Processing Error:', {
+          error: processError.message,
+          details: processError,
+          timestamp: new Date().toISOString()
+        });
+        throw processError;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['prototypes'] });
       
+      console.log('Process Complete:', {
+        success: true,
+        timestamp: new Date().toISOString()
+      });
+
       toast({
         title: 'Success',
         description: 'Prototype uploaded successfully',
       });
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Error uploading prototype:', error);
+      console.error('Operation Failed:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: 'Error',
         description: error.message,
