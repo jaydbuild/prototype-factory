@@ -1,4 +1,3 @@
-
 import { format, parseISO } from "date-fns";
 import { ArrowUpRight, FileUp } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -13,7 +12,7 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
   if (!prototype) return null;
   
   const timestamp = prototype.created_at ? parseISO(prototype.created_at) : new Date();
-  const previewUrl = prototype.deployment_url || prototype.preview_url || prototype.url;
+  const previewUrl = prototype.deployment_status === 'deployed' ? prototype.deployment_url : null;
 
   return (
     <div className="group relative bg-card rounded-lg border shadow-sm hover:shadow-md transition-shadow">
@@ -27,7 +26,9 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">
-              <span className="text-muted-foreground">No preview available</span>
+              <span className="text-muted-foreground">
+                {prototype.deployment_status === 'pending' ? 'Processing...' : 'No preview available'}
+              </span>
             </div>
           )}
           {prototype.deployment_status && (
@@ -63,7 +64,7 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
             <time dateTime={timestamp.toISOString()}>
               {format(timestamp, "MMM d, yyyy")}
             </time>
-            {previewUrl && (
+            {previewUrl && prototype.deployment_status === 'deployed' && (
               <a
                 href={previewUrl}
                 target="_blank"

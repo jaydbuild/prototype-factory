@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,9 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Grid2X2, List, Plus, Search } from "lucide-react";
+import { Grid2X2, List, Plus, Search, Trash2 } from "lucide-react";
 import { PrototypeCard } from "./prototype-card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,9 @@ export const PrototypeGrid = () => {
   const [sortBy, setSortBy] = useState("recent");
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedPrototypes, setSelectedPrototypes] = useState<string[]>([]);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: prototypes = [], isLoading } = useQuery({
     queryKey: ['prototypes', sortBy, searchTerm],
@@ -73,6 +74,47 @@ export const PrototypeGrid = () => {
     },
   });
 
+  const handleDeleteSelected = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('delete-prototypes', {
+        body: { prototypeIds: selectedPrototypes }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedPrototypes.length} prototype(s)`,
+      });
+
+      setSelectedPrototypes([]);
+      queryClient.invalidateQueries({ queryKey: ['prototypes'] });
+    } catch (error: any) {
+      console.error('Error deleting prototypes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete prototypes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedPrototypes.length === prototypes.length) {
+      setSelectedPrototypes([]);
+    } else {
+      setSelectedPrototypes(prototypes.map(p => p.id));
+    }
+  };
+
+  const togglePrototypeSelection = (id: string) => {
+    setSelectedPrototypes(prev => 
+      prev.includes(id) 
+        ? prev.filter(p => p !== id)
+        : [...prev, id]
+    );
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center justify-between mb-8">
@@ -111,29 +153,48 @@ export const PrototypeGrid = () => {
               <List className="h-4 w-4" />
             </Button>
           </div>
+          {selectedPrototypes.length > 0 && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleSelectAll}
+                className="ml-2"
+              >
+                {selectedPrototypes.length === prototypes.length ? 'Deselect All' : 'Select All'}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteSelected}
+                className="ml-2"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected ({selectedPrototypes.length})
+              </Button>
+            </>
+          )}
         </div>
         <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="h-4 w-4 mr-2" />
           Add Prototype
         </Button>
       </div>
 
-      {isLoading ? (
-        <div>Loading...</div>
-      ) : prototypes.length === 0 ? (
-        <div className="text-center text-muted-foreground">
-          No prototypes found
-        </div>
-      ) : (
-        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
-          {prototypes.map((prototype) => (
+      <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
+        {prototypes.map((prototype) => (
+          <div key={prototype.id} className="relative">
+            <input
+              type="checkbox"
+              checked={selectedPrototypes.includes(prototype.id)}
+              onChange={() => togglePrototypeSelection(prototype.id)}
+              className="absolute top-2 left-2 z-10 h-4 w-4"
+            />
             <PrototypeCard
               key={prototype.id}
               prototype={prototype}
             />
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
 
       <AddPrototypeDialog
         open={isAddDialogOpen}

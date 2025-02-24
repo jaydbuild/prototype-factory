@@ -1,7 +1,14 @@
+import { serve, createClient, unzip } from '../bundle-prototype/deps.ts';
+import type { UnzippedFile } from "../types/prototypes.ts";
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { zipSync, unzipSync } from "https://deno.land/x/zip@v1.2.3/mod.ts";
+// Type declarations
+interface PrototypeRequest {
+  prototypeId: string;
+  fileName: string;
+}
+
+// Add logging for module verification
+console.log("Module imports verified")
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,14 +21,32 @@ serve(async (req) => {
   }
 
   try {
-    const { prototypeId, fileName } = await req.json()
-
-    console.log(`Processing prototype ${prototypeId} with file ${fileName}`)
+    const { prototypeId, fileName } = await req.json() as PrototypeRequest
+    console.log(`Starting processing for prototype ${prototypeId} with file ${fileName}`)
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // First, verify the prototype exists and check its current state
+    const { data: prototypeData, error: prototypeError } = await supabase
+      .from('prototypes')
+      .select('*')
+      .eq('id', prototypeId)
+      .single()
+
+    if (prototypeError) {
+      console.error(`Failed to fetch prototype: ${prototypeError.message}`)
+      throw new Error(`Prototype verification failed: ${prototypeError.message}`)
+    }
+
+    if (!prototypeData) {
+      console.error(`No prototype found with ID: ${prototypeId}`)
+      throw new Error('Prototype not found')
+    }
+
+    console.log(`Current prototype state: ${JSON.stringify(prototypeData)}`)
 
     // Download the uploaded file
     const { data: fileData, error: downloadError } = await supabase.storage
@@ -29,8 +54,11 @@ serve(async (req) => {
       .download(`${prototypeId}/${fileName}`)
 
     if (downloadError) {
+      console.error(`Download error: ${downloadError.message}`)
       throw new Error(`Failed to download file: ${downloadError.message}`)
     }
+
+    console.log('File downloaded successfully, beginning processing...')
 
     // Process the file based on its type
     const isZip = fileName.toLowerCase().endsWith('.zip')
@@ -44,30 +72,38 @@ serve(async (req) => {
         const zipData = new Uint8Array(await fileData.arrayBuffer())
         
         // Unzip the content
-        const unzippedFiles = unzipSync(zipData);
+        const unzippedFiles = await unzip(zipData) as UnzippedFile[];
         
-        console.log(`Found ${Object.keys(unzippedFiles).length} files in ZIP`)
+        console.log(`Found ${unzippedFiles.length} files in ZIP`)
         
         // Process each file in the zip
-        for (const [filename, content] of Object.entries(unzippedFiles)) {
-          if (content.length > 0) { // Skip empty files/directories
+        for (const file of unzippedFiles) {
+          // Skip Mac metadata files and empty files
+          if (
+            file.content.length > 0 && // Skip empty files/directories
+            !file.name.startsWith('__MACOSX/') && // Skip Mac metadata directory
+            !file.name.startsWith('._') && // Skip Mac metadata files
+            !file.name.endsWith('/') // Skip directory entries
+          ) {
             const { error: uploadError } = await supabase.storage
               .from('prototype-deployments')
-              .upload(`${deploymentPath}/${filename}`, content, {
-                contentType: getContentType(filename),
+              .upload(`${deploymentPath}/${file.name}`, file.content, {
+                contentType: getContentType(file.name),
                 upsert: true
               })
 
             if (uploadError) {
-              throw new Error(`Failed to upload extracted file ${filename}: ${uploadError.message}`)
+              throw new Error(`Failed to upload extracted file ${file.name}: ${uploadError.message}`)
             }
             
-            console.log(`Uploaded ${filename}`)
+            console.log(`Uploaded ${file.name}`)
+          } else {
+            console.log(`Skipping file ${file.name} (metadata or directory)`)
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error processing ZIP:', error)
-        throw new Error(`Failed to process ZIP file: ${error.message}`)
+        throw new Error(`Failed to process ZIP file: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     } else {
       // Upload single file directly
@@ -89,17 +125,43 @@ serve(async (req) => {
       .from('prototype-deployments')
       .getPublicUrl(`${deploymentPath}/index.html`)
 
-    // Update prototype status
+    console.log(`Generated public URL: ${publicUrl}`)
+
+    // First, let's check what fields exist in the table
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('prototypes')
+      .select('*')
+      .limit(1)
+
+    if (tableError) {
+      console.error(`Failed to fetch table info: ${tableError.message}`)
+      throw new Error(`Schema verification failed: ${tableError.message}`)
+    }
+
+    console.log('Available columns:', Object.keys(tableInfo?.[0] || {}))
+
+    // Update with minimal fields
+    const updateData: Record<string, any> = {
+      deployment_url: publicUrl
+    }
+
+    // Only add these if they exist in the schema
+    if (tableInfo?.[0]?.hasOwnProperty('deployment_status')) {
+      updateData.deployment_status = 'deployed'
+    }
+    if (tableInfo?.[0]?.hasOwnProperty('file_path')) {
+      updateData.file_path = `${prototypeId}/${fileName}`
+    }
+
+    console.log('Updating with fields:', updateData)
+
     const { error: updateError } = await supabase
       .from('prototypes')
-      .update({
-        deployment_status: 'deployed',
-        deployment_url: publicUrl,
-        file_path: `${prototypeId}/${fileName}`
-      })
+      .update(updateData)
       .eq('id', prototypeId)
 
     if (updateError) {
+      console.error(`Failed to update prototype: ${updateError.message}`)
       throw new Error(`Failed to update prototype status: ${updateError.message}`)
     }
 
@@ -107,29 +169,25 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
-        status: 'success',
+        success: true,
+        message: 'Prototype processed successfully',
+        prototypeId,
         url: publicUrl
       }),
       { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
       }
     )
   } catch (error) {
-    console.error('Error processing prototype:', error)
-
+    console.error(`Processing failed: ${error.message}`)
     return new Response(
-      JSON.stringify({
-        status: 'error',
-        message: error.message
+      JSON.stringify({ 
+        success: false,
+        error: error.message 
       }),
       { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
     )

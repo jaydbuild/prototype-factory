@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +48,7 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         .insert({
           name: name.trim(),
           created_by: session.user.id,
-          url: 'pending', // Required field
+          url: null,
           deployment_status: 'pending'
         })
         .select()

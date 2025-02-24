@@ -1,0 +1,21 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read --watch supabase/functions/bundle-prototype/index.ts"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window", "deno.ns", "esnext"],
+    "strict": true
+  },
+  "importMap": "./supabase/functions/import_map.json",
+  "lint": {
+    "files": {
+      "include": ["supabase/functions/"]
+    }
+  },
+  "fmt": {
+    "files": {
+      "include": ["supabase/functions/"]
+    }
+  }
+}
