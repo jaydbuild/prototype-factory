@@ -23,6 +23,11 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
+    console.log('Drop event:', { 
+      fileName: file?.name,
+      fileSize: file?.size,
+      fileType: file?.type 
+    });
 
     if (!file || !name.trim()) {
       toast({
@@ -35,9 +40,15 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
     setIsUploading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user) {
+      // Get current session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      console.log('Auth Session:', { 
+        hasSession: !!sessionData?.session,
+        userId: sessionData?.session?.user?.id,
+        sessionError 
+      });
+
+      if (!sessionData?.session?.user) {
         toast({
           title: 'Error',
           description: 'Please sign in to upload prototypes',
@@ -47,47 +58,77 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         return;
       }
 
-      // Create prototype with required fields
+      // Create prototype entry
+      console.log('Creating prototype:', { 
+        name: name.trim(),
+        userId: sessionData.session.user.id 
+      });
+
       const { data: prototype, error: prototypeError } = await supabase
         .from('prototypes')
         .insert({
           name: name.trim(),
-          created_by: session.user.id,
-          url: 'pending', // Required field
+          created_by: sessionData.session.user.id,
+          url: 'pending',
           deployment_status: 'pending'
         })
         .select()
         .single();
 
-      if (prototypeError) throw prototypeError;
+      if (prototypeError) {
+        console.error('Prototype creation error:', prototypeError);
+        throw prototypeError;
+      }
+
+      console.log('Prototype created:', prototype);
 
       // Upload file
       const filePath = `${prototype.id}/${file.name}`;
+      console.log('Uploading file:', { filePath, fileSize: file.size });
+
       const { error: uploadError } = await supabase.storage
         .from('prototype-uploads')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('File upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('File uploaded successfully:', { filePath });
 
       // Update prototype with file path
       const { error: updateError } = await supabase
         .from('prototypes')
-        .update({ 
-          file_path: filePath,
-        })
+        .update({ file_path: filePath })
         .eq('id', prototype.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Prototype update error:', updateError);
+        throw updateError;
+      }
 
-      // Process the prototype
-      const { error: processError } = await supabase.functions
+      // Process prototype
+      console.log('Invoking process-prototype function:', {
+        prototypeId: prototype.id,
+        fileName: file.name
+      });
+
+      const { data: processData, error: processError } = await supabase.functions
         .invoke('process-prototype', {
-          body: { prototypeId: prototype.id, fileName: file.name },
+          body: { 
+            prototypeId: prototype.id, 
+            fileName: file.name 
+          }
         });
 
-      if (processError) throw processError;
+      console.log('Process response:', { processData, processError });
 
-      // Use the correct invalidate query format
+      if (processError) {
+        console.error('Processing error:', processError);
+        throw processError;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['prototypes'] });
 
       toast({
@@ -96,7 +137,11 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       });
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Operation failed:', error);
+      console.error('Operation failed:', {
+        error,
+        message: error.message,
+        stack: error.stack
+      });
       toast({
         title: 'Error',
         description: error.message,
