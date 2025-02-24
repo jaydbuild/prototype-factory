@@ -13,9 +13,12 @@ export const PrototypeDetail = () => {
   const navigate = useNavigate();
   const [showUI, setShowUI] = useState(true);
 
+  console.log('Attempting to fetch prototype with ID:', id);
+
   const { data: prototype, isLoading } = useQuery({
     queryKey: ['prototype', id],
     queryFn: async () => {
+      console.log('Making Supabase query for ID:', id);
       const { data, error } = await supabase
         .from('prototypes')
         .select('*')
@@ -65,13 +68,22 @@ export const PrototypeDetail = () => {
         {/* Preview */}
         <div className="absolute inset-0">
           {id && (
-            <PreviewIframe 
-              url={prototype.preview_url || prototype.url}
-              title={prototype.name}
-              prototypeId={id}
-            />
+            <>
+              {console.log('Preview URL:', prototype.preview_url, 'URL:', prototype.url)}
+              <PreviewIframe 
+                url={prototype.deployment_status === 'deployed' ? prototype.deployment_url : prototype.preview_url || prototype.url}
+                title={prototype.name}
+                prototypeId={id}
+              />
+            </>
           )}
         </div>
+
+        {prototype.deployment_status === 'processing' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+            <p className="text-lg">Deployment in progress...</p>
+          </div>
+        )}
 
         {/* UI Layer */}
         {showUI && (

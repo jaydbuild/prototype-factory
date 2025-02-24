@@ -14,6 +14,8 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
   const timestamp = prototype.created_at ? parseISO(prototype.created_at) : new Date();
   const previewUrl = prototype.deployment_status === 'deployed' ? prototype.deployment_url : null;
 
+  console.log('Rendering prototype card:', { id: prototype.id, status: prototype.deployment_status, url: previewUrl });
+
   return (
     <div className="group relative bg-card rounded-lg border shadow-sm hover:shadow-md transition-shadow">
       <Link to={`/prototype/${prototype.id}`} className="block">

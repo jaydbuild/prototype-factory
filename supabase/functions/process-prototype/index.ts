@@ -186,9 +186,13 @@ serve(async (req) => {
     }
 
     // Update prototype status
+    const deploymentUrl = `${supabaseUrl}/storage/v1/object/public/prototype-deployments/${deploymentPath}/index.html`;
     const { error: updateError } = await supabase
       .from('prototypes')
-      .update({ deployment_status: 'deployed' })
+      .update({ 
+        deployment_status: 'deployed',
+        deployment_url: deploymentUrl 
+      })
       .eq('id', prototypeId);
 
     if (updateError) {
