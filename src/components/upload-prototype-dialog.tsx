@@ -1,29 +1,22 @@
-import { useState } from "react";
+
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Upload, Loader2 } from "lucide-react";
-import { useCallback } from "react";
+import { useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+  const onDrop = async (acceptedFiles: File[]) => {
     try {
       const file = acceptedFiles[0];
       if (!file) return;
@@ -37,50 +30,69 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         return;
       }
 
-      // Create a new prototype entry
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.user) {
+        toast({
+          title: "Error",
+          description: "Please sign in to upload prototypes",
+          variant: "destructive",
+        });
+        navigate('/auth');
+        return;
+      }
+
+      // Create prototype entry with all required fields
       const { data: prototype, error: prototypeError } = await supabase
         .from('prototypes')
-        .insert([
-          {
-            name: name,
-            deployment_status: 'pending'
-          }
-        ])
+        .insert({
+          name: name.trim(),
+          created_by: session.user.id,
+          url: 'pending', // Required field
+          deployment_status: 'pending'
+        })
         .select()
         .single();
 
       if (prototypeError) throw prototypeError;
 
-      // Upload the file
+      // Upload file
+      const filePath = `${prototype.id}/${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('prototype-uploads')
-        .upload(`${prototype.id}/${file.name}`, file);
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Trigger the processing function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-prototype`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prototypeId: prototype.id,
-          fileName: file.name,
-        }),
-      });
+      // Update prototype with file path
+      const { error: updateError } = await supabase
+        .from('prototypes')
+        .update({ file_path: filePath })
+        .eq('id', prototype.id);
 
-      if (!response.ok) {
-        throw new Error('Failed to process prototype');
-      }
+      if (updateError) throw updateError;
+
+      // Process prototype
+      const { error: processError } = await supabase.functions
+        .invoke('process-prototype', {
+          body: { 
+            prototypeId: prototype.id,
+            fileName: file.name
+          }
+        });
+
+      if (processError) throw processError;
+
+      // Use correct invalidate query format
+      queryClient.invalidateQueries({
+        queryKey: ['prototypes']
+      });
 
       toast({
         title: "Success",
-        description: "Prototype uploaded successfully. Processing will begin shortly.",
+        description: "Prototype uploaded successfully",
       });
-
-      queryClient.invalidateQueries(["prototypes"]);
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error uploading prototype:', error);
@@ -90,7 +102,7 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         variant: "destructive",
       });
     }
-  }, [name, onOpenChange, queryClient]);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -131,7 +143,6 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
             `}
           >
             <input {...getInputProps()} />
-            <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
             <p className="mt-2 text-sm text-muted-foreground">
               {isDragActive
                 ? "Drop your prototype here"
@@ -145,7 +156,10 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         <DialogFooter>
           <Button
             type="submit"
-            onClick={() => document.querySelector('input[type="file"]')?.click()}
+            onClick={() => {
+              const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (input) input.click();
+            }}
           >
             Select Files
           </Button>
