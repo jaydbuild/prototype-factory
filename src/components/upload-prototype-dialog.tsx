@@ -5,12 +5,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { UploadCloud } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -58,9 +60,16 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
 
       // Upload file
       const filePath = `${prototype.id}/${file.name}`;
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('prototype-uploads')
         .upload(filePath, file);
+
+      // Update progress separately using uploadProgress event listener
+      supabase.storage
+        .from('prototype-uploads')
+        .on('uploadProgress', (progress) => {
+          setUploadProgress(progress);
+        });
 
       if (uploadError) throw uploadError;
 
@@ -109,6 +118,8 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
     accept: {
       'application/zip': ['.zip'],
       'text/html': ['.html'],
+      'text/css': ['.css'],
+      'application/javascript': ['.js']
     },
   });
 
@@ -116,11 +127,49 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Prototype</DialogTitle>
+          <DialogTitle>Add New Prototype</DialogTitle>
           <DialogDescription>
-            Upload your HTML, CSS, and JavaScript files or a ZIP package containing your prototype.
+            Upload your prototype files or a ZIP archive containing your prototype.
           </DialogDescription>
         </DialogHeader>
+        
+        <div {...getRootProps()} className="group relative">
+          <div className={`flex h-64 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed 
+            ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/50'} 
+            transition-colors hover:border-primary p-6`}>
+            <div className="space-y-4 text-center">
+              <UploadCloud className="mx-auto h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">
+                  {isDragActive ? 'Drop to upload' : 'Drag files here or click to select'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Required: index.html
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Optional: CSS and JavaScript files
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Or upload everything as a ZIP (max 50MB)
+                </p>
+              </div>
+              {uploadProgress > 0 && (
+                <div className="w-full max-w-xs mx-auto">
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-300" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {uploadProgress === 100 ? 'Processing...' : `Uploading: ${uploadProgress}%`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          <input {...getInputProps()} />
+        </div>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
@@ -133,23 +182,6 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
               className="col-span-3"
               placeholder="Enter prototype name"
             />
-          </div>
-          <div
-            {...getRootProps()}
-            className={`
-              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-              ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted'}
-            `}
-          >
-            <input {...getInputProps()} />
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isDragActive
-                ? "Drop your prototype here"
-                : "Drag and drop your prototype here, or click to select"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload a ZIP file containing your prototype or a single HTML file
-            </p>
           </div>
         </div>
         <DialogFooter>
