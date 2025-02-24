@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { extract } from "https://deno.land/x/zip@v1.2.3/mod.ts"
+import { Unzip } from "https://deno.land/x/zip@v1.2.5/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,30 +33,54 @@ serve(async (req) => {
     }
 
     // Process the file based on its type
-    const isZip = fileName.endsWith('.zip')
+    const isZip = fileName.toLowerCase().endsWith('.zip')
     const deploymentPath = `${prototypeId}`
     
     if (isZip) {
-      // Extract zip contents
-      const zipBlob = new Blob([fileData])
-      const zipBuffer = await zipBlob.arrayBuffer()
-      const files = await extract(new Uint8Array(zipBuffer))
+      console.log('Processing ZIP file')
+      // Create a temporary directory for extraction
+      const tempDir = await Deno.makeTempDir()
       
-      // Upload each extracted file
-      for (const [path, content] of Object.entries(files)) {
-        const { error: uploadError } = await supabase.storage
-          .from('prototype-deployments')
-          .upload(`${deploymentPath}/${path}`, content, {
-            contentType: getContentType(path),
-            upsert: true
-          })
+      try {
+        // Convert ArrayBuffer to Uint8Array
+        const zipData = new Uint8Array(await fileData.arrayBuffer())
+        
+        // Write zip file to temp directory
+        const zipPath = `${tempDir}/archive.zip`
+        await Deno.writeFile(zipPath, zipData)
+        
+        // Extract zip contents
+        const unzip = new Unzip(zipPath)
+        const entries = unzip.getEntries()
+        
+        console.log(`Found ${entries.length} files in ZIP`)
+        
+        // Process each file in the zip
+        for (const entry of entries) {
+          if (!entry.isDirectory) {
+            const content = await entry.getData()
+            
+            const { error: uploadError } = await supabase.storage
+              .from('prototype-deployments')
+              .upload(`${deploymentPath}/${entry.filename}`, content, {
+                contentType: getContentType(entry.filename),
+                upsert: true
+              })
 
-        if (uploadError) {
-          throw new Error(`Failed to upload extracted file ${path}: ${uploadError.message}`)
+            if (uploadError) {
+              throw new Error(`Failed to upload extracted file ${entry.filename}: ${uploadError.message}`)
+            }
+            
+            console.log(`Uploaded ${entry.filename}`)
+          }
         }
+      } finally {
+        // Clean up temporary directory
+        await Deno.remove(tempDir, { recursive: true })
       }
     } else {
       // Upload single file directly
+      console.log('Processing single file')
       const { error: uploadError } = await supabase.storage
         .from('prototype-deployments')
         .upload(`${deploymentPath}/index.html`, fileData, {
@@ -87,6 +111,8 @@ serve(async (req) => {
     if (updateError) {
       throw new Error(`Failed to update prototype status: ${updateError.message}`)
     }
+
+    console.log(`Processing complete, deployed at ${publicUrl}`)
 
     return new Response(
       JSON.stringify({ 
