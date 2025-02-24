@@ -1,4 +1,4 @@
-import { serve, createClient, unzip } from '../bundle-prototype/deps.ts';
+import { serve, createClient, unzip, esbuild } from '../bundle-prototype/deps.ts';
 import type { UnzippedFile } from "../types/prototypes.ts";
 
 // Type declarations
@@ -7,8 +7,16 @@ interface PrototypeRequest {
   fileName: string;
 }
 
-// Add logging for module verification
-console.log("Module imports verified")
+interface PrototypeState {
+  id: string;
+  status: 'pending' | 'processing' | 'processed' | 'failed';
+  deployment_url?: string;
+  processed_at?: Date;
+  bundle_path?: string;
+  sandbox_config?: {
+    permissions: string[];
+  };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,24 +37,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // First, verify the prototype exists and check its current state
-    const { data: prototypeData, error: prototypeError } = await supabase
+    // Update status to processing
+    await supabase
       .from('prototypes')
-      .select('*')
+      .update({ status: 'processing' })
       .eq('id', prototypeId)
-      .single()
-
-    if (prototypeError) {
-      console.error(`Failed to fetch prototype: ${prototypeError.message}`)
-      throw new Error(`Prototype verification failed: ${prototypeError.message}`)
-    }
-
-    if (!prototypeData) {
-      console.error(`No prototype found with ID: ${prototypeId}`)
-      throw new Error('Prototype not found')
-    }
-
-    console.log(`Current prototype state: ${JSON.stringify(prototypeData)}`)
 
     // Download the uploaded file
     const { data: fileData, error: downloadError } = await supabase.storage
@@ -54,63 +49,63 @@ serve(async (req) => {
       .download(`${prototypeId}/${fileName}`)
 
     if (downloadError) {
-      console.error(`Download error: ${downloadError.message}`)
       throw new Error(`Failed to download file: ${downloadError.message}`)
     }
-
-    console.log('File downloaded successfully, beginning processing...')
 
     // Process the file based on its type
     const isZip = fileName.toLowerCase().endsWith('.zip')
     const deploymentPath = `${prototypeId}`
-    
+    let bundlePath: string | undefined
+
     if (isZip) {
       console.log('Processing ZIP file')
-      
       try {
-        // Convert ArrayBuffer to Uint8Array
-        const zipData = new Uint8Array(await fileData.arrayBuffer())
+        const files = await unzip(new Uint8Array(await fileData.arrayBuffer()))
         
-        // Unzip the content
-        const unzippedFiles = await unzip(zipData) as UnzippedFile[];
-        
-        console.log(`Found ${unzippedFiles.length} files in ZIP`)
-        
-        // Process each file in the zip
-        for (const file of unzippedFiles) {
-          // Skip Mac metadata files and empty files
-          if (
-            file.content.length > 0 && // Skip empty files/directories
-            !file.name.startsWith('__MACOSX/') && // Skip Mac metadata directory
-            !file.name.startsWith('._') && // Skip Mac metadata files
-            !file.name.endsWith('/') // Skip directory entries
-          ) {
-            const { error: uploadError } = await supabase.storage
-              .from('prototype-deployments')
-              .upload(`${deploymentPath}/${file.name}`, file.content, {
-                contentType: getContentType(file.name),
-                upsert: true
-              })
-
-            if (uploadError) {
-              throw new Error(`Failed to upload extracted file ${file.name}: ${uploadError.message}`)
-            }
-            
-            console.log(`Uploaded ${file.name}`)
-          } else {
-            console.log(`Skipping file ${file.name} (metadata or directory)`)
-          }
+        // Find the entry point (index.html)
+        const indexFile = files.find(f => f.name.toLowerCase() === 'index.html')
+        if (!indexFile) {
+          throw new Error('No index.html found in ZIP')
         }
-      } catch (error: unknown) {
+
+        // Bundle the code using esbuild
+        const result = await esbuild.build({
+          entryPoints: ['index.html'],
+          bundle: true,
+          write: false,
+          format: 'esm',
+          sourcemap: true,
+          minify: true,
+          loader: {
+            '.html': 'text',
+            '.js': 'js',
+            '.css': 'css',
+          },
+        })
+
+        // Upload the bundled code
+        const { error: uploadError } = await supabase.storage
+          .from('prototype-deployments')
+          .upload(`${deploymentPath}/bundle.js`, result.outputFiles[0].contents, {
+            contentType: 'application/javascript',
+            upsert: true
+          })
+
+        if (uploadError) {
+          throw new Error(`Failed to upload bundle: ${uploadError.message}`)
+        }
+
+        bundlePath = `${deploymentPath}/bundle.js`
+      } catch (error) {
         console.error('Error processing ZIP:', error)
         throw new Error(`Failed to process ZIP file: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     } else {
-      // Upload single file directly
-      console.log('Processing single file')
+      // For single file uploads, treat as the bundle
+      bundlePath = `${deploymentPath}/index.html`
       const { error: uploadError } = await supabase.storage
         .from('prototype-deployments')
-        .upload(`${deploymentPath}/index.html`, fileData, {
+        .upload(bundlePath, fileData, {
           contentType: 'text/html',
           upsert: true
         })
@@ -123,37 +118,18 @@ serve(async (req) => {
     // Get the public URL for the deployed prototype
     const { data: { publicUrl } } = supabase.storage
       .from('prototype-deployments')
-      .getPublicUrl(`${deploymentPath}/index.html`)
+      .getPublicUrl(bundlePath!)
 
-    console.log(`Generated public URL: ${publicUrl}`)
-
-    // First, let's check what fields exist in the table
-    const { data: tableInfo, error: tableError } = await supabase
-      .from('prototypes')
-      .select('*')
-      .limit(1)
-
-    if (tableError) {
-      console.error(`Failed to fetch table info: ${tableError.message}`)
-      throw new Error(`Schema verification failed: ${tableError.message}`)
+    // Update prototype with final state
+    const updateData: Partial<PrototypeState> = {
+      status: 'processed',
+      deployment_url: publicUrl,
+      processed_at: new Date(),
+      bundle_path: bundlePath,
+      sandbox_config: {
+        permissions: ['allow-scripts', 'allow-same-origin']
+      }
     }
-
-    console.log('Available columns:', Object.keys(tableInfo?.[0] || {}))
-
-    // Update with minimal fields
-    const updateData: Record<string, any> = {
-      deployment_url: publicUrl
-    }
-
-    // Only add these if they exist in the schema
-    if (tableInfo?.[0]?.hasOwnProperty('deployment_status')) {
-      updateData.deployment_status = 'deployed'
-    }
-    if (tableInfo?.[0]?.hasOwnProperty('file_path')) {
-      updateData.file_path = `${prototypeId}/${fileName}`
-    }
-
-    console.log('Updating with fields:', updateData)
 
     const { error: updateError } = await supabase
       .from('prototypes')
@@ -165,14 +141,22 @@ serve(async (req) => {
       throw new Error(`Failed to update prototype status: ${updateError.message}`)
     }
 
-    console.log(`Processing complete, deployed at ${publicUrl}`)
+    // Log final state for debugging
+    const { data: finalState } = await supabase
+      .from('prototypes')
+      .select('*')
+      .eq('id', prototypeId)
+      .single()
+    
+    console.log('Final prototype state:', finalState)
 
     return new Response(
       JSON.stringify({ 
         success: true,
         message: 'Prototype processed successfully',
         prototypeId,
-        url: publicUrl
+        url: publicUrl,
+        sandbox_config: updateData.sandbox_config
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -180,11 +164,23 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error(`Processing failed: ${error.message}`)
+    // Update status to failed if there's an error
+    const { prototypeId } = await req.json() as PrototypeRequest
+    if (prototypeId) {
+      await supabase
+        .from('prototypes')
+        .update({ 
+          status: 'failed',
+          processed_at: new Date()
+        })
+        .eq('id', prototypeId)
+    }
+
+    console.error(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -200,6 +196,7 @@ function getContentType(filename: string): string {
     case 'html': return 'text/html'
     case 'css': return 'text/css'
     case 'js': return 'application/javascript'
+    case 'json': return 'application/json'
     case 'png': return 'image/png'
     case 'jpg':
     case 'jpeg': return 'image/jpeg'
