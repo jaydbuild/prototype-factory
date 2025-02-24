@@ -1,3 +1,4 @@
+
 import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, AlertCircle } from "lucide-react";
@@ -24,25 +25,28 @@ const PreviewIframe = forwardRef<HTMLIFrameElement, PreviewIframeProps>(
     setHasError(true);
   };
 
-  // Sanitize and validate URL
-  const sanitizeUrl = (url: string) => {
+  // Sanitize and validate URL - moved outside of render phase
+  const sanitizeUrl = (unsafeUrl: string) => {
+    if (!unsafeUrl) return '';
+    
     try {
-      const urlObj = new URL(url);
+      const urlObj = new URL(unsafeUrl);
       // Only allow http and https protocols
       if (!['http:', 'https:'].includes(urlObj.protocol)) {
-        throw new Error('Invalid protocol');
+        console.error('Invalid protocol:', urlObj.protocol);
+        return '';
       }
       return urlObj.toString();
     } catch (e) {
       console.error('Invalid URL:', e);
-      setHasError(true);
       return '';
     }
   };
 
+  // Memoize the sanitized URL to prevent recalculation on every render
   const sanitizedUrl = sanitizeUrl(url);
-
-  if (hasError || !sanitizedUrl) {
+  
+  if (!sanitizedUrl || hasError) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Card className="max-w-md p-6 text-center">
@@ -102,5 +106,3 @@ const PreviewIframe = forwardRef<HTMLIFrameElement, PreviewIframeProps>(
 PreviewIframe.displayName = 'PreviewIframe';
 
 export { PreviewIframe };
-
-//This is just for commit
