@@ -67,7 +67,9 @@ export const PrototypeDetail = () => {
         <div className="absolute inset-0">
           {id && (
             <PreviewWindow 
-              deploymentId={id}
+              prototypeId={id}
+              url={prototype.deployment_url}
+              onShare={handleShare}
             />
           )}
         </div>

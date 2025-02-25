@@ -1,52 +1,59 @@
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
-import React, { useState } from 'react';
-import { PreviewIframe } from './PreviewIframe';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
 
 interface PreviewWindowProps {
-  url: string;
-  onShare: () => void;
+  url?: string;
+  onShare?: () => void;
   prototypeId: string;
 }
 
-export const PreviewWindow = ({ url, onShare, prototypeId }: PreviewWindowProps) => {
-  const [key, setKey] = useState(0);
+export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps) {
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleRefresh = () => {
-    setKey(prev => prev + 1);
-  };
+  useEffect(() => {
+    const fetchPrototypeUrl = async () => {
+      try {
+        // If url is provided, use it directly
+        if (url) {
+          setPreviewUrl(url);
+          setIsLoading(false);
+          return;
+        }
+
+        // Otherwise fetch from storage
+        const { data: { publicUrl } } = await supabase.storage
+          .from('prototype-deployments')
+          .getPublicUrl(`${prototypeId}/index.html`);
+        
+        setPreviewUrl(publicUrl);
+      } catch (error) {
+        console.error('Error fetching preview URL:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPrototypeUrl();
+  }, [prototypeId, url]);
 
   return (
-    <div className="flex flex-col h-screen">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 shrink-0">
-        <div className="flex space-x-2">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <div className="w-3 h-3 rounded-full bg-yellow-500" />
-          <div className="w-3 h-3 rounded-full bg-green-500" />
+    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden rounded-lg border">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-            title="Refresh preview"
-          >
-            <ArrowPathIcon className="w-5 h-5 text-gray-600" />
-          </button>
-          <button
-            onClick={onShare}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            Share
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 min-h-0">
-        <PreviewIframe
-          key={key}
-          url={url}
-          title="Preview"
-          prototypeId={prototypeId}
+      )}
+      {previewUrl && (
+        <iframe
+          src={previewUrl}
+          className="h-full w-full border-none"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
+          title="Prototype Preview"
+          onLoad={() => setIsLoading(false)}
         />
-      </div>
+      )}
     </div>
   );
-};
+}
