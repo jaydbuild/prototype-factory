@@ -58,9 +58,13 @@ export const PrototypeGrid = () => {
           preview_title: item.preview_title,
           preview_description: item.preview_description,
           preview_image: item.preview_image,
-          deployment_status: item.deployment_status as 'pending' | 'deployed' | 'failed' | undefined,
+          deployment_status: item.deployment_status as 'pending' | 'processing' | 'deployed' | 'failed',
           deployment_url: item.deployment_url,
-          file_path: item.file_path
+          file_path: item.file_path,
+          bundle_path: item.bundle_path,
+          processed_at: item.processed_at,
+          status: item.status,
+          sandbox_config: item.sandbox_config
         }));
       } catch (error: any) {
         console.error('Error fetching prototypes:', error);

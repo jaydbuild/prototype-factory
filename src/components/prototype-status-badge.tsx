@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "lucide-react"
 
 interface PrototypeStatusBadgeProps {
-  status: 'pending' | 'deployed' | 'failed' | null
+  status: 'pending' | 'processing' | 'deployed' | 'failed' | null
 }
 
 export function PrototypeStatusBadge({ status }: PrototypeStatusBadgeProps) {
@@ -11,6 +11,7 @@ export function PrototypeStatusBadge({ status }: PrototypeStatusBadgeProps) {
 
   switch (status) {
     case 'pending':
+    case 'processing':
       return (
         <Badge variant="secondary" className="gap-1">
           <Loader2 className="h-3 w-3 animate-spin" />
