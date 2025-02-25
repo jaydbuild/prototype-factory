@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,24 +49,40 @@ export const PrototypeGrid = () => {
 
         if (error) throw error;
         
-        return (data || []).map((item): Prototype => ({
-          id: item.id,
-          name: item.name,
-          created_at: item.created_at,
-          created_by: item.created_by,
-          url: item.url,
-          preview_url: item.preview_url,
-          preview_title: item.preview_title,
-          preview_description: item.preview_description,
-          preview_image: item.preview_image,
-          deployment_status: item.deployment_status as 'pending' | 'processing' | 'deployed' | 'failed',
-          deployment_url: item.deployment_url,
-          file_path: item.file_path,
-          bundle_path: item.bundle_path,
-          processed_at: item.processed_at,
-          status: item.status,
-          sandbox_config: item.sandbox_config
-        }));
+        return (data || []).map((item): Prototype => {
+          // Handle sandbox_config parsing and type conversion
+          let parsedSandboxConfig: Record<string, unknown> | null = null;
+          if (item.sandbox_config) {
+            if (typeof item.sandbox_config === 'string') {
+              try {
+                parsedSandboxConfig = JSON.parse(item.sandbox_config);
+              } catch {
+                console.warn('Failed to parse sandbox_config:', item.sandbox_config);
+              }
+            } else if (typeof item.sandbox_config === 'object') {
+              parsedSandboxConfig = item.sandbox_config as Record<string, unknown>;
+            }
+          }
+
+          return {
+            id: item.id,
+            name: item.name,
+            created_at: item.created_at,
+            created_by: item.created_by,
+            url: item.url,
+            preview_url: item.preview_url,
+            preview_title: item.preview_title,
+            preview_description: item.preview_description,
+            preview_image: item.preview_image,
+            deployment_status: item.deployment_status as 'pending' | 'processing' | 'deployed' | 'failed',
+            deployment_url: item.deployment_url,
+            file_path: item.file_path,
+            bundle_path: item.bundle_path,
+            processed_at: item.processed_at,
+            status: item.status,
+            sandbox_config: parsedSandboxConfig
+          };
+        });
       } catch (error: any) {
         console.error('Error fetching prototypes:', error);
         toast({
