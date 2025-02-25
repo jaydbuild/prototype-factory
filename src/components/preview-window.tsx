@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
@@ -29,7 +30,7 @@ export function PreviewWindow({ deploymentId }: { deploymentId: string }) {
       <iframe
         src={previewUrl}
         className="h-full w-full border-none"
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
         title="Prototype Preview"
         onLoad={() => setIsLoading(false)}
       />

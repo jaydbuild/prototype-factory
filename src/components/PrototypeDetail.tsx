@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { PreviewIframe } from "./PreviewIframe";
+import { PreviewWindow } from "./PreviewWindow";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -13,12 +14,9 @@ export const PrototypeDetail = () => {
   const navigate = useNavigate();
   const [showUI, setShowUI] = useState(true);
 
-  console.log('Attempting to fetch prototype with ID:', id);
-
   const { data: prototype, isLoading } = useQuery({
     queryKey: ['prototype', id],
     queryFn: async () => {
-      console.log('Making Supabase query for ID:', id);
       const { data, error } = await supabase
         .from('prototypes')
         .select('*')
@@ -68,14 +66,9 @@ export const PrototypeDetail = () => {
         {/* Preview */}
         <div className="absolute inset-0">
           {id && (
-            <>
-              {console.log('Preview URL:', prototype.preview_url, 'URL:', prototype.url)}
-              <PreviewIframe 
-                url={prototype.deployment_status === 'deployed' ? prototype.deployment_url : prototype.preview_url || prototype.url}
-                title={prototype.name}
-                prototypeId={id}
-              />
-            </>
+            <PreviewWindow 
+              deploymentId={id}
+            />
           )}
         </div>
 

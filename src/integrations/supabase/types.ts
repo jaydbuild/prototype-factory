@@ -123,6 +123,7 @@ export type Database = {
       }
       prototypes: {
         Row: {
+          bundle_path: string | null
           created_at: string
           created_by: string
           deployment_status: string | null
@@ -134,10 +135,14 @@ export type Database = {
           preview_image: string | null
           preview_title: string | null
           preview_url: string | null
+          processed_at: string | null
+          sandbox_config: Json | null
+          status: string | null
           updated_at: string
           url: string
         }
         Insert: {
+          bundle_path?: string | null
           created_at?: string
           created_by: string
           deployment_status?: string | null
@@ -149,10 +154,14 @@ export type Database = {
           preview_image?: string | null
           preview_title?: string | null
           preview_url?: string | null
+          processed_at?: string | null
+          sandbox_config?: Json | null
+          status?: string | null
           updated_at?: string
           url: string
         }
         Update: {
+          bundle_path?: string | null
           created_at?: string
           created_by?: string
           deployment_status?: string | null
@@ -164,6 +173,9 @@ export type Database = {
           preview_image?: string | null
           preview_title?: string | null
           preview_url?: string | null
+          processed_at?: string | null
+          sandbox_config?: Json | null
+          status?: string | null
           updated_at?: string
           url?: string
         }
