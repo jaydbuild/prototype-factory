@@ -22,11 +22,25 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
           return;
         }
 
-        // Otherwise fetch from storage
-        const { data: { publicUrl } } = await supabase.storage
+        // Otherwise fetch from storage with correct content type headers
+        const { data: { publicUrl }, error } = await supabase.storage
           .from('prototype-deployments')
-          .getPublicUrl(`${prototypeId}/index.html`);
-        
+          .createSignedUrl(`${prototypeId}/index.html`, 3600, {
+            download: false,
+            transform: {
+              metadata: {
+                'Content-Type': 'text/html',
+                'Cache-Control': 'no-cache',
+                'X-Frame-Options': 'SAMEORIGIN'
+              }
+            }
+          });
+          
+        if (error) {
+          console.error('Error fetching preview URL:', error);
+          return;
+        }
+
         setPreviewUrl(publicUrl);
       } catch (error) {
         console.error('Error fetching preview URL:', error);
@@ -50,6 +64,10 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
           src={previewUrl}
           className="h-full w-full border-none"
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
+          allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; midi"
+          loading="lazy"
+          importance="high"
+          referrerPolicy="no-referrer"
           title="Prototype Preview"
           onLoad={() => setIsLoading(false)}
         />
