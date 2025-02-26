@@ -97,28 +97,22 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
       console.log('File uploaded successfully:', { filePath });
 
-      // Update prototype with file path
-      const { error: updateError } = await supabase
-        .from('prototypes')
-        .update({ file_path: filePath })
-        .eq('id', prototype.id);
+      // Create form data for processing
+      const formData = new FormData();
+      formData.append('file', file);
 
-      if (updateError) {
-        console.error('Prototype update error:', updateError);
-        throw updateError;
-      }
-
-      // Process prototype
-      console.log('Invoking process-prototype function:', {
+      // Process prototype with metadata in URL
+      console.log('Processing prototype:', {
         prototypeId: prototype.id,
         fileName: file.name
       });
 
       const { data: processData, error: processError } = await supabase.functions
         .invoke('process-prototype', {
-          body: { 
-            prototypeId: prototype.id, 
-            fileName: file.name 
+          body: formData,
+          headers: {
+            'x-prototype-id': prototype.id,
+            'x-file-name': file.name
           }
         });
 

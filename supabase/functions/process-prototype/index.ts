@@ -1,34 +1,31 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-prototype-id, x-file-name',
 }
 
-const getContentType = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'html': return 'text/html';
-    case 'css': return 'text/css';
-    case 'js': return 'application/javascript';
-    case 'json': return 'application/json';
-    case 'png': return 'image/png';
-    case 'jpg':
-    case 'jpeg': return 'image/jpeg';
-    case 'svg': return 'image/svg+xml';
-    default: return 'text/plain';
-  }
-};
-
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    // Get metadata from headers
+    const prototypeId = req.headers.get('x-prototype-id');
+    const fileName = req.headers.get('x-file-name');
+
+    if (!prototypeId || !fileName) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required headers' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    // Get the file from the form data
     const formData = await req.formData()
     const file = formData.get('file')
 
@@ -44,59 +41,46 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { prototypeId, fileName } = await req.json()
-    const deploymentPath = `${prototypeId}`
-
     // Upload the file with proper content type
     const { error: uploadError } = await supabase.storage
       .from('prototype-deployments')
-      .upload(`${deploymentPath}/${fileName}`, file, {
-        contentType: getContentType(fileName),
+      .upload(`${prototypeId}/${fileName}`, file, {
+        contentType: file.type,
         cacheControl: '3600',
         upsert: true
       })
 
     if (uploadError) {
+      console.error('Upload error:', uploadError);
       return new Response(
         JSON.stringify({ error: 'Failed to upload file', details: uploadError }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
 
-    // Get the public URL
-    const { data: { publicUrl }, error: urlError } = await supabase.storage
-      .from('prototype-deployments')
-      .getPublicUrl(`${deploymentPath}/${fileName}`)
-
-    if (urlError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to get public URL', details: urlError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
-    }
-
-    // Update prototype with deployment URL
+    // Update prototype status
     const { error: updateError } = await supabase
       .from('prototypes')
       .update({
         deployment_status: 'deployed',
-        deployment_url: publicUrl
+        processed_at: new Date().toISOString()
       })
       .eq('id', prototypeId)
 
     if (updateError) {
+      console.error('Update error:', updateError);
       return new Response(
-        JSON.stringify({ error: 'Failed to update prototype', details: updateError }),
+        JSON.stringify({ error: 'Failed to update prototype status', details: updateError }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
 
     return new Response(
-      JSON.stringify({ success: true, url: publicUrl }),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
-
   } catch (error) {
+    console.error('Process error:', error);
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred', details: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
