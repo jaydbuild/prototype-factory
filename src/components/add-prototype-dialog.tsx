@@ -8,7 +8,6 @@ import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 
 interface AddPrototypeDialogProps {
   open: boolean;
@@ -18,7 +17,6 @@ interface AddPrototypeDialogProps {
 export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogProps) {
   const [name, setName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -41,8 +39,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     }
 
     setIsUploading(true);
-    setUploadProgress('Creating prototype...');
-
     try {
       // Get current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -63,7 +59,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       }
 
       // Create prototype entry
-      setUploadProgress('Creating prototype entry...');
       console.log('Creating prototype:', { 
         name: name.trim(),
         userId: sessionData.session.user.id 
@@ -88,7 +83,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       console.log('Prototype created:', prototype);
 
       // Upload file
-      setUploadProgress('Uploading file...');
       const filePath = `${prototype.id}/${file.name}`;
       console.log('Uploading file:', { filePath, fileSize: file.size });
 
@@ -103,23 +97,29 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
       console.log('File uploaded successfully:', { filePath });
 
-      // Process prototype - UPDATED to use FormData instead of headers
-      setUploadProgress('Processing prototype...');
-      const formData = new FormData();
-      formData.append('file', file);
-      // Send metadata in FormData instead of headers
-      formData.append('prototypeId', prototype.id);
-      formData.append('fileName', file.name);
+      // Update prototype with file path
+      const { error: updateError } = await supabase
+        .from('prototypes')
+        .update({ file_path: filePath })
+        .eq('id', prototype.id);
 
-      console.log('Processing prototype:', {
+      if (updateError) {
+        console.error('Prototype update error:', updateError);
+        throw updateError;
+      }
+
+      // Process prototype
+      console.log('Invoking process-prototype function:', {
         prototypeId: prototype.id,
         fileName: file.name
       });
 
       const { data: processData, error: processError } = await supabase.functions
         .invoke('process-prototype', {
-          body: formData,
-          // No headers for metadata, they're now in FormData
+          body: { 
+            prototypeId: prototype.id, 
+            fileName: file.name 
+          }
         });
 
       console.log('Process response:', { processData, processError });
@@ -129,12 +129,11 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         throw processError;
       }
 
-      // Invalidate queries to refresh the list
       queryClient.invalidateQueries({ queryKey: ['prototypes'] });
 
       toast({
         title: 'Success',
-        description: 'Prototype uploaded and processed successfully',
+        description: 'Prototype uploaded successfully',
       });
       onOpenChange(false);
     } catch (error: any) {
@@ -145,12 +144,11 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       });
       toast({
         title: 'Error',
-        description: error.message || 'Failed to process prototype',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
       setIsUploading(false);
-      setUploadProgress('');
     }
   };
 
@@ -190,10 +188,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
           >
             <input {...getInputProps()} />
             {isUploading ? (
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <p>{uploadProgress || 'Uploading...'}</p>
-              </div>
+              <p>Uploading...</p>
             ) : isDragActive ? (
               <p>Drop the files here...</p>
             ) : (

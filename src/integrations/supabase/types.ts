@@ -126,8 +126,6 @@ export type Database = {
           bundle_path: string | null
           created_at: string
           created_by: string
-          deployment_metadata: Json | null
-          deployment_provider: string | null
           deployment_status: string | null
           deployment_url: string | null
           file_path: string | null
@@ -147,8 +145,6 @@ export type Database = {
           bundle_path?: string | null
           created_at?: string
           created_by: string
-          deployment_metadata?: Json | null
-          deployment_provider?: string | null
           deployment_status?: string | null
           deployment_url?: string | null
           file_path?: string | null
@@ -168,8 +164,6 @@ export type Database = {
           bundle_path?: string | null
           created_at?: string
           created_by?: string
-          deployment_metadata?: Json | null
-          deployment_provider?: string | null
           deployment_status?: string | null
           deployment_url?: string | null
           file_path?: string | null
