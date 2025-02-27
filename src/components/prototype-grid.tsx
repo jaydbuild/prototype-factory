@@ -16,7 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { AddPrototypeDialog } from "./add-prototype-dialog";
 import type { Prototype } from "@/types/prototype";
-import type { Database } from "@/types/supabase";
 
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
