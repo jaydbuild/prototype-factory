@@ -1,7 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { JSZip } from "https://deno.land/x/zipjs@v2.7.45/index.js";
+
+// Import JSZip correctly
+import * as JSZip from "https://deno.land/x/jszip@0.11.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +17,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Process prototype function called");
+    
     // Parse the request body as JSON
     const { prototypeId, fileName } = await req.json();
     
@@ -31,6 +35,7 @@ serve(async (req) => {
     );
 
     // Update prototype status to processing
+    console.log("Updating prototype status to processing");
     await supabase
       .from('prototypes')
       .update({ 
@@ -40,6 +45,7 @@ serve(async (req) => {
       .eq('id', prototypeId);
 
     // Get the uploaded file from storage
+    console.log(`Downloading file from storage: ${prototypeId}/${fileName}`);
     const { data: fileData, error: fileError } = await supabase.storage
       .from('prototype-uploads')
       .download(`${prototypeId}/${fileName}`);
@@ -58,22 +64,26 @@ serve(async (req) => {
     // Process based on file type
     if (fileName.endsWith('.zip')) {
       console.log('Processing ZIP file');
-      const zip = new JSZip();
       
       try {
-        await zip.loadAsync(fileData);
+        // Convert the file to ArrayBuffer and process with JSZip
+        const zip = new JSZip.JSZip();
+        const arrayBuffer = await fileData.arrayBuffer();
+        
+        console.log(`Loading ZIP from ArrayBuffer (${arrayBuffer.byteLength} bytes)`);
+        await zip.loadAsync(arrayBuffer);
         console.log('ZIP loaded successfully');
         
-        // Process all files in the ZIP
+        // Get all files in the ZIP
         const files = Object.keys(zip.files);
-        console.log(`Found ${files.length} files in ZIP`);
+        console.log(`Found ${files.length} files in ZIP: ${files.join(', ')}`);
         
         // Find HTML files
         const htmlFiles = files.filter(path => 
           !zip.files[path].dir && (path.endsWith('.html') || path.endsWith('.htm'))
         );
         
-        console.log(`Found ${htmlFiles.length} HTML files`);
+        console.log(`Found ${htmlFiles.length} HTML files: ${htmlFiles.join(', ')}`);
         
         if (htmlFiles.length === 0) {
           throw new Error('No HTML files found in the ZIP');
@@ -87,11 +97,15 @@ serve(async (req) => {
         console.log(`Using ${indexFile} as the main HTML file`);
         
         // Process and upload all files
+        let successfulUploads = 0;
+        let failedUploads = 0;
+        
         for (const path of files) {
           const zipEntry = zip.files[path];
           
           if (!zipEntry.dir) {
             try {
+              console.log(`Processing file: ${path}`);
               const fileContent = await zipEntry.async('uint8array');
               const uploadPath = `${prototypeId}/${path}`;
               
@@ -117,18 +131,21 @@ serve(async (req) => {
                 
               if (uploadError) {
                 console.error(`Error uploading ${path}:`, uploadError);
-                // Continue with other files instead of throwing
-                console.warn(`Skipping file ${path} due to upload error`);
+                failedUploads++;
+              } else {
+                successfulUploads++;
               }
             } catch (uploadError) {
               console.error(`Error processing file ${path}:`, uploadError);
-              // Continue with other files
-              console.warn(`Skipping file ${path} due to processing error`);
+              failedUploads++;
             }
           }
         }
         
-        // Ensure index.html exists at the root level
+        console.log(`Upload summary: ${successfulUploads} successful, ${failedUploads} failed`);
+        
+        // Create index.html at the root level
+        console.log(`Ensuring index.html exists at the root level (using ${indexFile})`);
         const mainFileContent = await zip.files[indexFile].async('uint8array');
         const { error: mainFileError } = await supabase.storage
           .from('prototype-deployments')
@@ -165,6 +182,7 @@ serve(async (req) => {
     }
     
     // Get the deployment URL
+    console.log('Getting deployment URL');
     const { data: publicUrlData } = await supabase.storage
       .from('prototype-deployments')
       .getPublicUrl(`${prototypeId}/index.html`);
@@ -173,6 +191,7 @@ serve(async (req) => {
     console.log(`Deployment URL: ${deploymentUrl}`);
     
     // Update prototype with status and URL
+    console.log('Updating prototype with deployed status and URL');
     await supabase
       .from('prototypes')
       .update({
@@ -209,10 +228,16 @@ serve(async (req) => {
       );
       
       // Get prototypeId from the request
-      const reqBody = await req.json().catch(() => ({}));
-      const prototypeId = reqBody.prototypeId;
+      let prototypeId;
+      try {
+        const reqBody = await req.json();
+        prototypeId = reqBody.prototypeId;
+      } catch (parseError) {
+        console.error('Error parsing request body:', parseError);
+      }
       
       if (prototypeId) {
+        console.log(`Updating prototype ${prototypeId} status to failed`);
         await supabase
           .from('prototypes')
           .update({
