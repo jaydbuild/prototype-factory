@@ -103,10 +103,13 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
       console.log('File uploaded successfully:', { filePath });
 
-      // Process prototype
+      // Process prototype - UPDATED to use FormData instead of headers
       setUploadProgress('Processing prototype...');
       const formData = new FormData();
       formData.append('file', file);
+      // Send metadata in FormData instead of headers
+      formData.append('prototypeId', prototype.id);
+      formData.append('fileName', file.name);
 
       console.log('Processing prototype:', {
         prototypeId: prototype.id,
@@ -116,10 +119,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       const { data: processData, error: processError } = await supabase.functions
         .invoke('process-prototype', {
           body: formData,
-          headers: {
-            'x-prototype-id': prototype.id,
-            'x-file-name': file.name
-          }
+          // No headers for metadata, they're now in FormData
         });
 
       console.log('Process response:', { processData, processError });
