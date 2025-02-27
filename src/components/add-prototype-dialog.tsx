@@ -8,6 +8,7 @@ import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 interface AddPrototypeDialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface AddPrototypeDialogProps {
 export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogProps) {
   const [name, setName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -39,6 +41,8 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     }
 
     setIsUploading(true);
+    setUploadStep("Getting session...");
+    
     try {
       // Get current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -59,6 +63,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       }
 
       // Create prototype entry
+      setUploadStep("Creating prototype entry...");
       console.log('Creating prototype:', { 
         name: name.trim(),
         userId: sessionData.session.user.id 
@@ -83,6 +88,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       console.log('Prototype created:', prototype);
 
       // Upload file
+      setUploadStep("Uploading file...");
       const filePath = `${prototype.id}/${file.name}`;
       console.log('Uploading file:', { filePath, fileSize: file.size });
 
@@ -98,6 +104,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       console.log('File uploaded successfully:', { filePath });
 
       // Update prototype with file path
+      setUploadStep("Updating prototype metadata...");
       const { error: updateError } = await supabase
         .from('prototypes')
         .update({ file_path: filePath })
@@ -109,6 +116,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       }
 
       // Process prototype
+      setUploadStep("Processing prototype...");
       console.log('Invoking process-prototype function:', {
         prototypeId: prototype.id,
         fileName: file.name
@@ -144,11 +152,12 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       });
       toast({
         title: 'Error',
-        description: error.message,
+        description: error.message || 'Failed to process prototype',
         variant: 'destructive',
       });
     } finally {
       setIsUploading(false);
+      setUploadStep("");
     }
   };
 
@@ -188,7 +197,10 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
           >
             <input {...getInputProps()} />
             {isUploading ? (
-              <p>Uploading...</p>
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <p>{uploadStep || 'Uploading...'}</p>
+              </div>
             ) : isDragActive ? (
               <p>Drop the files here...</p>
             ) : (

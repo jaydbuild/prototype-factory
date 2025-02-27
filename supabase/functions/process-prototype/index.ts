@@ -1,24 +1,7 @@
-import { serve, createClient, unzip, esbuild } from '../bundle-prototype/deps.ts';
-import type { UnzippedFile } from "../types/prototypes.ts";
-import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
-import { crypto } from 'https://deno.land/std@0.140.0/crypto/mod.ts';
 
-// Type declarations
-interface PrototypeRequest {
-  prototypeId: string;
-  fileName: string;
-}
-
-interface PrototypeState {
-  id: string;
-  status: 'pending' | 'processing' | 'processed' | 'failed';
-  deployment_url?: string;
-  processed_at?: Date;
-  bundle_path?: string;
-  sandbox_config?: {
-    permissions: string[];
-  };
-}
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { JSZip } from "https://deno.land/x/zipjs@v2.7.45/index.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,224 +9,235 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Add request tracking
-  const requestId = crypto.randomUUID();
-  console.log(`[${requestId}] Processing new request`);
-  
+  // CORS preflight request handling
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Validate environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // Parse the request body as JSON
+    const { prototypeId, fileName } = await req.json();
     
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error(`[${requestId}] Missing required environment variables`);
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    console.log(`Processing prototype: ${prototypeId}, file: ${fileName}`);
+
+    if (!prototypeId || !fileName) {
+      throw new Error('Missing required parameters: prototypeId and fileName');
     }
 
-    const { prototypeId, fileName } = await req.json() as PrototypeRequest;
-    console.log(`[${requestId}] Processing prototype ${prototypeId} with file ${fileName}`);
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    // Update status to processing
+    // Update prototype status to processing
     await supabase
       .from('prototypes')
-      .update({ status: 'processing' })
-      .eq('id', prototypeId)
-      .single();
-
-    // Download the uploaded file
-    console.log(`[${requestId}] Downloading file from storage`);
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('prototype-uploads')
-      .download(`${prototypeId}/${fileName}`);
-
-    if (downloadError) {
-      console.error(`[${requestId}] Download error: ${downloadError.message}`);
-      return new Response(
-        JSON.stringify({ error: 'Failed to download prototype file' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const isZip = fileName.toLowerCase().endsWith('.zip');
-    const deploymentPath = `${prototypeId}`;
-    
-    if (isZip) {
-      console.log(`[${requestId}] Processing ZIP file`);
-      
-      try {
-        const fileSize = fileData.size;
-        // Check file size (10MB limit)
-        if (fileSize > 10 * 1024 * 1024) {
-          console.error(`[${requestId}] File too large: ${fileSize} bytes`);
-          return new Response(
-            JSON.stringify({ error: 'File size exceeds 10MB limit' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        const zipData = new Uint8Array(await fileData.arrayBuffer());
-        console.log(`[${requestId}] Unzipping file of size: ${zipData.length} bytes`);
-        
-        const unzippedFiles = await unzip(zipData) as UnzippedFile[];
-        console.log(`[${requestId}] Found ${unzippedFiles.length} files in ZIP`);
-
-        try {
-          const { indexHtml, hasCss, hasJs } = validateFiles(unzippedFiles);
-          
-          // Process each file
-          for (const file of unzippedFiles) {
-            if (
-              file.content.length > 0 &&
-              !file.name.startsWith('__MACOSX/') &&
-              !file.name.startsWith('._') &&
-              !file.name.endsWith('/')
-            ) {
-              console.log(`[${requestId}] Processing file: ${file.name}`);
-              
-              let fileContent = file.content;
-              
-              if (file.name.toLowerCase() === 'index.html') {
-                try {
-                  const parser = new DOMParser();
-                  const doc = parser.parseFromString(
-                    new TextDecoder().decode(file.content),
-                    'text/html'
-                  );
-                  
-                  if (!doc) {
-                    throw new Error('Failed to parse HTML');
-                  }
-                  
-                  const sanitizedHTML = doc.documentElement.outerHTML;
-                  fileContent = new TextEncoder().encode(sanitizedHTML);
-                } catch (error) {
-                  console.error(`[${requestId}] HTML processing error: ${error}`);
-                  return new Response(
-                    JSON.stringify({ error: 'Invalid HTML content' }),
-                    { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                  );
-                }
-              }
-
-              const { error: uploadError } = await supabase.storage
-                .from('prototype-deployments')
-                .upload(`${deploymentPath}/${file.name}`, fileContent, {
-                  contentType: getContentType(file.name),
-                  upsert: true
-                });
-
-              if (uploadError) {
-                console.error(`[${requestId}] Upload error for ${file.name}: ${uploadError.message}`);
-                return new Response(
-                  JSON.stringify({ error: `Failed to upload file: ${file.name}` }),
-                  { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
-              }
-              
-              console.log(`[${requestId}] Successfully uploaded ${file.name}`);
-            }
-          }
-        } catch (error) {
-          console.error(`[${requestId}] ZIP processing error: ${error}`);
-          return new Response(
-            JSON.stringify({ error: 'Failed to process ZIP contents' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      } catch (error) {
-        console.error(`[${requestId}] ZIP extraction error: ${error}`);
-        return new Response(
-          JSON.stringify({ error: 'Failed to extract ZIP file' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } else {
-      // Handle single file upload
-      console.log(`[${requestId}] Processing single file`);
-      const { error: uploadError } = await supabase.storage
-        .from('prototype-deployments')
-        .upload(`${deploymentPath}/${fileName}`, fileData, {
-          contentType: getContentType(fileName),
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error(`[${requestId}] Single file upload error: ${uploadError.message}`);
-        return new Response(
-          JSON.stringify({ error: 'Failed to upload file' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Update prototype status
-    const deploymentUrl = `${supabaseUrl}/storage/v1/object/public/prototype-deployments/${deploymentPath}/index.html`;
-    const { error: updateError } = await supabase
-      .from('prototypes')
       .update({ 
-        deployment_status: 'deployed',
-        deployment_url: deploymentUrl 
+        deployment_status: 'processing',
+        status: 'processing'
       })
       .eq('id', prototypeId);
 
-    if (updateError) {
-      console.error(`[${requestId}] Status update error: ${updateError.message}`);
-      return new Response(
-        JSON.stringify({ error: 'Failed to update prototype status' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Get the uploaded file from storage
+    const { data: fileData, error: fileError } = await supabase.storage
+      .from('prototype-uploads')
+      .download(`${prototypeId}/${fileName}`);
+
+    if (fileError) {
+      console.error('Error downloading file:', fileError);
+      throw new Error(`Failed to download file: ${fileError.message}`);
     }
 
-    console.log(`[${requestId}] Successfully processed prototype`);
+    if (!fileData) {
+      throw new Error('No file data received');
+    }
+
+    console.log(`File downloaded: ${fileData.size} bytes`);
+
+    // Process based on file type
+    if (fileName.endsWith('.zip')) {
+      console.log('Processing ZIP file');
+      const zip = new JSZip();
+      
+      try {
+        await zip.loadAsync(fileData);
+        console.log('ZIP loaded successfully');
+        
+        // Process all files in the ZIP
+        const files = Object.keys(zip.files);
+        console.log(`Found ${files.length} files in ZIP`);
+        
+        // Find HTML files
+        const htmlFiles = files.filter(path => 
+          !zip.files[path].dir && (path.endsWith('.html') || path.endsWith('.htm'))
+        );
+        
+        console.log(`Found ${htmlFiles.length} HTML files`);
+        
+        if (htmlFiles.length === 0) {
+          throw new Error('No HTML files found in the ZIP');
+        }
+        
+        // Find index.html or first HTML file
+        const indexFile = htmlFiles.find(path => 
+          path.toLowerCase().includes('index.html') || path.toLowerCase().includes('index.htm')
+        ) || htmlFiles[0];
+        
+        console.log(`Using ${indexFile} as the main HTML file`);
+        
+        // Process and upload all files
+        for (const path of files) {
+          const zipEntry = zip.files[path];
+          
+          if (!zipEntry.dir) {
+            try {
+              const fileContent = await zipEntry.async('uint8array');
+              const uploadPath = `${prototypeId}/${path}`;
+              
+              // Determine content type
+              let contentType = 'application/octet-stream';
+              if (path.endsWith('.html') || path.endsWith('.htm')) contentType = 'text/html';
+              else if (path.endsWith('.css')) contentType = 'text/css';
+              else if (path.endsWith('.js')) contentType = 'application/javascript';
+              else if (path.endsWith('.json')) contentType = 'application/json';
+              else if (path.endsWith('.png')) contentType = 'image/png';
+              else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) contentType = 'image/jpeg';
+              else if (path.endsWith('.gif')) contentType = 'image/gif';
+              else if (path.endsWith('.svg')) contentType = 'image/svg+xml';
+              
+              console.log(`Uploading ${path} (${fileContent.length} bytes, ${contentType})`);
+              
+              const { error: uploadError } = await supabase.storage
+                .from('prototype-deployments')
+                .upload(uploadPath, fileContent, {
+                  contentType,
+                  upsert: true
+                });
+                
+              if (uploadError) {
+                console.error(`Error uploading ${path}:`, uploadError);
+                // Continue with other files instead of throwing
+                console.warn(`Skipping file ${path} due to upload error`);
+              }
+            } catch (uploadError) {
+              console.error(`Error processing file ${path}:`, uploadError);
+              // Continue with other files
+              console.warn(`Skipping file ${path} due to processing error`);
+            }
+          }
+        }
+        
+        // Ensure index.html exists at the root level
+        const mainFileContent = await zip.files[indexFile].async('uint8array');
+        const { error: mainFileError } = await supabase.storage
+          .from('prototype-deployments')
+          .upload(`${prototypeId}/index.html`, mainFileContent, {
+            contentType: 'text/html',
+            upsert: true
+          });
+          
+        if (mainFileError) {
+          console.error('Error uploading main HTML file:', mainFileError);
+          throw new Error(`Failed to upload main HTML file: ${mainFileError.message}`);
+        }
+      } catch (zipError) {
+        console.error('Error processing ZIP:', zipError);
+        throw new Error(`Failed to process ZIP file: ${zipError.message}`);
+      }
+    } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+      console.log('Processing HTML file');
+      
+      // Upload directly as index.html
+      const { error: uploadError } = await supabase.storage
+        .from('prototype-deployments')
+        .upload(`${prototypeId}/index.html`, fileData, {
+          contentType: 'text/html',
+          upsert: true
+        });
+        
+      if (uploadError) {
+        console.error('Error uploading HTML file:', uploadError);
+        throw new Error(`Failed to upload HTML file: ${uploadError.message}`);
+      }
+    } else {
+      throw new Error(`Unsupported file type: ${fileName}. Please upload an HTML file or ZIP archive.`);
+    }
+    
+    // Get the deployment URL
+    const { data: publicUrlData } = await supabase.storage
+      .from('prototype-deployments')
+      .getPublicUrl(`${prototypeId}/index.html`);
+    
+    const deploymentUrl = publicUrlData?.publicUrl;
+    console.log(`Deployment URL: ${deploymentUrl}`);
+    
+    // Update prototype with status and URL
+    await supabase
+      .from('prototypes')
+      .update({
+        deployment_status: 'deployed',
+        status: 'deployed',
+        deployment_url: deploymentUrl,
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', prototypeId);
+      
+    console.log('Processing completed successfully');
+    
     return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        success: true, 
+        deploymentUrl 
+      }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
 
   } catch (error) {
-    console.error(`[${requestId}] Unhandled error: ${error}`);
+    console.error('Error processing prototype:', error);
+    
+    try {
+      // Try to update the prototype status to failed
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      // Get prototypeId from the request
+      const reqBody = await req.json().catch(() => ({}));
+      const prototypeId = reqBody.prototypeId;
+      
+      if (prototypeId) {
+        await supabase
+          .from('prototypes')
+          .update({
+            deployment_status: 'failed',
+            status: 'failed',
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', prototypeId);
+      }
+    } catch (updateError) {
+      console.error('Error updating prototype status:', updateError);
+    }
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: error.message || 'An unknown error occurred',
+        details: error.stack
+      }),
+      {
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        },
+        status: 400
+      }
     );
   }
 });
-
-function getContentType(name: string): string {
-  if (name.endsWith('.html')) return 'text/html';
-  if (name.endsWith('.css')) return 'text/css';
-  if (name.endsWith('.js')) return 'text/javascript';
-  if (name.endsWith('.json')) return 'application/json';
-  return 'text/plain';
-}
-
-function validateFiles(files: UnzippedFile[]): { indexHtml: UnzippedFile, hasCss: boolean, hasJs: boolean } {
-  let indexHtml: UnzippedFile | undefined;
-  let hasCss = false;
-  let hasJs = false;
-
-  for (const file of files) {
-    if (file.name.toLowerCase() === 'index.html') {
-      indexHtml = file;
-    } else if (file.name.endsWith('.css')) {
-      hasCss = true;
-    } else if (file.name.endsWith('.js')) {
-      hasJs = true;
-    }
-  }
-
-  if (!indexHtml) {
-    throw new Error('No index.html file found in the prototype');
-  }
-
-  return { indexHtml, hasCss, hasJs };
-}
