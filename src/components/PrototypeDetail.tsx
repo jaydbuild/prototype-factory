@@ -74,12 +74,25 @@ export const PrototypeDetail = () => {
     if (!id) return;
     
     try {
+      // Get the deployment URL from storage or generate one
+      let deploymentUrl = prototype?.deployment_url;
+      
+      if (!deploymentUrl) {
+        // Generate a deployment URL 
+        const { data } = await supabase.storage
+          .from('prototype-deployments')
+          .getPublicUrl(`${id}/index.html`);
+        
+        deploymentUrl = data.publicUrl;
+      }
+      
       // Force the prototype to be marked as deployed
       await supabase
         .from('prototypes')
         .update({
           deployment_status: 'deployed',
           status: 'deployed',
+          deployment_url: deploymentUrl,
           processed_at: new Date().toISOString()
         })
         .eq('id', id);

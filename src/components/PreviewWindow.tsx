@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 interface PreviewWindowProps {
-  url?: string;
+  url?: string | null;
   onShare?: () => void;
   prototypeId: string;
 }
@@ -22,15 +21,18 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         
         // If url is provided, use it directly
         if (url) {
+          console.log("Using provided URL:", url);
           setPreviewUrl(url);
           return;
         }
 
         // Otherwise fetch from storage
+        console.log("Fetching from storage for ID:", prototypeId);
         const { data: { publicUrl } } = await supabase.storage
           .from('prototype-deployments')
           .getPublicUrl(`${prototypeId}/index.html`);
         
+        console.log("Generated public URL:", publicUrl);
         setPreviewUrl(publicUrl);
       } catch (error) {
         console.error('Error fetching preview URL:', error);
