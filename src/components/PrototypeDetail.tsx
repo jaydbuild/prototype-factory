@@ -38,9 +38,19 @@ export const PrototypeDetail = () => {
       }
 
       return data;
-    },
-    refetchInterval: prototype?.deployment_status === 'processing' ? 5000 : false,
+    }
   });
+
+  // Set up polling when prototype is in processing state
+  useEffect(() => {
+    if (prototype?.deployment_status === 'processing') {
+      const intervalId = setInterval(() => {
+        refetch();
+      }, 5000);
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [prototype?.deployment_status, refetch]);
 
   const handleRefresh = () => {
     refetch();
