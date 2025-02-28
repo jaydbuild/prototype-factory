@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewWindow } from "./PreviewWindow";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Share2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Share2, RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 
 export const PrototypeDetail = () => {
@@ -13,6 +13,7 @@ export const PrototypeDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [showUI, setShowUI] = useState(true);
+  const [processingTimeout, setProcessingTimeout] = useState(false);
 
   const { 
     data: prototype, 
@@ -44,16 +45,58 @@ export const PrototypeDetail = () => {
   // Set up polling when prototype is in processing state
   useEffect(() => {
     if (prototype?.deployment_status === 'processing') {
+      // Set up polling
       const intervalId = setInterval(() => {
         refetch();
       }, 5000);
       
-      return () => clearInterval(intervalId);
+      // Set up timeout after 60 seconds of processing
+      const timeoutId = setTimeout(() => {
+        setProcessingTimeout(true);
+      }, 60000);
+      
+      return () => {
+        clearInterval(intervalId);
+        clearTimeout(timeoutId);
+      };
+    } else {
+      // Reset timeout if status changes
+      setProcessingTimeout(false);
     }
   }, [prototype?.deployment_status, refetch]);
 
   const handleRefresh = () => {
+    setProcessingTimeout(false);
     refetch();
+  };
+
+  const handleForceComplete = async () => {
+    if (!id) return;
+    
+    try {
+      // Force the prototype to be marked as deployed
+      await supabase
+        .from('prototypes')
+        .update({
+          deployment_status: 'deployed',
+          status: 'deployed',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      
+      toast({
+        title: "Status updated",
+        description: "Prototype marked as deployed"
+      });
+      
+      refetch();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error updating status",
+        description: "Failed to update prototype status"
+      });
+    }
   };
 
   const handleShare = async () => {
@@ -119,9 +162,30 @@ export const PrototypeDetail = () => {
                 <h2 className="text-xl font-semibold">Deployment in progress...</h2>
               </div>
               <p className="text-muted-foreground mb-4">Your prototype is being prepared. This may take a moment.</p>
-              <Button onClick={handleRefresh} disabled={isRefetching}>
-                {isRefetching ? 'Checking...' : 'Check Status'}
-              </Button>
+              
+              {processingTimeout && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Taking longer than expected</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      The deployment is taking longer than usual. You can continue waiting or try to force complete the deployment.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                <Button onClick={handleRefresh} disabled={isRefetching}>
+                  {isRefetching ? 'Checking...' : 'Check Status'}
+                </Button>
+                
+                {processingTimeout && (
+                  <Button variant="outline" onClick={handleForceComplete}>
+                    Force Complete
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -131,12 +195,15 @@ export const PrototypeDetail = () => {
             <div className="bg-white rounded-lg p-6 shadow-lg max-w-md">
               <h2 className="text-xl font-semibold text-destructive mb-2">Deployment Failed</h2>
               <p className="text-muted-foreground mb-4">
-                There was an issue deploying your prototype. Please try uploading it again.
+                There was an issue deploying your prototype. Please try uploading it again or force complete the deployment.
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
                 <Button onClick={handleRefresh} disabled={isRefetching}>
                   {isRefetching ? 'Checking...' : 'Check Again'}
+                </Button>
+                <Button variant="outline" onClick={handleForceComplete}>
+                  Force Complete
                 </Button>
               </div>
             </div>
