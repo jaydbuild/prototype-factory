@@ -4,19 +4,34 @@ import sdk from '@stackblitz/sdk';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
+import { PreviewControls } from './preview/PreviewControls';
+import { FeedbackOverlay } from './feedback/FeedbackOverlay';
 import JSZip from 'jszip';
 
 interface StackBlitzPreviewProps {
   prototypeId: string;
   url?: string | null;
   deploymentUrl?: string | null;
+  onShare?: () => void;
 }
 
-export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlitzPreviewProps) {
+export function StackBlitzPreview({ prototypeId, url, deploymentUrl, onShare }: StackBlitzPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'split'>('preview');
+  const [isFeedbackMode, setIsFeedbackMode] = useState(false);
   const { toast } = useToast();
+  
+  const {
+    feedbackPoints,
+    isLoading: isFeedbackLoading,
+    feedbackUsers,
+    currentUser,
+    addFeedbackPoint,
+    updateFeedbackPoint
+  } = usePrototypeFeedback(prototypeId);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -156,7 +171,7 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
             hideNavigation: true,
             hideDevTools: false,
             showSidebar: false,
-            view: 'preview',
+            view: viewMode === 'preview' ? 'preview' : viewMode === 'code' ? 'editor' : 'both',
             terminalHeight: 0,
             forceEmbedLayout: true,
           }
@@ -178,7 +193,38 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
     };
 
     loadProject();
-  }, [prototypeId, url, deploymentUrl, toast]);
+  }, [prototypeId, url, deploymentUrl, toast, viewMode]);
+
+  const handleViewModeChange = (mode: 'preview' | 'code' | 'split') => {
+    setViewMode(mode);
+    
+    // If we have a StackBlitz VM, update its view
+    if (containerRef.current && containerRef.current.querySelector('iframe')) {
+      try {
+        sdk.embedProjectId(
+          containerRef.current,
+          prototypeId,
+          {
+            view: mode === 'preview' ? 'preview' : mode === 'code' ? 'editor' : 'both',
+          }
+        );
+      } catch (error) {
+        console.error("Error updating StackBlitz view mode:", error);
+      }
+    }
+  };
+
+  const handleToggleFeedbackMode = () => {
+    if (!isFeedbackMode && !currentUser) {
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to leave feedback.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsFeedbackMode(!isFeedbackMode);
+  };
 
   // If we have a deployment URL, render it in an iframe instead
   if (deploymentUrl) {
@@ -190,6 +236,28 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
             <div className="text-muted-foreground">Loading preview...</div>
           </div>
         )}
+        
+        {/* Custom Controls */}
+        <div className="absolute top-2 right-2 z-50">
+          <PreviewControls 
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            isFeedbackMode={isFeedbackMode}
+            onToggleFeedbackMode={handleToggleFeedbackMode}
+            onShareClick={onShare || (() => {})}
+          />
+        </div>
+        
+        {/* Feedback Overlay */}
+        <FeedbackOverlay
+          prototypeId={prototypeId}
+          isFeedbackMode={isFeedbackMode}
+          feedbackPoints={feedbackPoints}
+          onFeedbackAdded={addFeedbackPoint}
+          onFeedbackUpdated={updateFeedbackPoint}
+          feedbackUsers={feedbackUsers}
+          currentUser={currentUser}
+        />
         
         <iframe
           src={deploymentUrl}
@@ -223,6 +291,28 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
           </div>
         </div>
       )}
+      
+      {/* Custom Controls */}
+      <div className="absolute top-2 right-2 z-50">
+        <PreviewControls 
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          isFeedbackMode={isFeedbackMode}
+          onToggleFeedbackMode={handleToggleFeedbackMode}
+          onShareClick={onShare || (() => {})}
+        />
+      </div>
+      
+      {/* Feedback Overlay */}
+      <FeedbackOverlay
+        prototypeId={prototypeId}
+        isFeedbackMode={isFeedbackMode}
+        feedbackPoints={feedbackPoints}
+        onFeedbackAdded={addFeedbackPoint}
+        onFeedbackUpdated={updateFeedbackPoint}
+        feedbackUsers={feedbackUsers}
+        currentUser={currentUser}
+      />
       
       <div 
         ref={containerRef} 

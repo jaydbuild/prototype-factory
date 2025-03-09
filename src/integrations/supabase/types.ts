@@ -91,6 +91,89 @@ export type Database = {
         }
         Relationships: []
       }
+      prototype_feedback: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          position: Json | null
+          prototype_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          position?: Json | null
+          prototype_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          position?: Json | null
+          prototype_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prototype_feedback_prototype_id_fkey"
+            columns: ["prototype_id"]
+            isOneToOne: false
+            referencedRelation: "prototypes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prototype_reactions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          feedback_id: string | null
+          id: string
+          prototype_id: string | null
+          reaction_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          feedback_id?: string | null
+          id?: string
+          prototype_id?: string | null
+          reaction_type: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          feedback_id?: string | null
+          id?: string
+          prototype_id?: string | null
+          reaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prototype_reactions_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "prototype_feedback"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prototype_reactions_prototype_id_fkey"
+            columns: ["prototype_id"]
+            isOneToOne: false
+            referencedRelation: "prototypes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prototype_tags: {
         Row: {
           prototype_id: string
