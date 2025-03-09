@@ -89,19 +89,46 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
           await Promise.all(promises);
           
           // Look for index.html at root or in any subdirectory
-          const indexFile = Object.keys(files).find(path => 
+          let indexFile = Object.keys(files).find(path => 
             path === 'index.html' || path.endsWith('/index.html')
           );
           
           if (!indexFile) {
             // If no index.html, try to find any HTML file
             const anyHtmlFile = Object.keys(files).find(path => path.endsWith('.html'));
-            if (!anyHtmlFile) {
+            if (anyHtmlFile) {
+              indexFile = anyHtmlFile;
+              console.log("Using HTML file as index:", anyHtmlFile);
+            } else {
               throw new Error('No HTML files found in the ZIP archive');
             }
-            // Rename the first HTML file to index.html for simplicity
-            files['index.html'] = files[anyHtmlFile];
-            console.log("Using HTML file as index:", anyHtmlFile);
+          }
+
+          // Enhance HTML file with proper CSS imports
+          if (indexFile) {
+            let htmlContent = files[indexFile];
+            
+            // Find all CSS files in the archive
+            const cssFiles = Object.keys(files).filter(path => path.endsWith('.css'));
+            
+            // Ensure CSS files are properly linked in the HTML
+            if (cssFiles.length > 0) {
+              // Create style injections for each CSS file
+              const styleInjections = cssFiles.map(cssPath => {
+                return `<style>${files[cssPath]}</style>`;
+              }).join('\n');
+              
+              // Insert styles in the head of the HTML
+              htmlContent = htmlContent.replace('</head>', `${styleInjections}\n</head>`);
+              
+              // Update the HTML file with CSS inlined
+              files['index.html'] = htmlContent;
+              
+              // If the index file wasn't at the root, also update it
+              if (indexFile !== 'index.html') {
+                files[indexFile] = htmlContent;
+              }
+            }
           }
         } else if (fileName.endsWith('.html')) {
           // Handle HTML file
@@ -114,7 +141,7 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
 
         console.log("Creating StackBlitz project with files:", Object.keys(files));
         
-        // Create StackBlitz project
+        // Create StackBlitz project with enhanced configuration
         await sdk.embedProject(
           containerRef.current,
           {
@@ -127,6 +154,11 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
             height: '100%',
             hideNavigation: true,
             hideDevTools: false,
+            allowFullScreen: true,
+            showSidebar: false,
+            view: 'preview',
+            terminalHeight: 0,
+            forceEmbedLayout: true,
           }
         );
 

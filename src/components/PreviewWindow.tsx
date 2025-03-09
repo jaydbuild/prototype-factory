@@ -1,7 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { StackBlitzPreview } from './StackBlitzPreview';
+import '@/styles/PreviewIframe.css';
 
 interface PreviewWindowProps {
   url?: string | null;
@@ -101,8 +103,39 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
     setUseStackBlitz(true);
   };
 
+  // Define a function to inject CSS fixes into the iframe after it loads
+  const injectCssFixesToIframe = (iframe: HTMLIFrameElement) => {
+    try {
+      if (iframe && iframe.contentDocument) {
+        // Create a style element
+        const style = iframe.contentDocument.createElement('style');
+        style.textContent = `
+          /* Fix for bullet points and list styling */
+          body { font-family: system-ui, -apple-system, sans-serif; }
+          ul { padding-left: 20px; list-style-type: disc !important; }
+          ol { padding-left: 20px; list-style-type: decimal !important; }
+          li { display: list-item !important; margin: 0.5em 0; }
+          li::marker { display: inline-block; }
+        `;
+        
+        // Append it to the iframe's head
+        if (iframe.contentDocument.head) {
+          iframe.contentDocument.head.appendChild(style);
+        }
+        
+        // Add a class to the body for additional styling
+        if (iframe.contentDocument.body) {
+          iframe.contentDocument.body.classList.add('preview-style-fix');
+        }
+      }
+    } catch (e) {
+      console.error('Error injecting CSS into iframe:', e);
+      // Don't fail the preview if this doesn't work
+    }
+  };
+
   return (
-    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden rounded-lg border">
+    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden rounded-lg border preview-iframe-container">
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -122,10 +155,16 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
       {previewUrl && !useStackBlitz && (
         <iframe
           src={previewUrl}
-          className="h-full w-full border-none"
+          className="preview-iframe"
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
           title="Prototype Preview"
-          onLoad={handleIframeLoad}
+          onLoad={(e) => {
+            handleIframeLoad();
+            // Inject CSS fixes to the iframe
+            if (e.currentTarget) {
+              injectCssFixesToIframe(e.currentTarget);
+            }
+          }}
           onError={handleIframeError}
         />
       )}

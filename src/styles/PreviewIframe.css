@@ -1,0 +1,50 @@
+
+/* Ensure the iframe properly fills its container */
+.preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  overflow: auto;
+}
+
+/* Fix for iframe content scaling */
+.preview-iframe-container {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Override for bullet points and other styling that might be missing */
+.preview-iframe-container iframe {
+  background-color: white;
+}
+
+/* Custom styles to inject into previews for better rendering */
+.preview-style-fix {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.5;
+  list-style-position: inside;
+}
+
+.preview-style-fix ul {
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.preview-style-fix ol {
+  padding-left: 20px;
+  list-style-type: decimal;
+}
+
+.preview-style-fix li {
+  display: list-item;
+  margin: 0.5em 0;
+}
+
+/* Make sure bullet points are visible */
+.preview-style-fix li::marker {
+  content: "• ";
+  display: inline-block;
+}
