@@ -78,6 +78,7 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, onShare }: Sa
   const [scale, setScale] = useState<number>(1);
   const [showCustomDimensionsDialog, setShowCustomDimensionsDialog] = useState(false);
   const [tempCustomDimensions, setTempCustomDimensions] = useState({ width: 375, height: 667 });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   
   const {
@@ -535,12 +536,32 @@ if (typeof window.menuitemfn === 'undefined') {
           onDeviceSelection={handleDeviceSelection}
           deviceConfigs={deviceConfigs}
           onRefresh={() => {
-            // Force refresh the preview
+            // Set refreshing state
+            setIsRefreshing(true);
             console.log(`Manually refreshed preview for file: ${activeFile}`);
+            
             // Create a temporary iframe to trigger a refresh
             const iframe = document.querySelector('.sp-preview iframe') as HTMLIFrameElement;
             if (iframe) {
               iframe.src = iframe.src;
+              
+              // Listen for the iframe to load
+              iframe.onload = () => {
+                // Reset refreshing state after a short delay to ensure the UI updates
+                setTimeout(() => {
+                  setIsRefreshing(false);
+                }, 500);
+              };
+              
+              // Fallback timeout in case onload doesn't fire
+              setTimeout(() => {
+                setIsRefreshing(false);
+              }, 5000);
+            } else {
+              // If iframe not found, reset state after a short delay
+              setTimeout(() => {
+                setIsRefreshing(false);
+              }, 1000);
             }
           }}
           onShare={onShare}
@@ -560,30 +581,42 @@ if (typeof window.menuitemfn === 'undefined') {
         </div>
       </div>
       
-      {/* Always show a minimal toggle button when UI is hidden */}
+      {/* UI toggle button when UI is hidden - positioned at top left */}
       {!showUI && (
-        <div className="absolute top-2 right-2 z-50">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-sm shadow-md"
-            onClick={handleToggleUI}
-            title="Show UI"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="absolute top-2 left-2 z-50 bg-background"
+          onClick={handleToggleUI}
+        >
+          <Eye className="h-4 w-4 mr-1" />
+          Show UI
+        </Button>
       )}
       
+      {/* Loading indicator for initial load */}
       {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <div className="text-muted-foreground">Loading preview...</div>
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading prototype...</p>
+          </div>
         </div>
       )}
       
+      {/* Refreshing indicator */}
+      {isRefreshing && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
+          <div className="flex flex-col items-center gap-2">
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Refreshing prototype...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Error display */}
       {loadError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
           <div className="bg-white rounded-lg p-6 shadow-md max-w-md">
             <h3 className="text-lg font-semibold text-destructive mb-2">Preview Error</h3>
             <p className="text-muted-foreground">{loadError}</p>
