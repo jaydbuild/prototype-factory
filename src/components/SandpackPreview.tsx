@@ -61,6 +61,7 @@ interface SandpackPreviewProps {
 
 export function SandpackPreview({ prototypeId, url, deploymentUrl, onShare }: SandpackPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
@@ -314,6 +315,11 @@ if (typeof window.menuitemfn === 'undefined') {
       return;
     }
     setIsFeedbackMode(!isFeedbackMode);
+    
+    // When enabling feedback mode, make sure we're in preview mode
+    if (!isFeedbackMode && viewMode !== 'preview') {
+      handleViewModeChange('preview');
+    }
   };
 
   // Handle toggle UI
@@ -498,7 +504,7 @@ if (typeof window.menuitemfn === 'undefined') {
     // Reset scale when changing device type
     setScale(1);
   };
-  
+
   // Handle specific device selection
   const handleDeviceSelection = (deviceId: string) => {
     setSelectedDevice(deviceId);
@@ -642,13 +648,17 @@ if (typeof window.menuitemfn === 'undefined') {
         onFeedbackUpdated={updateFeedbackPoint}
         feedbackUsers={feedbackUsers}
         currentUser={currentUser}
+        previewContainerRef={previewContainerRef}
+        deviceType={deviceType}
+        orientation={orientation}
+        scale={scale}
       />
       
       {isFilesReady && (
         <div className="h-full w-full">
           {viewMode === 'preview' && isPreviewable && (
             <div className="h-full w-full flex items-center justify-center overflow-auto">
-              <div style={getDevicePreviewStyle()}>
+              <div style={getDevicePreviewStyle()} ref={previewContainerRef}>
                 <SandpackProvider
                   key={`preview-${activeFile}-${deviceType}-${orientation}`}
                   template="static"
