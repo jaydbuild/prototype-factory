@@ -24,16 +24,18 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
   DropdownMenuGroup,
   DropdownMenuSub,
-  DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Device preview types
 type DeviceType = 'desktop' | 'tablet' | 'mobile' | 'custom';
@@ -358,6 +360,18 @@ export function PreviewControls({
         </div>
       )}
 
+      {/* Feedback mode toggle */}
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="feedback-mode"
+          checked={isFeedbackMode}
+          onCheckedChange={onToggleFeedbackMode}
+        />
+        <Label htmlFor="feedback-mode" className="text-xs cursor-pointer">
+          Feedback Mode
+        </Label>
+      </div>
+
       {/* Refresh button */}
       {onRefresh && (
         <Button
@@ -396,33 +410,6 @@ export function PreviewControls({
           {showUI ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </Button>
       )}
-
-      {/* Feedback button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className={`h-7 w-7 ${isFeedbackMode ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}`}
-        onClick={onToggleFeedbackMode}
-        title={isFeedbackMode ? "Exit feedback mode" : "Enter feedback mode"}
-      >
-        <MessageSquare className="h-3.5 w-3.5" />
-      </Button>
-
-      {/* Thumbs up button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={() => {
-          toast({
-            title: "Feedback sent",
-            description: "Thanks for your positive feedback!"
-          });
-        }}
-        title="Send positive feedback"
-      >
-        <ThumbsUp className="h-3.5 w-3.5" />
-      </Button>
     </div>
   );
 }

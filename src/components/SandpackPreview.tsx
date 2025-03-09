@@ -352,6 +352,10 @@ if (typeof window.menuitemfn === 'undefined') {
           .sp-preview-container {
             padding-top: 0 !important;
           }
+          /* Hide the "Open Sandbox" FAB button */
+          .sp-button.sp-preview-actions {
+            display: none !important;
+          }
         `;
         document.head.appendChild(styleElement);
         
