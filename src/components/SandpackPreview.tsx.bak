@@ -9,7 +9,7 @@ import {
   useSandpack,
   SandpackConsole
 } from '@codesandbox/sandpack-react';
-import { Loader2, Eye, AlertCircle, RefreshCw, Smartphone, Tablet, Monitor, RotateCcw } from 'lucide-react';
+import { Loader2, Eye, AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
@@ -18,39 +18,6 @@ import { FeedbackOverlay } from './feedback/FeedbackOverlay';
 import JSZip from 'jszip';
 import { Button } from '@/components/ui/button';
 import '@/styles/sandpack-fix.css';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-
-// Device preview types
-type DeviceType = 'desktop' | 'tablet' | 'mobile' | 'custom';
-type Orientation = 'portrait' | 'landscape';
-
-interface DeviceConfig {
-  name: string;
-  width: number;
-  height: number;
-  devicePixelRatio?: number;
-}
-
-// Predefined device configurations
-const deviceConfigs: Record<string, DeviceConfig> = {
-  // Mobile devices
-  'iphone-se': { name: 'iPhone SE', width: 375, height: 667, devicePixelRatio: 2 },
-  'iphone-xr': { name: 'iPhone XR', width: 414, height: 896, devicePixelRatio: 2 },
-  'iphone-12': { name: 'iPhone 12', width: 390, height: 844, devicePixelRatio: 3 },
-  'pixel-5': { name: 'Pixel 5', width: 393, height: 851, devicePixelRatio: 2.75 },
-  'galaxy-s20': { name: 'Galaxy S20', width: 360, height: 800, devicePixelRatio: 3 },
-  
-  // Tablet devices
-  'ipad-mini': { name: 'iPad Mini', width: 768, height: 1024, devicePixelRatio: 2 },
-  'ipad-pro': { name: 'iPad Pro 11"', width: 834, height: 1194, devicePixelRatio: 2 },
-  'galaxy-tab': { name: 'Galaxy Tab S7', width: 800, height: 1280, devicePixelRatio: 2 },
-  
-  // Desktop presets
-  'laptop': { name: 'Laptop (1366x768)', width: 1366, height: 768 },
-  'desktop': { name: 'Desktop (1920x1080)', width: 1920, height: 1080 },
-};
 
 interface SandpackPreviewProps {
   prototypeId: string;
@@ -70,14 +37,6 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, onShare }: Sa
   const [isFilesReady, setIsFilesReady] = useState(false);
   const [activeFile, setActiveFile] = useState<string>('index.html');
   const [isPreviewable, setIsPreviewable] = useState<boolean>(true);
-  // Device preview state
-  const [deviceType, setDeviceType] = useState<DeviceType>('desktop');
-  const [orientation, setOrientation] = useState<Orientation>('portrait');
-  const [selectedDevice, setSelectedDevice] = useState<string>('');
-  const [customDimensions, setCustomDimensions] = useState<{ width: number; height: number }>({ width: 375, height: 667 });
-  const [scale, setScale] = useState<number>(1);
-  const [showCustomDimensionsDialog, setShowCustomDimensionsDialog] = useState(false);
-  const [tempCustomDimensions, setTempCustomDimensions] = useState({ width: 375, height: 667 });
   const { toast } = useToast();
   
   const {
@@ -284,13 +243,6 @@ if (typeof window.menuitemfn === 'undefined') {
 
   // Handle view mode change
   const handleViewModeChange = (mode: 'preview' | 'code') => {
-    setViewMode(mode);
-    // Reset to desktop view when switching to code view
-    if (mode === 'code') {
-      setDeviceType('desktop');
-      setOrientation('portrait');
-    }
-    
     // If trying to switch to preview mode but file isn't previewable, stay in code mode
     if (mode === 'preview' && !isPreviewable) {
       toast({
@@ -299,10 +251,14 @@ if (typeof window.menuitemfn === 'undefined') {
         variant: "default",
       });
       setViewMode('code');
+    } else {
+      setViewMode(mode);
     }
+    
+    // Add analytics or other side effects if needed
+    console.log(`View mode changed to: ${mode}`);
   };
 
-  // Handle toggle feedback mode
   const handleToggleFeedbackMode = () => {
     if (!isFeedbackMode && !currentUser) {
       toast({
@@ -315,27 +271,90 @@ if (typeof window.menuitemfn === 'undefined') {
     setIsFeedbackMode(!isFeedbackMode);
   };
 
-  // Handle toggle UI
   const handleToggleUI = () => {
     setShowUI(!showUI);
+    // If onShare is provided, call it as well (for backward compatibility)
+    if (onShare) {
+      onShare();
+    }
   };
-  
+
+  // If we have a deployment URL, render it in an iframe instead
+  if (deploymentUrl) {
+    return (
+      <div className="relative h-full w-full overflow-hidden">
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="text-muted-foreground">Loading preview...</div>
+          </div>
+        )}
+        
+        {/* Custom Controls - Only show if showUI is true */}
+        {showUI && (
+          <div className="absolute top-2 right-2 z-50">
+            <PreviewControls 
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+              isFeedbackMode={isFeedbackMode}
+              onToggleFeedbackMode={handleToggleFeedbackMode}
+              showUI={showUI}
+              onToggleUI={handleToggleUI}
+            />
+          </div>
+        )}
+        
+        {/* Always show a minimal toggle button when UI is hidden */}
+        {!showUI && (
+          <div className="absolute top-2 right-2 z-50">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-sm shadow-md"
+              onClick={handleToggleUI}
+              title="Show UI"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+        
+        {/* Feedback Overlay */}
+        <FeedbackOverlay
+          prototypeId={prototypeId}
+          isFeedbackMode={isFeedbackMode}
+          feedbackPoints={feedbackPoints}
+          onFeedbackAdded={addFeedbackPoint}
+          onFeedbackUpdated={updateFeedbackPoint}
+          feedbackUsers={feedbackUsers}
+          currentUser={currentUser}
+        />
+        
+        <iframe
+          src={deploymentUrl}
+          className="h-full w-full border-none"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
+          title="Prototype Preview"
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setIsLoading(false);
+            setLoadError('Failed to load iframe content. Check console for details.');
+          }}
+        />
+      </div>
+    );
+  }
+
   // Custom preview component that shows the correct file
   const CustomPreview = ({ file }: { file: string }) => {
     const { sandpack } = useSandpack();
     const [refreshKey, setRefreshKey] = useState(0);
-    const previousFileRef = useRef<string | null>(null);
     
     // Force the preview to update when the file changes
     useEffect(() => {
-      // Only update if the file has actually changed
-      if (sandpack && file && previousFileRef.current !== file) {
+      if (sandpack && file) {
         // Set the active file in Sandpack
         sandpack.setActiveFile(file);
-        console.log(`Set active file to: ${file}`);
-        
-        // Update the ref to track the current file
-        previousFileRef.current = file;
       }
     }, [file, sandpack]);
     
@@ -345,15 +364,19 @@ if (typeof window.menuitemfn === 'undefined') {
           className="h-full w-full" 
           showNavigator={true} 
           showRefreshButton={true}
+          key={`${file}-${refreshKey}`} // Force re-render when file changes
         />
         <div className="absolute top-2 right-2 z-10">
           <Button 
             size="sm" 
             variant="outline" 
             onClick={() => {
-              // Force refresh by updating the key
-              setRefreshKey(prev => prev + 1);
-              console.log(`Manually refreshed preview for file: ${file}`);
+              // Force refresh the preview
+              if (sandpack) {
+                sandpack.refresh();
+                setRefreshKey(prev => prev + 1); // Force re-render
+                console.log(`Manually refreshed preview for file: ${file}`);
+              }
             }}
           >
             <RefreshCw className="h-4 w-4 mr-1" />
@@ -398,160 +421,37 @@ if (typeof window.menuitemfn === 'undefined') {
     return null;
   };
 
-  // Helper function to get device dimensions
-  const getDeviceDimensions = () => {
-    if (deviceType === 'desktop') {
-      return { width: '100%', height: '100%' };
-    }
-    
-    if (deviceType === 'custom') {
-      const { width, height } = customDimensions;
-      return orientation === 'portrait' 
-        ? { width: `${width}px`, height: `${height}px` } 
-        : { width: `${height}px`, height: `${width}px` };
-    }
-    
-    if (selectedDevice && deviceConfigs[selectedDevice]) {
-      const { width, height } = deviceConfigs[selectedDevice];
-      return orientation === 'portrait' 
-        ? { width: `${width}px`, height: `${height}px` } 
-        : { width: `${height}px`, height: `${width}px` };
-    }
-    
-    // Default dimensions if no specific device is selected
-    switch (deviceType) {
-      case 'mobile':
-        return orientation === 'portrait' 
-          ? { width: '375px', height: '667px' } 
-          : { width: '667px', height: '375px' };
-      case 'tablet':
-        return orientation === 'portrait' 
-          ? { width: '768px', height: '1024px' } 
-          : { width: '1024px', height: '768px' };
-      default:
-        return { width: '100%', height: '100%' };
-    }
-  };
-
-  // Apply device preview styling
-  const getDevicePreviewStyle = () => {
-    if (deviceType === 'desktop') {
-      return {
-        width: '100%',
-        height: '100%',
-        overflow: 'auto'
-      };
-    }
-    
-    const { width, height } = getDeviceDimensions();
-    
-    return {
-      width,
-      height,
-      margin: 'auto',
-      border: '12px solid #333',
-      borderRadius: '12px',
-      boxShadow: '0 0 20px rgba(0, 0, 0, 0.2)',
-      overflow: 'hidden',
-      transition: 'all 0.3s ease',
-      transform: scale !== 1 ? `scale(${scale})` : 'none',
-      transformOrigin: 'center top'
-    };
-  };
-  
-  // Handle device type change
-  const handleDeviceTypeChange = (type: DeviceType) => {
-    setDeviceType(type);
-    
-    // Set a default device for each type
-    if (type === 'mobile') {
-      setSelectedDevice('iphone-12');
-    } else if (type === 'tablet') {
-      setSelectedDevice('ipad-mini');
-    } else if (type === 'desktop') {
-      setSelectedDevice('');
-    } else if (type === 'custom') {
-      setSelectedDevice('');
-      // Show custom dimensions dialog
-      setTempCustomDimensions(customDimensions);
-      setShowCustomDimensionsDialog(true);
-    }
-    
-    // Reset scale when changing device type
-    setScale(1);
-  };
-  
-  // Handle specific device selection
-  const handleDeviceSelection = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    
-    // Set the appropriate device type based on the selected device
-    if (deviceId.includes('iphone') || deviceId.includes('pixel') || deviceId.includes('galaxy-s')) {
-      setDeviceType('mobile');
-    } else if (deviceId.includes('ipad') || deviceId.includes('galaxy-tab')) {
-      setDeviceType('tablet');
-    } else if (deviceId === 'laptop' || deviceId === 'desktop') {
-      setDeviceType('desktop');
-    }
-  };
-  
-  // Handle scale change
-  const handleScaleChange = (newScale: number) => {
-    setScale(newScale);
-  };
-
-  // Handle saving custom dimensions
-  const handleSaveCustomDimensions = () => {
-    setCustomDimensions(tempCustomDimensions);
-    setShowCustomDimensionsDialog(false);
-  };
-
   return (
-    <div ref={containerRef} className="flex flex-col h-full relative">
-      {/* Fixed-height header with controls */}
-      <div className={`flex justify-between items-center p-2 ${showUI ? '' : 'hidden'}`}>
-        <PreviewControls
-          viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
-          isFeedbackMode={isFeedbackMode}
-          onToggleFeedbackMode={handleToggleFeedbackMode}
-          showUI={showUI}
-          onToggleUI={handleToggleUI}
-          deviceType={deviceType}
-          orientation={orientation}
-          onDeviceChange={handleDeviceTypeChange}
-          onOrientationChange={() => setOrientation(orientation === 'portrait' ? 'landscape' : 'portrait')}
-          onScaleChange={handleScaleChange}
-          scale={scale}
-          selectedDevice={selectedDevice}
-          onDeviceSelection={handleDeviceSelection}
-          deviceConfigs={deviceConfigs}
-        />
-        
-        <div className="flex items-center gap-2">
-          {deploymentUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => window.open(deploymentUrl, '_blank')}
-            >
-              Open Deployed Version
-            </Button>
-          )}
-          
-          {onShare && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={onShare}
-            >
-              Share
-            </Button>
-          )}
-        </div>
+    <div className="relative h-full w-full overflow-hidden">
+      {isLoading && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-muted-foreground">Loading preview...</div>
       </div>
+      )}
+      
+      {loadError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
+          <div className="bg-white rounded-lg p-6 shadow-md max-w-md">
+            <h3 className="text-lg font-semibold text-destructive mb-2">Preview Error</h3>
+            <p className="text-muted-foreground">{loadError}</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Custom Controls - Only show if showUI is true */}
+      {showUI && (
+        <div className="absolute top-2 right-2 z-50">
+          <div className="flex items-center justify-between px-4 py-2 border-b">
+            <PreviewControls 
+              viewMode={viewMode} 
+              onViewModeChange={handleViewModeChange}
+              isFeedbackMode={isFeedbackMode}
+              onToggleFeedbackMode={handleToggleFeedbackMode}
+            />
+          </div>
+        </div>
+      )}
       
       {/* Always show a minimal toggle button when UI is hidden */}
       {!showUI && (
@@ -565,22 +465,6 @@ if (typeof window.menuitemfn === 'undefined') {
           >
             <Eye className="h-3.5 w-3.5" />
           </Button>
-        </div>
-      )}
-      
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <div className="text-muted-foreground">Loading preview...</div>
-        </div>
-      )}
-      
-      {loadError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
-          <div className="bg-white rounded-lg p-6 shadow-md max-w-md">
-            <h3 className="text-lg font-semibold text-destructive mb-2">Preview Error</h3>
-            <p className="text-muted-foreground">{loadError}</p>
-          </div>
         </div>
       )}
       
@@ -598,34 +482,30 @@ if (typeof window.menuitemfn === 'undefined') {
       {isFilesReady && (
         <div className="h-full w-full">
           {viewMode === 'preview' && isPreviewable && (
-            <div className="h-full w-full flex items-center justify-center overflow-auto p-4">
-              <div style={getDevicePreviewStyle()}>
-                <SandpackProvider
-                  key={`preview-${activeFile}-${deviceType}-${orientation}`}
-                  template="static"
-                  files={files}
-                  theme="dark"
-                  options={{
-                    classes: {
-                      "sp-wrapper": "h-full",
-                      "sp-layout": "h-full",
-                      "sp-stack": "h-full",
-                      "sp-preview": "h-full",
-                      "sp-preview-container": "h-full",
-                      "sp-preview-iframe": "h-full"
-                    },
-                    recompileMode: "immediate",
-                    recompileDelay: 0,
-                    activeFile: activeFile
-                  }}
-                  customSetup={{
-                    entry: activeFile
-                  }}
-                >
-                  <CustomPreview file={activeFile} />
-                </SandpackProvider>
-              </div>
-            </div>
+            <SandpackProvider
+              key={`preview-${activeFile}`}
+              template="static"
+              files={files}
+              theme="dark"
+              options={{
+                classes: {
+                  "sp-wrapper": "h-full",
+                  "sp-layout": "h-full",
+                  "sp-stack": "h-full",
+                  "sp-preview": "h-full",
+                  "sp-preview-container": "h-full",
+                  "sp-preview-iframe": "h-full"
+                },
+                recompileMode: "immediate",
+                recompileDelay: 0,
+                activeFile: activeFile
+              }}
+              customSetup={{
+                entry: activeFile
+              }}
+            >
+              <CustomPreview file={activeFile} />
+            </SandpackProvider>
           )}
           
           {(viewMode === 'code' || !isPreviewable) && (
@@ -659,7 +539,7 @@ if (typeof window.menuitemfn === 'undefined') {
                     {!isPreviewable && viewMode === 'preview' && (
                       <div className="bg-muted/50 text-muted-foreground text-sm p-2 flex items-center gap-2">
                         <AlertCircle className="h-4 w-4" />
-                        <span>This file type cannot be previewed directly. Showing code view instead.</span>
+                        <span>This file type cannot be previewed directly. Showing code instead.</span>
                       </div>
                     )}
                     <SandpackCodeEditor
@@ -677,34 +557,30 @@ if (typeof window.menuitemfn === 'undefined') {
               {/* Preview - takes 60% of the space */}
               <div className="w-[60%] h-full border-l border-border">
                 {isPreviewable ? (
-                  <div className="h-full w-full flex items-center justify-center overflow-auto">
-                    <div style={getDevicePreviewStyle()}>
-                      <SandpackProvider
-                        key={`split-preview-${activeFile}-${deviceType}-${orientation}`}
-                        template="static"
-                        files={files}
-                        theme="dark"
-                        options={{
-                          classes: {
-                            "sp-wrapper": "h-full",
-                            "sp-layout": "h-full",
-                            "sp-stack": "h-full",
-                            "sp-preview": "h-full",
-                            "sp-preview-container": "h-full",
-                            "sp-preview-iframe": "h-full"
-                          },
-                          recompileMode: "immediate",
-                          recompileDelay: 0,
-                          activeFile: activeFile
-                        }}
-                        customSetup={{
-                          entry: activeFile
-                        }}
-                      >
-                        <CustomPreview file={activeFile} />
-                      </SandpackProvider>
-                    </div>
-                  </div>
+                  <SandpackProvider
+                    key={`split-preview-${activeFile}`}
+                    template="static"
+                    files={files}
+                    theme="dark"
+                    options={{
+                      classes: {
+                        "sp-wrapper": "h-full",
+                        "sp-layout": "h-full",
+                        "sp-stack": "h-full",
+                        "sp-preview": "h-full",
+                        "sp-preview-container": "h-full",
+                        "sp-preview-iframe": "h-full"
+                      },
+                      recompileMode: "immediate",
+                      recompileDelay: 0,
+                      activeFile: activeFile
+                    }}
+                    customSetup={{
+                      entry: activeFile
+                    }}
+                  >
+                    <CustomPreview file={activeFile} />
+                  </SandpackProvider>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-muted/30">
                     <div className="text-center p-6 max-w-md">
@@ -721,96 +597,6 @@ if (typeof window.menuitemfn === 'undefined') {
           )}
         </div>
       )}
-      
-      {/* Custom Dimensions Dialog */}
-      <Dialog open={showCustomDimensionsDialog} onOpenChange={setShowCustomDimensionsDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Custom Device Dimensions</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="width">Width (px)</Label>
-                <Input
-                  id="width"
-                  type="number"
-                  value={tempCustomDimensions.width}
-                  onChange={(e) => setTempCustomDimensions({
-                    ...tempCustomDimensions,
-                    width: parseInt(e.target.value) || 375
-                  })}
-                />
-              </div>
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="height">Height (px)</Label>
-                <Input
-                  id="height"
-                  type="number"
-                  value={tempCustomDimensions.height}
-                  onChange={(e) => setTempCustomDimensions({
-                    ...tempCustomDimensions,
-                    height: parseInt(e.target.value) || 667
-                  })}
-                />
-              </div>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Common dimensions:
-              <div className="flex flex-wrap gap-1 mt-1">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 375, height: 667 })}
-                >
-                  375×667
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 390, height: 844 })}
-                >
-                  390×844
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 768, height: 1024 })}
-                >
-                  768×1024
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 1366, height: 768 })}
-                >
-                  1366×768
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 1920, height: 1080 })}
-                >
-                  1920×1080
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCustomDimensionsDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveCustomDimensions}>
-              Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
