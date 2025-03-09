@@ -40,128 +40,94 @@ export function FeedbackOverlay({
   const [newFeedbackPosition, setNewFeedbackPosition] = useState<{ x: number, y: number } | null>(null);
   const [newFeedbackContent, setNewFeedbackContent] = useState('');
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackPointType | null>(null);
-  const [iframeRect, setIframeRect] = useState<DOMRect | null>(null);
+  const [iframeReady, setIframeReady] = useState(false);
 
-  // Find and track the iframe position
+  // Monitor for iframe readiness
   useEffect(() => {
-    const positionOverlay = () => {
-      // If we have a direct reference to the preview container, use it
-      if (previewContainerRef?.current) {
-        const previewContainer = previewContainerRef.current;
-        const previewRect = previewContainer.getBoundingClientRect();
-        
-        // Find the iframe within the preview container
-        const iframe = previewContainer.querySelector('iframe') as HTMLIFrameElement;
+    if (!isFeedbackMode) {
+      setIframeReady(false);
+      return;
+    }
+
+    let isMounted = true;
+    let checkTimer: NodeJS.Timeout | null = null;
+    
+    const checkIframe = () => {
+      try {
+        // Find the iframe
+        const iframe = document.querySelector('.sp-preview iframe');
         
         if (iframe) {
-          // Get the iframe's position and dimensions
-          const iframeRect = iframe.getBoundingClientRect();
-          setIframeRect(iframeRect);
+          const rect = iframe.getBoundingClientRect();
           
-          // Position the overlay exactly over the iframe
-          if (overlayRef.current) {
-            overlayRef.current.style.position = 'fixed';
-            overlayRef.current.style.top = `${iframeRect.top}px`;
-            overlayRef.current.style.left = `${iframeRect.left}px`;
-            overlayRef.current.style.width = `${iframeRect.width}px`;
-            overlayRef.current.style.height = `${iframeRect.height}px`;
-          }
-        } else {
-          // Fallback: position over the preview container if iframe not found
-          if (overlayRef.current) {
-            overlayRef.current.style.position = 'fixed';
-            overlayRef.current.style.top = `${previewRect.top}px`;
-            overlayRef.current.style.left = `${previewRect.left}px`;
-            overlayRef.current.style.width = `${previewRect.width}px`;
-            overlayRef.current.style.height = `${previewRect.height}px`;
+          // Check if iframe has valid dimensions
+          if (rect.width > 0 && rect.height > 0) {
+            if (isMounted) {
+              setIframeReady(true);
+            }
+            return;
           }
         }
-      } else {
-        // Fallback: look for the iframe directly if no preview container ref
-        const iframe = document.querySelector('.sp-preview iframe') as HTMLIFrameElement;
         
-        if (iframe) {
-          // Get the iframe's position and dimensions
-          const rect = iframe.getBoundingClientRect();
-          setIframeRect(rect);
-          
-          // Position the overlay exactly over the iframe
-          if (overlayRef.current) {
-            overlayRef.current.style.position = 'fixed';
-            overlayRef.current.style.top = `${rect.top}px`;
-            overlayRef.current.style.left = `${rect.left}px`;
-            overlayRef.current.style.width = `${rect.width}px`;
-            overlayRef.current.style.height = `${rect.height}px`;
-          }
+        // If we get here, iframe isn't ready yet - check again soon
+        if (isMounted) {
+          checkTimer = setTimeout(checkIframe, 100);
+        }
+      } catch (error) {
+        console.error('Error checking iframe:', error);
+        if (isMounted) {
+          checkTimer = setTimeout(checkIframe, 500); // Longer delay on error
         }
       }
     };
-
-    // Position the overlay initially
-    if (isFeedbackMode) {
-      // Small delay to ensure the iframe is rendered
-      const timer = setTimeout(() => {
-        positionOverlay();
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isFeedbackMode, previewContainerRef, deviceType, orientation, scale]);
-
-  // Set up a resize observer to track changes to the iframe size
-  useEffect(() => {
-    if (!isFeedbackMode) return;
     
-    const handleResize = () => {
-      // Small delay to ensure the iframe has been resized
-      setTimeout(() => {
-        const positionOverlay = () => {
-          if (previewContainerRef?.current) {
-            const previewContainer = previewContainerRef.current;
-            const iframe = previewContainer.querySelector('iframe') as HTMLIFrameElement;
-            
-            if (iframe) {
-              const iframeRect = iframe.getBoundingClientRect();
-              setIframeRect(iframeRect);
-              
-              if (overlayRef.current) {
-                overlayRef.current.style.position = 'fixed';
-                overlayRef.current.style.top = `${iframeRect.top}px`;
-                overlayRef.current.style.left = `${iframeRect.left}px`;
-                overlayRef.current.style.width = `${iframeRect.width}px`;
-                overlayRef.current.style.height = `${iframeRect.height}px`;
-              }
-            }
+    // Start checking for iframe
+    checkIframe();
+    
+    // Set up iframe load event listener
+    const handleIframeLoad = () => {
+      if (isMounted) {
+        setIframeReady(true);
+      }
+    };
+    
+    const iframe = document.querySelector('.sp-preview iframe');
+    if (iframe) {
+      iframe.addEventListener('load', handleIframeLoad);
+    }
+    
+    // Use MutationObserver to detect when iframe is added to the DOM
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          const newIframe = document.querySelector('.sp-preview iframe');
+          if (newIframe) {
+            newIframe.addEventListener('load', handleIframeLoad);
+            checkIframe(); // Check dimensions immediately
           }
-        };
-        
-        positionOverlay();
-      }, 300);
-    };
-
-    // Set up the resize observer
-    const resizeObserver = new ResizeObserver(handleResize);
+        }
+      }
+    });
     
-    // Observe the document body for size changes
-    resizeObserver.observe(document.body);
+    // Start observing the document body
+    observer.observe(document.body, { childList: true, subtree: true });
     
-    // Also observe the preview container if available
-    if (previewContainerRef?.current) {
-      resizeObserver.observe(previewContainerRef.current);
-    }
-    
-    // Add window resize listener for good measure
-    window.addEventListener('resize', handleResize);
-
-    // Clean up
     return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
+      isMounted = false;
+      observer.disconnect();
+      
+      if (checkTimer) {
+        clearTimeout(checkTimer);
+      }
+      
+      if (iframe) {
+        iframe.removeEventListener('load', handleIframeLoad);
+      }
     };
-  }, [isFeedbackMode, previewContainerRef]);
+  }, [isFeedbackMode]);
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isFeedbackMode || !overlayRef.current || !iframeRect) return;
+    if (!isFeedbackMode || !overlayRef.current || !iframeReady) return;
     
     // Don't add new feedback if clicking on existing feedback or comment thread
     if ((e.target as HTMLElement).closest('.feedback-point') || 
@@ -170,15 +136,19 @@ export function FeedbackOverlay({
       return;
     }
     
-    // Calculate position relative to the iframe
-    const rect = overlayRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    // Ensure the click is within the bounds of the overlay
-    if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
-      setNewFeedbackPosition({ x, y });
-      setSelectedFeedback(null);
+    try {
+      // Calculate position relative to the overlay
+      const rect = overlayRef.current.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      
+      // Ensure the click is within the bounds of the overlay
+      if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
+        setNewFeedbackPosition({ x, y });
+        setSelectedFeedback(null);
+      }
+    } catch (error) {
+      console.error('Error handling overlay click:', error);
     }
   };
 
@@ -277,17 +247,25 @@ export function FeedbackOverlay({
     });
   };
 
+  // If feedback mode is not active or iframe is not ready, don't render anything interactive
+  if (!isFeedbackMode) {
+    return null;
+  }
+
   return (
     <div 
       ref={overlayRef}
-      className={`fixed ${isFeedbackMode ? 'cursor-crosshair z-40' : 'pointer-events-none'}`}
+      className={`absolute inset-0 ${iframeReady ? 'cursor-crosshair' : 'cursor-wait'} ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
       onClick={handleOverlayClick}
-      style={{ 
-        pointerEvents: isFeedbackMode ? 'auto' : 'none',
-      }}
     >
+      {!iframeReady && isFeedbackMode && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/30 z-10">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      )}
+      
       {/* Existing feedback points */}
-      {feedbackPoints.map(feedback => (
+      {iframeReady && feedbackPoints.map(feedback => (
         <div key={feedback.id} className="feedback-point">
           <FeedbackPoint
             feedback={feedback}
@@ -299,7 +277,7 @@ export function FeedbackOverlay({
       ))}
       
       {/* Selected feedback comment thread */}
-      {selectedFeedback && (
+      {iframeReady && selectedFeedback && (
         <div 
           className="absolute comment-thread z-40"
           style={{
@@ -321,7 +299,7 @@ export function FeedbackOverlay({
       )}
       
       {/* New feedback form */}
-      {newFeedbackPosition && (
+      {iframeReady && newFeedbackPosition && (
         <div 
           className="absolute feedback-form z-40"
           style={{

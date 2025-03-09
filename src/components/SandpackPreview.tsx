@@ -314,11 +314,16 @@ if (typeof window.menuitemfn === 'undefined') {
       });
       return;
     }
-    setIsFeedbackMode(!isFeedbackMode);
     
     // When enabling feedback mode, make sure we're in preview mode
     if (!isFeedbackMode && viewMode !== 'preview') {
       handleViewModeChange('preview');
+      // Add a small delay before enabling feedback mode to ensure view mode has changed
+      setTimeout(() => {
+        setIsFeedbackMode(true);
+      }, 100);
+    } else {
+      setIsFeedbackMode(!isFeedbackMode);
     }
   };
 
@@ -327,30 +332,44 @@ if (typeof window.menuitemfn === 'undefined') {
     setShowUI(!showUI);
   };
   
-  // Custom preview component that shows the correct file
-  const CustomPreview = ({ file, hideNavigator = false }: { file: string, hideNavigator?: boolean }) => {
+  // More stable preview component that prevents white screen issues
+  const StablePreview = ({ file, hideNavigator = false }: { file: string, hideNavigator?: boolean }) => {
     const { sandpack } = useSandpack();
-    const [refreshKey, setRefreshKey] = useState(0);
     const previousFileRef = useRef<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     
     // Force the preview to update when the file changes
     useEffect(() => {
-      // Only update if the file has actually changed
-      if (sandpack && file && previousFileRef.current !== file) {
-        // Set the active file in Sandpack
-        sandpack.setActiveFile(file);
-        console.log(`Set active file to: ${file}`);
-        
-        // Update the ref to track the current file
-        previousFileRef.current = file;
+      try {
+        // Only update if the file has actually changed
+        if (sandpack && file && previousFileRef.current !== file) {
+          // Set the active file in Sandpack
+          sandpack.setActiveFile(file);
+          console.log(`Set active file to: ${file}`);
+          
+          // Update the ref to track the current file
+          previousFileRef.current = file;
+        }
+      } catch (error) {
+        console.error("Error setting active file:", error);
       }
     }, [file, sandpack]);
 
     // Add custom CSS to hide the navigator bar
     useEffect(() => {
-      if (hideNavigator) {
-        // Add a style element to hide the navigator
-        const styleElement = document.createElement('style');
+      if (!hideNavigator) return;
+      
+      try {
+        // Use a class-based approach instead of directly manipulating the DOM
+        const styleId = 'sandpack-custom-styles';
+        let styleElement = document.getElementById(styleId) as HTMLStyleElement;
+        
+        if (!styleElement) {
+          styleElement = document.createElement('style');
+          styleElement.id = styleId;
+          document.head.appendChild(styleElement);
+        }
+        
         styleElement.textContent = `
           .sp-navigator {
             display: none !important;
@@ -368,17 +387,62 @@ if (typeof window.menuitemfn === 'undefined') {
             display: none !important;
           }
         `;
-        document.head.appendChild(styleElement);
         
         return () => {
-          // Clean up the style element when component unmounts
-          document.head.removeChild(styleElement);
+          // We don't remove the style element to prevent flashing
+          // when components remount
         };
+      } catch (error) {
+        console.error("Error applying custom styles:", error);
       }
     }, [hideNavigator]);
     
+    // Handle iframe load events
+    useEffect(() => {
+      const handleIframeLoad = () => {
+        setIsLoading(false);
+      };
+      
+      // Use MutationObserver to detect when iframe is added to the DOM
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList') {
+            const iframe = document.querySelector('.sp-preview iframe');
+            if (iframe) {
+              iframe.addEventListener('load', handleIframeLoad);
+              observer.disconnect();
+              break;
+            }
+          }
+        }
+      });
+      
+      // Start observing the document body
+      observer.observe(document.body, { childList: true, subtree: true });
+      
+      // Check if iframe already exists
+      const iframe = document.querySelector('.sp-preview iframe');
+      if (iframe) {
+        iframe.addEventListener('load', handleIframeLoad);
+        observer.disconnect();
+      }
+      
+      return () => {
+        observer.disconnect();
+        const iframe = document.querySelector('.sp-preview iframe');
+        if (iframe) {
+          iframe.removeEventListener('load', handleIframeLoad);
+        }
+      };
+    }, []);
+    
     return (
       <div className="h-full w-full relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+          </div>
+        )}
         <SandpackPreviewComponent 
           className="h-full w-full" 
           showNavigator={!hideNavigator}
@@ -639,28 +703,18 @@ if (typeof window.menuitemfn === 'undefined') {
         </div>
       )}
       
-      {/* Feedback Overlay */}
-      <FeedbackOverlay
-        prototypeId={prototypeId}
-        isFeedbackMode={isFeedbackMode}
-        feedbackPoints={feedbackPoints}
-        onFeedbackAdded={addFeedbackPoint}
-        onFeedbackUpdated={updateFeedbackPoint}
-        feedbackUsers={feedbackUsers}
-        currentUser={currentUser}
-        previewContainerRef={previewContainerRef}
-        deviceType={deviceType}
-        orientation={orientation}
-        scale={scale}
-      />
-      
       {isFilesReady && (
         <div className="h-full w-full">
           {viewMode === 'preview' && isPreviewable && (
             <div className="h-full w-full flex items-center justify-center overflow-auto">
-              <div style={getDevicePreviewStyle()} ref={previewContainerRef}>
+              <div 
+                style={getDevicePreviewStyle()} 
+                ref={previewContainerRef}
+                className="relative"
+              >
+                {/* Stable SandpackProvider that doesn't remount when toggling feedback */}
                 <SandpackProvider
-                  key={`preview-${activeFile}-${deviceType}-${orientation}`}
+                  key={`preview-${prototypeId}`}
                   template="static"
                   files={files}
                   theme="dark"
@@ -681,8 +735,28 @@ if (typeof window.menuitemfn === 'undefined') {
                     entry: activeFile
                   }}
                 >
-                  <CustomPreview file={activeFile} hideNavigator={true} />
+                  <StablePreview 
+                    file={activeFile} 
+                    hideNavigator={true} 
+                  />
                 </SandpackProvider>
+                
+                {/* Feedback Overlay positioned absolutely over the preview */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <FeedbackOverlay
+                    prototypeId={prototypeId}
+                    isFeedbackMode={isFeedbackMode}
+                    feedbackPoints={feedbackPoints}
+                    onFeedbackAdded={addFeedbackPoint}
+                    onFeedbackUpdated={updateFeedbackPoint}
+                    feedbackUsers={feedbackUsers}
+                    currentUser={currentUser}
+                    previewContainerRef={previewContainerRef}
+                    deviceType={deviceType}
+                    orientation={orientation}
+                    scale={scale}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -739,7 +813,7 @@ if (typeof window.menuitemfn === 'undefined') {
                   <div className="h-full w-full flex items-center justify-center overflow-auto">
                     <div style={getDevicePreviewStyle()}>
                       <SandpackProvider
-                        key={`split-preview-${activeFile}-${deviceType}-${orientation}`}
+                        key={`split-preview-${prototypeId}`}
                         template="static"
                         files={files}
                         theme="dark"
@@ -760,7 +834,7 @@ if (typeof window.menuitemfn === 'undefined') {
                           entry: activeFile
                         }}
                       >
-                        <CustomPreview file={activeFile} hideNavigator={true} />
+                        <StablePreview file={activeFile} hideNavigator={true} />
                       </SandpackProvider>
                     </div>
                   </div>
