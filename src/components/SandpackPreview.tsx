@@ -356,6 +356,11 @@ if (typeof window.menuitemfn === 'undefined') {
           .sp-button.sp-preview-actions {
             display: none !important;
           }
+          /* Hide the CodeSandbox export button */
+          .sp-c-kwibBT.sp-preview-actions,
+          .sp-preview-actions {
+            display: none !important;
+          }
         `;
         document.head.appendChild(styleElement);
         
