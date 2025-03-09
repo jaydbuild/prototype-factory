@@ -8,7 +8,8 @@ import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, AlertTriangle } from "lucide-react";
+import JSZip from 'jszip';
 
 interface AddPrototypeDialogProps {
   open: boolean;
@@ -19,9 +20,86 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
   const [name, setName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<string>("");
+  const [fileValidationStatus, setFileValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
+  const [fileValidationMessage, setFileValidationMessage] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Function to validate HTML files
+  const validateHtmlFile = async (file: File): Promise<boolean> => {
+    setFileValidationStatus('validating');
+    setFileValidationMessage("Validating HTML file...");
+    
+    try {
+      // Check if it's an HTML file
+      if (!file.name.toLowerCase().endsWith('.html')) {
+        setFileValidationStatus('invalid');
+        setFileValidationMessage("File must be an HTML document.");
+        return false;
+      }
+      
+      // Basic content check
+      const content = await file.text();
+      if (!content.includes('<html') && !content.includes('<HTML')) {
+        setFileValidationStatus('invalid');
+        setFileValidationMessage("File does not appear to be a valid HTML document.");
+        return false;
+      }
+      
+      setFileValidationStatus('valid');
+      setFileValidationMessage("HTML file is valid.");
+      return true;
+    } catch (error) {
+      console.error("HTML validation error:", error);
+      setFileValidationStatus('invalid');
+      setFileValidationMessage("Error validating HTML file.");
+      return false;
+    }
+  };
+
+  // Function to validate ZIP files
+  const validateZipFile = async (file: File): Promise<boolean> => {
+    setFileValidationStatus('validating');
+    setFileValidationMessage("Validating ZIP archive...");
+    
+    try {
+      const zip = new JSZip();
+      const contents = await zip.loadAsync(file);
+      
+      // Check if zip contains any HTML files
+      const hasHtmlFile = Object.keys(contents.files).some(
+        filename => filename.toLowerCase().endsWith('.html')
+      );
+      
+      if (!hasHtmlFile) {
+        setFileValidationStatus('invalid');
+        setFileValidationMessage("ZIP archive must contain at least one HTML file.");
+        return false;
+      }
+      
+      // Check if zip contains index.html (preferred)
+      const hasIndexHtml = Object.keys(contents.files).some(
+        filename => filename === 'index.html' || filename.endsWith('/index.html')
+      );
+      
+      if (!hasIndexHtml) {
+        // Still valid, but warn the user
+        setFileValidationStatus('valid');
+        setFileValidationMessage("ZIP is valid, but does not contain index.html. The first HTML file will be used.");
+      } else {
+        setFileValidationStatus('valid');
+        setFileValidationMessage("ZIP archive contains valid HTML content.");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("ZIP validation error:", error);
+      setFileValidationStatus('invalid');
+      setFileValidationMessage("Invalid ZIP archive format.");
+      return false;
+    }
+  };
 
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -35,6 +113,27 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       toast({
         title: 'Error',
         description: 'Please provide both a name and a file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate the file first
+    let isValid = false;
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      isValid = await validateZipFile(file);
+    } else if (file.name.toLowerCase().endsWith('.html')) {
+      isValid = await validateHtmlFile(file);
+    } else {
+      setFileValidationStatus('invalid');
+      setFileValidationMessage("Unsupported file type. Please upload an HTML file or ZIP archive.");
+      return;
+    }
+
+    if (!isValid) {
+      toast({
+        title: 'Validation Error',
+        description: fileValidationMessage,
         variant: 'destructive',
       });
       return;
@@ -75,7 +174,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
           name: name.trim(),
           created_by: sessionData.session.user.id,
           url: 'pending',
-          deployment_status: 'pending'
+          deployment_status: 'processing'
         })
         .select()
         .single();
@@ -107,34 +206,17 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       setUploadStep("Updating prototype metadata...");
       const { error: updateError } = await supabase
         .from('prototypes')
-        .update({ file_path: filePath })
+        .update({ 
+          file_path: filePath,
+          // Set as 'client_side' to indicate we'll use StackBlitz for preview
+          deployment_status: 'deployed',
+          status: 'deployed'
+        })
         .eq('id', prototype.id);
 
       if (updateError) {
         console.error('Prototype update error:', updateError);
         throw updateError;
-      }
-
-      // Process prototype
-      setUploadStep("Processing prototype...");
-      console.log('Invoking process-prototype function:', {
-        prototypeId: prototype.id,
-        fileName: file.name
-      });
-
-      const { data: processData, error: processError } = await supabase.functions
-        .invoke('process-prototype', {
-          body: { 
-            prototypeId: prototype.id, 
-            fileName: file.name 
-          }
-        });
-
-      console.log('Process response:', { processData, processError });
-
-      if (processError) {
-        console.error('Processing error:', processError);
-        throw processError;
       }
 
       queryClient.invalidateQueries({ queryKey: ['prototypes'] });
@@ -143,6 +225,9 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         title: 'Success',
         description: 'Prototype uploaded successfully',
       });
+      
+      // Navigate to the prototype detail page
+      navigate(`/prototype/${prototype.id}`);
       onOpenChange(false);
     } catch (error: any) {
       console.error('Operation failed:', {
@@ -158,6 +243,8 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     } finally {
       setIsUploading(false);
       setUploadStep("");
+      setFileValidationStatus('idle');
+      setFileValidationMessage("");
     }
   };
 
@@ -193,6 +280,8 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
               border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
               ${isDragActive ? 'border-primary' : 'border-muted'}
               ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
+              ${fileValidationStatus === 'valid' ? 'border-green-500 bg-green-50' : ''}
+              ${fileValidationStatus === 'invalid' ? 'border-red-500 bg-red-50' : ''}
             `}
           >
             <input {...getInputProps()} />
@@ -201,13 +290,31 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
                 <Loader2 className="h-6 w-6 animate-spin" />
                 <p>{uploadStep || 'Uploading...'}</p>
               </div>
+            ) : fileValidationStatus === 'validating' ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <p>{fileValidationMessage || 'Validating file...'}</p>
+              </div>
+            ) : fileValidationStatus === 'valid' ? (
+              <div className="flex flex-col items-center gap-2">
+                <Check className="h-6 w-6 text-green-500" />
+                <p className="text-green-700">{fileValidationMessage || 'File is valid!'}</p>
+              </div>
+            ) : fileValidationStatus === 'invalid' ? (
+              <div className="flex flex-col items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+                <p className="text-red-700">{fileValidationMessage || 'File is invalid!'}</p>
+                <p className="text-sm text-red-600 mt-2">
+                  Please upload a valid HTML file or ZIP archive containing HTML files.
+                </p>
+              </div>
             ) : isDragActive ? (
               <p>Drop the files here...</p>
             ) : (
               <p>Drag 'n' drop a file here, or click to select</p>
             )}
             <p className="text-sm text-muted-foreground mt-2">
-              Supports HTML files or ZIP archives
+              Supports HTML files or ZIP archives containing web content
             </p>
           </div>
         </div>
