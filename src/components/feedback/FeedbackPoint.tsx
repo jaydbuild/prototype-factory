@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackStatus } from '@/types/feedback';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +33,13 @@ export function FeedbackPoint({
     }
   };
 
+  // Handle click with explicit event stopping
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onClick(feedback);
+  };
+
   return (
     <div
       className={`absolute flex items-center justify-center -translate-x-1/2 -translate-y-1/2 ${
@@ -43,9 +49,10 @@ export function FeedbackPoint({
         left: `${position.x}%`,
         top: `${position.y}%`,
       }}
+      onClick={handleClick}
     >
       <button
-        onClick={() => onClick(feedback)}
+        onClick={handleClick}
         className={`group relative flex items-center justify-center w-6 h-6 rounded-full transition-all duration-200 ${
           isSelected
             ? 'bg-primary text-primary-foreground scale-125'

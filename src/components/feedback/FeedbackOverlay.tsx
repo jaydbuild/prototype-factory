@@ -41,8 +41,8 @@ export function FeedbackOverlay({
   const [newFeedbackContent, setNewFeedbackContent] = useState('');
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackPointType | null>(null);
   const [iframeReady, setIframeReady] = useState(false);
+  const [isInteractingWithComment, setIsInteractingWithComment] = useState(false);
 
-  // Monitor for iframe readiness
   useEffect(() => {
     if (!isFeedbackMode) {
       setIframeReady(false);
@@ -54,13 +54,11 @@ export function FeedbackOverlay({
     
     const checkIframe = () => {
       try {
-        // Find the iframe
         const iframe = document.querySelector('.sp-preview iframe');
         
         if (iframe) {
           const rect = iframe.getBoundingClientRect();
           
-          // Check if iframe has valid dimensions
           if (rect.width > 0 && rect.height > 0) {
             if (isMounted) {
               setIframeReady(true);
@@ -69,22 +67,19 @@ export function FeedbackOverlay({
           }
         }
         
-        // If we get here, iframe isn't ready yet - check again soon
         if (isMounted) {
           checkTimer = setTimeout(checkIframe, 100);
         }
       } catch (error) {
         console.error('Error checking iframe:', error);
         if (isMounted) {
-          checkTimer = setTimeout(checkIframe, 500); // Longer delay on error
+          checkTimer = setTimeout(checkIframe, 500); 
         }
       }
     };
     
-    // Start checking for iframe
     checkIframe();
     
-    // Set up iframe load event listener
     const handleIframeLoad = () => {
       if (isMounted) {
         setIframeReady(true);
@@ -96,20 +91,18 @@ export function FeedbackOverlay({
       iframe.addEventListener('load', handleIframeLoad);
     }
     
-    // Use MutationObserver to detect when iframe is added to the DOM
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
           const newIframe = document.querySelector('.sp-preview iframe');
           if (newIframe) {
             newIframe.addEventListener('load', handleIframeLoad);
-            checkIframe(); // Check dimensions immediately
+            checkIframe(); 
           }
         }
       }
     });
     
-    // Start observing the document body
     observer.observe(document.body, { childList: true, subtree: true });
     
     return () => {
@@ -129,23 +122,29 @@ export function FeedbackOverlay({
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isFeedbackMode || !overlayRef.current || !iframeReady) return;
     
-    // Don't add new feedback if clicking on existing feedback or comment thread
+    // If we're already interacting with a comment, don't add a new one
+    if (isInteractingWithComment) {
+      e.stopPropagation();
+      return;
+    }
+    
+    // Check if we clicked on an existing feedback point or form
     if ((e.target as HTMLElement).closest('.feedback-point') || 
         (e.target as HTMLElement).closest('.feedback-form') ||
         (e.target as HTMLElement).closest('.comment-thread')) {
+      e.stopPropagation();
       return;
     }
     
     try {
-      // Calculate position relative to the overlay
       const rect = overlayRef.current.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 100;
       const y = ((e.clientY - rect.top) / rect.height) * 100;
       
-      // Ensure the click is within the bounds of the overlay
       if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
         setNewFeedbackPosition({ x, y });
         setSelectedFeedback(null);
+        e.stopPropagation();
       }
     } catch (error) {
       console.error('Error handling overlay click:', error);
@@ -153,16 +152,25 @@ export function FeedbackOverlay({
   };
 
   const handleFeedbackPointClick = (feedback: FeedbackPointType) => {
+    setIsInteractingWithComment(true);
     setSelectedFeedback(feedback);
     setNewFeedbackPosition(null);
   };
 
-  const handleCancelNewFeedback = () => {
+  const handleCancelNewFeedback = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
     setNewFeedbackPosition(null);
     setNewFeedbackContent('');
+    
+    setTimeout(() => setIsInteractingWithComment(false), 100);
   };
 
-  const handleSubmitNewFeedback = async () => {
+  const handleSubmitNewFeedback = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
     if (!newFeedbackPosition || !newFeedbackContent.trim() || !currentUser) {
       toast({
         variant: "destructive",
@@ -197,6 +205,8 @@ export function FeedbackOverlay({
       
       setNewFeedbackPosition(null);
       setNewFeedbackContent('');
+      
+      setTimeout(() => setIsInteractingWithComment(false), 100);
     } catch (error) {
       console.error("Error adding feedback:", error);
       toast({
@@ -204,10 +214,16 @@ export function FeedbackOverlay({
         title: "Error",
         description: "Failed to add feedback. Please try again."
       });
+      setIsInteractingWithComment(false);
     }
   };
 
-  const handleUpdateFeedbackStatus = async (status: FeedbackPointType['status']) => {
+  const handleUpdateFeedbackStatus = async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
     if (!selectedFeedback || !currentUser) return;
     
     try {
@@ -238,16 +254,27 @@ export function FeedbackOverlay({
     }
   };
 
-  const handleAddReply = (content: string) => {
-    // In a real implementation, this would add a reply to the feedback
-    // For now, we'll just show a toast
+  const handleAddReply = (content: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
     toast({
       title: "Reply added",
       description: "Your reply has been added to the feedback."
     });
   };
+  
+  const handleCloseCommentThread = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    setSelectedFeedback(null);
+    
+    setTimeout(() => setIsInteractingWithComment(false), 100);
+  };
 
-  // If feedback mode is not active or iframe is not ready, don't render anything interactive
   if (!isFeedbackMode) {
     return null;
   }
@@ -264,19 +291,21 @@ export function FeedbackOverlay({
         </div>
       )}
       
-      {/* Existing feedback points */}
       {iframeReady && feedbackPoints.map(feedback => (
-        <div key={feedback.id} className="feedback-point">
+        <div 
+          key={feedback.id} 
+          className="feedback-point"
+          onClick={(e) => e.stopPropagation()} 
+        >
           <FeedbackPoint
             feedback={feedback}
             onClick={handleFeedbackPointClick}
             isSelected={selectedFeedback?.id === feedback.id}
-            commentCount={0} // In a real implementation, this would be the count of replies
+            commentCount={0} 
           />
         </div>
       ))}
       
-      {/* Selected feedback comment thread */}
       {iframeReady && selectedFeedback && (
         <div 
           className="absolute comment-thread z-40"
@@ -285,11 +314,11 @@ export function FeedbackOverlay({
             top: `${selectedFeedback.position.y}%`,
             transform: 'translate(10px, -50%)'
           }}
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()} 
         >
           <CommentThread
             feedback={selectedFeedback}
-            onClose={() => setSelectedFeedback(null)}
+            onClose={handleCloseCommentThread}
             onUpdateStatus={handleUpdateFeedbackStatus}
             onAddReply={handleAddReply}
             currentUser={currentUser}
@@ -298,7 +327,6 @@ export function FeedbackOverlay({
         </div>
       )}
       
-      {/* New feedback form */}
       {iframeReady && newFeedbackPosition && (
         <div 
           className="absolute feedback-form z-40"
@@ -307,20 +335,25 @@ export function FeedbackOverlay({
             top: `${newFeedbackPosition.y}%`,
             transform: 'translate(10px, -50%)'
           }}
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()} 
         >
           <Card className="w-72">
             <CardContent className="p-3">
               <Textarea
                 placeholder="What's your feedback?"
                 value={newFeedbackContent}
-                onChange={e => setNewFeedbackContent(e.target.value)}
+                onChange={(e) => setNewFeedbackContent(e.target.value)}
                 className="min-h-[80px]"
                 autoFocus
+                onClick={(e) => e.stopPropagation()} 
               />
             </CardContent>
             <CardFooter className="p-3 pt-0 flex justify-between">
-              <Button variant="outline" size="sm" onClick={handleCancelNewFeedback}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleCancelNewFeedback}
+              >
                 Cancel
               </Button>
               <Button 

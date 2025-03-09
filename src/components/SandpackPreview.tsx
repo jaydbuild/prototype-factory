@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   SandpackProvider, 
   SandpackPreview as SandpackPreviewComponent,
@@ -13,6 +13,7 @@ import { Loader2, Eye, AlertCircle, RefreshCw, Smartphone, Tablet, Monitor, Rota
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
+import { FeedbackPoint as FeedbackPointType } from '@/types/feedback';
 import { PreviewControls } from './preview/PreviewControls';
 import { FeedbackOverlay } from './feedback/FeedbackOverlay';
 import JSZip from 'jszip';
@@ -87,9 +88,17 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, onShare }: Sa
     isLoading: isFeedbackLoading,
     feedbackUsers,
     currentUser,
-    addFeedbackPoint,
-    updateFeedbackPoint
+    addFeedbackPoint: addFeedbackPointFromHook,
+    updateFeedbackPoint: updateFeedbackPointFromHook
   } = usePrototypeFeedback(prototypeId);
+
+  const addFeedbackPoint = useCallback((feedback: FeedbackPointType) => {
+    addFeedbackPointFromHook(feedback);
+  }, [addFeedbackPointFromHook]);
+
+  const updateFeedbackPoint = useCallback((updatedFeedback: FeedbackPointType) => {
+    updateFeedbackPointFromHook(updatedFeedback);
+  }, [updateFeedbackPointFromHook]);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -594,6 +603,8 @@ if (typeof window.menuitemfn === 'undefined') {
     setShowCustomDimensionsDialog(false);
   };
 
+  const sandpackKey = `preview-${prototypeId}`;
+
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">
       {/* Fixed-height header with controls */}
@@ -714,7 +725,7 @@ if (typeof window.menuitemfn === 'undefined') {
               >
                 {/* Stable SandpackProvider that doesn't remount when toggling feedback */}
                 <SandpackProvider
-                  key={`preview-${prototypeId}`}
+                  key={sandpackKey}
                   template="static"
                   files={files}
                   theme="dark"
@@ -742,7 +753,15 @@ if (typeof window.menuitemfn === 'undefined') {
                 </SandpackProvider>
                 
                 {/* Feedback Overlay positioned absolutely over the preview */}
-                <div className="absolute inset-0 pointer-events-none">
+                <div 
+                  className={`absolute inset-0 ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                  onClick={(e) => {
+                    // Allow clicks to pass through to the overlay
+                    if (isFeedbackMode) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
                   <FeedbackOverlay
                     prototypeId={prototypeId}
                     isFeedbackMode={isFeedbackMode}

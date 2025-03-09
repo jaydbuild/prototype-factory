@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackUser } from '@/types/feedback';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,9 +18,9 @@ import { Badge } from '@/components/ui/badge';
 
 interface CommentThreadProps {
   feedback: FeedbackPointType;
-  onClose: () => void;
-  onUpdateStatus: (status: FeedbackPointType['status']) => void;
-  onAddReply: (content: string) => void;
+  onClose: (e: React.MouseEvent) => void;
+  onUpdateStatus: (status: FeedbackPointType['status'], e?: React.MouseEvent) => void;
+  onAddReply: (content: string, e?: React.MouseEvent) => void;
   currentUser?: FeedbackUser;
   creator?: FeedbackUser;
 }
@@ -57,15 +56,39 @@ export function CommentThread({
 
   const statusInfo = getStatusLabel(feedback.status);
 
-  const handleSubmitReply = () => {
+  // Handle status update with explicit event stopping
+  const handleStatusUpdate = (status: FeedbackPointType['status'], e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onUpdateStatus(status, e);
+  };
+
+  // Handle reply submission with explicit event stopping
+  const handleSubmitReply = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
     if (replyContent.trim()) {
-      onAddReply(replyContent);
+      onAddReply(replyContent, e);
       setReplyContent('');
     }
   };
 
+  // Handle close with explicit event stopping
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onClose(e);
+  };
+
+  // Handle textarea change with explicit event stopping
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    setReplyContent(e.target.value);
+  };
+
   return (
-    <Card className="w-80 shadow-lg">
+    <Card className="w-80 shadow-lg" onClick={(e) => e.stopPropagation()}>
       <CardHeader className="p-3 flex flex-row items-start justify-between space-y-0">
         <div className="flex items-center space-x-2">
           <Avatar className="h-6 w-6">
@@ -79,7 +102,11 @@ export function CommentThread({
             </p>
           </div>
         </div>
-        <Badge variant="outline" className={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${statusInfo.color}`}>
+        <Badge 
+          variant="outline" 
+          className={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${statusInfo.color}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           {statusInfo.icon}
           <span>{statusInfo.label}</span>
         </Badge>
@@ -88,19 +115,39 @@ export function CommentThread({
         <p className="text-sm">{feedback.content}</p>
         
         <div className="flex flex-wrap gap-1 mt-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onUpdateStatus('open')}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-xs gap-1" 
+            onClick={(e) => handleStatusUpdate('open', e)}
+          >
             <AlertCircle className="h-3 w-3" />
             Open
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onUpdateStatus('in_progress')}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-xs gap-1" 
+            onClick={(e) => handleStatusUpdate('in_progress', e)}
+          >
             <Clock className="h-3 w-3" />
             In Progress
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onUpdateStatus('resolved')}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-xs gap-1" 
+            onClick={(e) => handleStatusUpdate('resolved', e)}
+          >
             <CheckCircle className="h-3 w-3" />
             Resolved
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onUpdateStatus('closed')}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-xs gap-1" 
+            onClick={(e) => handleStatusUpdate('closed', e)}
+          >
             <XCircle className="h-3 w-3" />
             Closed
           </Button>
@@ -109,14 +156,29 @@ export function CommentThread({
       <CardFooter className="p-3 pt-0 flex flex-col items-stretch gap-2">
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={(e) => e.stopPropagation()}
+            >
               <ThumbsUp className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={(e) => e.stopPropagation()}
+            >
               <ThumbsDown className="h-4 w-4" />
             </Button>
           </div>
-          <Button variant="outline" size="sm" className="h-8" onClick={onClose}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8" 
+            onClick={handleClose}
+          >
             Close
           </Button>
         </div>
@@ -126,7 +188,8 @@ export function CommentThread({
             placeholder="Add a reply..." 
             className="min-h-[60px] text-sm" 
             value={replyContent}
-            onChange={(e) => setReplyContent(e.target.value)}
+            onChange={handleTextareaChange}
+            onClick={(e) => e.stopPropagation()}
           />
           <Button 
             size="sm" 
