@@ -1,13 +1,13 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Eye, Code, SplitSquareHorizontal, ThumbsUp, ArrowLeft, EyeOff } from 'lucide-react';
+import { MessageSquare, Eye, Code, ThumbsUp, ArrowLeft, EyeOff } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
 interface PreviewControlsProps {
-  onViewModeChange: (mode: 'preview' | 'code' | 'split') => void;
-  viewMode: 'preview' | 'code' | 'split';
+  onViewModeChange: (mode: 'preview' | 'code') => void;
+  viewMode: 'preview' | 'code';
   isFeedbackMode: boolean;
   onToggleFeedbackMode: () => void;
   showUI?: boolean;
@@ -41,7 +41,7 @@ export function PreviewControls({
       {/* View mode toggle */}
       <Tabs 
         value={viewMode} 
-        onValueChange={(value) => onViewModeChange(value as 'preview' | 'code' | 'split')}
+        onValueChange={(value) => onViewModeChange(value as 'preview' | 'code')}
         className="w-auto"
       >
         <TabsList className="h-8">
@@ -52,10 +52,6 @@ export function PreviewControls({
           <TabsTrigger value="code" className="flex items-center gap-1 px-2 h-7">
             <Code className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Code</span>
-          </TabsTrigger>
-          <TabsTrigger value="split" className="flex items-center gap-1 px-2 h-7">
-            <SplitSquareHorizontal className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Split</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -79,7 +75,7 @@ export function PreviewControls({
         size="icon"
         className={`h-7 w-7 ${isFeedbackMode ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}`}
         onClick={onToggleFeedbackMode}
-        title="Toggle feedback mode"
+        title={isFeedbackMode ? "Exit feedback mode" : "Enter feedback mode"}
       >
         <MessageSquare className="h-3.5 w-3.5" />
       </Button>

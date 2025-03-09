@@ -5,9 +5,10 @@ import {
   SandpackCodeEditor,
   SandpackLayout,
   SandpackFiles,
-  Sandpack
+  Sandpack,
+  useSandpack
 } from '@codesandbox/sandpack-react';
-import { Loader2, Eye } from 'lucide-react';
+import { Loader2, Eye, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
@@ -28,11 +29,13 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, onShare }: Sa
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'split'>('preview');
+  const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
   const [isFeedbackMode, setIsFeedbackMode] = useState(false);
   const [showUI, setShowUI] = useState(true);
   const [files, setFiles] = useState<SandpackFiles>({});
   const [isFilesReady, setIsFilesReady] = useState(false);
+  const [activeFile, setActiveFile] = useState<string>('index.html');
+  const [isPreviewable, setIsPreviewable] = useState<boolean>(true);
   const { toast } = useToast();
   
   const {
@@ -210,9 +213,46 @@ if (typeof window.menuitemfn === 'undefined') {
     loadProject();
   }, [prototypeId, url, deploymentUrl, toast]);
 
+  // Check if a file is previewable
+  const checkIsPreviewable = (filename: string) => {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    
+    // Files that can be previewed directly
+    const previewableExtensions = ['html', 'htm'];
+    
+    // Files that can be previewed as part of an HTML page
+    const supportedAssets = ['js', 'css', 'json', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp'];
+    
+    if (previewableExtensions.includes(extension || '')) {
+      return true;
+    } else if (supportedAssets.includes(extension || '')) {
+      // Check if we have an HTML file that might include this asset
+      return Object.keys(files).some(file => file.endsWith('.html') || file.endsWith('.htm'));
+    }
+    
+    return false;
+  };
+  
+  // Handle file change
+  const handleFileChange = (file: string) => {
+    setActiveFile(file);
+    setIsPreviewable(checkIsPreviewable(file));
+    console.log(`Active file changed to: ${file}, previewable: ${checkIsPreviewable(file)}`);
+  };
+
   // Handle view mode change
-  const handleViewModeChange = (mode: 'preview' | 'code' | 'split') => {
-    setViewMode(mode);
+  const handleViewModeChange = (mode: 'preview' | 'code') => {
+    // If trying to switch to preview mode but file isn't previewable, stay in code mode
+    if (mode === 'preview' && !isPreviewable) {
+      toast({
+        title: "Preview not available",
+        description: `The file "${activeFile}" cannot be previewed directly. Showing code view instead.`,
+        variant: "default",
+      });
+      setViewMode('code');
+    } else {
+      setViewMode(mode);
+    }
     
     // Add analytics or other side effects if needed
     console.log(`View mode changed to: ${mode}`);
@@ -308,9 +348,9 @@ if (typeof window.menuitemfn === 'undefined') {
     <div className="relative h-full w-full overflow-hidden">
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <div className="text-muted-foreground">Loading preview...</div>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-muted-foreground">Loading preview...</div>
+      </div>
       )}
       
       {loadError && (
@@ -325,14 +365,14 @@ if (typeof window.menuitemfn === 'undefined') {
       {/* Custom Controls - Only show if showUI is true */}
       {showUI && (
         <div className="absolute top-2 right-2 z-50">
-          <PreviewControls 
-            viewMode={viewMode}
-            onViewModeChange={handleViewModeChange}
-            isFeedbackMode={isFeedbackMode}
-            onToggleFeedbackMode={handleToggleFeedbackMode}
-            showUI={showUI}
-            onToggleUI={handleToggleUI}
-          />
+          <div className="flex items-center justify-between px-4 py-2 border-b">
+            <PreviewControls 
+              viewMode={viewMode} 
+              onViewModeChange={handleViewModeChange}
+              isFeedbackMode={isFeedbackMode}
+              onToggleFeedbackMode={handleToggleFeedbackMode}
+            />
+          </div>
         </div>
       )}
       
@@ -364,7 +404,7 @@ if (typeof window.menuitemfn === 'undefined') {
       
       {isFilesReady && (
         <div className="h-full w-full">
-          {viewMode === 'preview' && (
+          {viewMode === 'preview' && isPreviewable && (
             <SandpackProvider
               template="static"
               files={files}
@@ -382,81 +422,135 @@ if (typeof window.menuitemfn === 'undefined') {
                 recompileDelay: 500
               }}
               customSetup={{
-                entry: "index.html"
+                entry: activeFile.endsWith('.html') || activeFile.endsWith('.htm') 
+                  ? activeFile 
+                  : Object.keys(files).find(f => f.endsWith('.html')) || 'index.html'
               }}
             >
               <SandpackPreviewComponent className="h-full w-full" />
             </SandpackProvider>
           )}
           
-          {viewMode === 'code' && (
-            <Sandpack
-              template="static"
-              files={files}
-              theme="dark"
-              options={{
-                showNavigator: true,
-                showTabs: true,
-                showLineNumbers: true,
-                showInlineErrors: true,
-                wrapContent: true,
-                editorHeight: "100%",
-                classes: {
-                  "sp-wrapper": "h-full",
-                  "sp-layout": "h-full",
-                  "sp-stack": "h-full",
-                  "sp-code-editor": "h-full",
-                  "sp-tabs": "bg-background border-b border-border",
-                  "sp-tab-button": "text-muted-foreground hover:text-foreground",
-                  "sp-file-explorer": "border-r border-border"
-                },
-                visibleFiles: Object.keys(files),
-                activeFile: 'index.html',
-                recompileMode: "delayed",
-                recompileDelay: 500
-              }}
-              customSetup={{
-                entry: "index.html"
-              }}
-            />
-          )}
-          
-          {viewMode === 'split' && (
-            <Sandpack
-              template="static"
-              files={files}
-              theme="dark"
-              options={{
-                showNavigator: true,
-                showTabs: true,
-                showLineNumbers: true,
-                showInlineErrors: true,
-                wrapContent: true,
-                editorHeight: "100%",
-                classes: {
-                  "sp-wrapper": "h-full",
-                  "sp-layout": "h-full",
-                  "sp-stack": "h-full",
-                  "sp-preview": "h-full",
-                  "sp-preview-container": "h-full",
-                  "sp-preview-iframe": "h-full",
-                  "sp-code-editor": "h-full",
-                  "sp-tabs": "bg-background border-b border-border",
-                  "sp-tab-button": "text-muted-foreground hover:text-foreground",
-                  "sp-file-explorer": "border-r border-border"
-                },
-                visibleFiles: Object.keys(files),
-                activeFile: 'index.html',
-                recompileMode: "delayed",
-                recompileDelay: 500
-              }}
-              customSetup={{
-                entry: "index.html"
-              }}
-            />
+          {(viewMode === 'code' || !isPreviewable) && (
+            <div className="flex h-full w-full">
+              {/* Code editor - takes 40% of the space */}
+              <div className="w-[40%] h-full">
+                <SandpackProvider
+                  template="static"
+                  files={files}
+                  theme="dark"
+                  options={{
+                    classes: {
+                      "sp-wrapper": "h-full",
+                      "sp-layout": "h-full",
+                      "sp-stack": "h-full",
+                      "sp-code-editor": "h-full",
+                      "sp-tabs": "bg-background border-b border-border",
+                      "sp-tab-button": "text-muted-foreground hover:text-foreground",
+                      "sp-file-explorer": "border-r border-border"
+                    },
+                    recompileMode: "delayed",
+                    recompileDelay: 500
+                  }}
+                  customSetup={{
+                    entry: activeFile
+                  }}
+                >
+                  <div className="flex h-full flex-col">
+                    {!isPreviewable && viewMode === 'preview' && (
+                      <div className="bg-muted/50 text-muted-foreground text-sm p-2 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>This file type cannot be previewed directly. Showing code instead.</span>
+                      </div>
+                    )}
+                    <SandpackCodeEditor
+                      showTabs={true}
+                      showLineNumbers={true}
+                      showInlineErrors={true}
+                      wrapContent={true}
+                      className="h-full"
+                    />
+                    <FileChangeListener onFileChange={handleFileChange} />
+                  </div>
+                </SandpackProvider>
+              </div>
+              
+              {/* Preview - takes 60% of the space */}
+              <div className="w-[60%] h-full border-l border-border">
+                {isPreviewable ? (
+                  <SandpackProvider
+                    template="static"
+                    files={files}
+                    theme="dark"
+                    options={{
+                      classes: {
+                        "sp-wrapper": "h-full",
+                        "sp-layout": "h-full",
+                        "sp-stack": "h-full",
+                        "sp-preview": "h-full",
+                        "sp-preview-container": "h-full",
+                        "sp-preview-iframe": "h-full"
+                      },
+                      recompileMode: "delayed",
+                      recompileDelay: 500
+                    }}
+                    customSetup={{
+                      entry: activeFile.endsWith('.html') || activeFile.endsWith('.htm') 
+                        ? activeFile 
+                        : Object.keys(files).find(f => f.endsWith('.html')) || 'index.html'
+                    }}
+                  >
+                    <SandpackPreviewComponent className="h-full w-full" />
+                  </SandpackProvider>
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted/30">
+                    <div className="text-center p-6 max-w-md">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="text-lg font-medium mb-2">No preview available</h3>
+                      <p className="text-sm text-muted-foreground">
+                        This file type cannot be previewed directly. You can view the code on the left.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}
     </div>
   );
 }
+
+// Custom component to listen for file changes
+const FileChangeListener = ({ onFileChange }: { onFileChange: (file: string) => void }) => {
+  const { sandpack } = useSandpack();
+  const [currentFile, setCurrentFile] = useState<string>(sandpack.activeFile || '');
+  
+  useEffect(() => {
+    // Handle initial file selection
+    if (sandpack.activeFile) {
+      onFileChange(sandpack.activeFile);
+      setCurrentFile(sandpack.activeFile);
+    }
+    
+    // Set up a listener for file changes
+    const handleFileChange = () => {
+      if (sandpack.activeFile && sandpack.activeFile !== currentFile) {
+        onFileChange(sandpack.activeFile);
+        setCurrentFile(sandpack.activeFile);
+        console.log(`Active file changed to: ${sandpack.activeFile}`);
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('sandpack-file-change', handleFileChange);
+    
+    return () => {
+      // Remove event listener
+      document.removeEventListener('sandpack-file-change', handleFileChange);
+    };
+  }, [sandpack, onFileChange, currentFile]);
+  
+  return null;
+};
