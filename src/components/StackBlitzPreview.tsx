@@ -141,7 +141,8 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
 
         console.log("Creating StackBlitz project with files:", Object.keys(files));
         
-        // Create StackBlitz project with enhanced configuration
+        // Create StackBlitz project with correct configuration
+        // Fixed: Removed the unsupported 'allowFullScreen' property
         await sdk.embedProject(
           containerRef.current,
           {
@@ -154,7 +155,6 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
             height: '100%',
             hideNavigation: true,
             hideDevTools: false,
-            allowFullScreen: true,
             showSidebar: false,
             view: 'preview',
             terminalHeight: 0,
