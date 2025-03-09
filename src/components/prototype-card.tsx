@@ -67,16 +67,17 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
               {format(timestamp, "MMM d, yyyy")}
             </time>
             {previewUrl && prototype.deployment_status === 'deployed' && (
-              <a
-                href={previewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()}
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(previewUrl, '_blank', 'noopener,noreferrer');
+                }}
+                className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
               >
                 View
                 <ArrowUpRight className="w-4 h-4" />
-              </a>
+              </button>
             )}
           </div>
         </div>

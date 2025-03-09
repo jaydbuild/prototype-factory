@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
-import { StackBlitzPreview } from './StackBlitzPreview';
+import { SandpackPreview } from './SandpackPreview';
 import '@/styles/PreviewIframe.css';
 
 interface PreviewWindowProps {
@@ -15,7 +14,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [useStackBlitz, setUseStackBlitz] = useState(false);
+  const [useSandpack, setUseSandpack] = useState(false);
 
   useEffect(() => {
     const fetchPrototypeUrl = async () => {
@@ -39,7 +38,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
 
         if (prototypeError) {
           console.error('Error fetching prototype details:', prototypeError);
-          setUseStackBlitz(true);
+          setUseSandpack(true);
           return;
         }
 
@@ -52,10 +51,10 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
           return;
         }
 
-        // If we have a file path but no deployment URL, use StackBlitz
+        // If we have a file path but no deployment URL, use Sandpack
         if (prototype?.file_path) {
-          console.log("Prototype has file_path but no deployment_url, using StackBlitz");
-          setUseStackBlitz(true);
+          console.log("Prototype has file_path but no deployment_url, using Sandpack");
+          setUseSandpack(true);
           return;
         }
 
@@ -72,13 +71,13 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
           return;
         }
 
-        // If we still don't have a URL, use StackBlitz
-        console.log("No URL found, falling back to StackBlitz");
-        setUseStackBlitz(true);
+        // If we still don't have a URL, use Sandpack
+        console.log("No URL found, falling back to Sandpack");
+        setUseSandpack(true);
       } catch (error) {
         console.error('Error fetching preview URL:', error);
-        setLoadError('Failed to load preview. Using StackBlitz instead.');
-        setUseStackBlitz(true);
+        setLoadError('Failed to load preview. Using Sandpack instead.');
+        setUseSandpack(true);
       } finally {
         setIsLoading(false);
       }
@@ -87,9 +86,14 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
     fetchPrototypeUrl();
   }, [prototypeId, url]);
 
-  // If we're using StackBlitz, render the StackBlitzPreview component
-  if (useStackBlitz) {
-    return <StackBlitzPreview prototypeId={prototypeId} url={url} deploymentUrl={previewUrl} />;
+  // If we're using Sandpack, render the SandpackPreview component
+  if (useSandpack) {
+    return <SandpackPreview 
+      prototypeId={prototypeId} 
+      url={url} 
+      deploymentUrl={previewUrl} 
+      onShare={onShare}
+    />;
   }
 
   // Otherwise, render the traditional iframe
@@ -99,8 +103,8 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
 
   const handleIframeError = () => {
     setIsLoading(false);
-    setLoadError('Failed to load preview content. Switching to StackBlitz...');
-    setUseStackBlitz(true);
+    setLoadError('Failed to load preview content. Switching to Sandpack...');
+    setUseSandpack(true);
   };
 
   // Define a function to inject CSS fixes into the iframe after it loads
@@ -143,7 +147,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         </div>
       )}
       
-      {loadError && !useStackBlitz && (
+      {loadError && !useSandpack && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
           <div className="bg-white rounded-lg p-6 shadow-md max-w-md">
             <h3 className="text-lg font-semibold text-destructive mb-2">Preview Error</h3>
@@ -152,7 +156,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         </div>
       )}
       
-      {previewUrl && !useStackBlitz && (
+      {previewUrl && !useSandpack && (
         <iframe
           src={previewUrl}
           className="preview-iframe"

@@ -1,16 +1,17 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Eye, Code, SplitSquareHorizontal, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { MessageSquare, Eye, Code, SplitSquareHorizontal, ThumbsUp, ArrowLeft, EyeOff } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface PreviewControlsProps {
   onViewModeChange: (mode: 'preview' | 'code' | 'split') => void;
   viewMode: 'preview' | 'code' | 'split';
   isFeedbackMode: boolean;
   onToggleFeedbackMode: () => void;
-  onShareClick: () => void;
+  showUI?: boolean;
+  onToggleUI?: () => void;
 }
 
 export function PreviewControls({
@@ -18,12 +19,26 @@ export function PreviewControls({
   viewMode,
   isFeedbackMode,
   onToggleFeedbackMode,
-  onShareClick
+  showUI = true,
+  onToggleUI
 }: PreviewControlsProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   return (
-    <div className="flex items-center gap-2 p-1 rounded-lg backdrop-blur-sm bg-background/80">
+    <div className="flex items-center gap-2 p-1 rounded-lg backdrop-blur-sm bg-background/80 shadow-md">
+      {/* Back button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        onClick={() => navigate(-1)}
+        title="Back to dashboard"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+      </Button>
+      
+      {/* View mode toggle */}
       <Tabs 
         value={viewMode} 
         onValueChange={(value) => onViewModeChange(value as 'preview' | 'code' | 'split')}
@@ -45,34 +60,45 @@ export function PreviewControls({
         </TabsList>
       </Tabs>
 
-      <div className="flex items-center h-8 border rounded-md border-input">
+      {/* Hide/Unhide UI button */}
+      {onToggleUI && (
         <Button
           variant="ghost"
           size="icon"
-          className={`h-7 w-7 rounded-r-none ${isFeedbackMode ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}`}
-          onClick={onToggleFeedbackMode}
-          title="Toggle feedback mode"
+          className="h-7 w-7"
+          onClick={onToggleUI}
+          title={showUI ? "Hide UI" : "Show UI"}
         >
-          <MessageSquare className="h-3.5 w-3.5" />
+          {showUI ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </Button>
+      )}
 
-        <div className="h-full w-px bg-input"></div>
+      {/* Feedback button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={`h-7 w-7 ${isFeedbackMode ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}`}
+        onClick={onToggleFeedbackMode}
+        title="Toggle feedback mode"
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+      </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-l-none"
-          onClick={() => {
-            toast({
-              title: "Feedback sent",
-              description: "Thanks for your positive feedback!"
-            });
-          }}
-          title="Send positive feedback"
-        >
-          <ThumbsUp className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+      {/* Thumbs up button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        onClick={() => {
+          toast({
+            title: "Feedback sent",
+            description: "Thanks for your positive feedback!"
+          });
+        }}
+        title="Send positive feedback"
+      >
+        <ThumbsUp className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 }

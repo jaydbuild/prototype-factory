@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -12,7 +11,6 @@ export const PrototypeDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [showUI, setShowUI] = useState(true);
   const [processingTimeout, setProcessingTimeout] = useState(false);
 
   const { 
@@ -90,7 +88,7 @@ export const PrototypeDetail = () => {
           }
         } catch (error) {
           console.error("Error generating deployment URL:", error);
-          // Continue even without a deployment URL, we'll use StackBlitz instead
+          // Continue even without a deployment URL, we'll use Sandpack instead
         }
       }
       
@@ -231,58 +229,7 @@ export const PrototypeDetail = () => {
             </div>
           </div>
         )}
-
-        {/* UI Layer */}
-        {showUI && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="flex justify-between items-center p-2 gap-2 shrink-0">
-              <div className="flex items-center gap-2 pointer-events-auto">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  onClick={() => navigate(-1)}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg">
-                  <h1 className="text-2xl font-semibold">{prototype.name}</h1>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pointer-events-auto">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  onClick={handleShare}
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                  onClick={handleRefresh}
-                  disabled={isRefetching}
-                >
-                  <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Toggle UI Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm hover:bg-background/90"
-        onClick={() => setShowUI(!showUI)}
-      >
-        {showUI ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </Button>
     </div>
   );
 };
