@@ -78,12 +78,20 @@ export const PrototypeDetail = () => {
       let deploymentUrl = prototype?.deployment_url;
       
       if (!deploymentUrl) {
-        // Generate a deployment URL 
-        const { data } = await supabase.storage
-          .from('prototype-deployments')
-          .getPublicUrl(`${id}/index.html`);
-        
-        deploymentUrl = data.publicUrl;
+        // Check if we can generate a URL from storage
+        try {
+          const { data } = await supabase.storage
+            .from('prototype-deployments')
+            .getPublicUrl(`${id}/index.html`);
+          
+          if (data && data.publicUrl) {
+            deploymentUrl = data.publicUrl;
+            console.log("Generated deployment URL:", deploymentUrl);
+          }
+        } catch (error) {
+          console.error("Error generating deployment URL:", error);
+          // Continue even without a deployment URL, we'll use StackBlitz instead
+        }
       }
       
       // Force the prototype to be marked as deployed
@@ -104,6 +112,7 @@ export const PrototypeDetail = () => {
       
       refetch();
     } catch (error) {
+      console.error("Error in handleForceComplete:", error);
       toast({
         variant: "destructive",
         title: "Error updating status",

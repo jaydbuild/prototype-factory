@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,20 +25,17 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Function to validate HTML files
   const validateHtmlFile = async (file: File): Promise<boolean> => {
     setFileValidationStatus('validating');
     setFileValidationMessage("Validating HTML file...");
     
     try {
-      // Check if it's an HTML file
       if (!file.name.toLowerCase().endsWith('.html')) {
         setFileValidationStatus('invalid');
         setFileValidationMessage("File must be an HTML document.");
         return false;
       }
       
-      // Basic content check
       const content = await file.text();
       if (!content.includes('<html') && !content.includes('<HTML')) {
         setFileValidationStatus('invalid');
@@ -58,7 +54,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     }
   };
 
-  // Function to validate ZIP files
   const validateZipFile = async (file: File): Promise<boolean> => {
     setFileValidationStatus('validating');
     setFileValidationMessage("Validating ZIP archive...");
@@ -67,7 +62,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       const zip = new JSZip();
       const contents = await zip.loadAsync(file);
       
-      // Check if zip contains any HTML files
       const hasHtmlFile = Object.keys(contents.files).some(
         filename => filename.toLowerCase().endsWith('.html')
       );
@@ -78,13 +72,11 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         return false;
       }
       
-      // Check if zip contains index.html (preferred)
       const hasIndexHtml = Object.keys(contents.files).some(
         filename => filename === 'index.html' || filename.endsWith('/index.html')
       );
       
       if (!hasIndexHtml) {
-        // Still valid, but warn the user
         setFileValidationStatus('valid');
         setFileValidationMessage("ZIP is valid, but does not contain index.html. The first HTML file will be used.");
       } else {
@@ -118,7 +110,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       return;
     }
 
-    // Validate the file first
     let isValid = false;
     if (file.name.toLowerCase().endsWith('.zip')) {
       isValid = await validateZipFile(file);
@@ -143,7 +134,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     setUploadStep("Getting session...");
     
     try {
-      // Get current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       console.log('Auth Session:', { 
         hasSession: !!sessionData?.session,
@@ -161,7 +151,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         return;
       }
 
-      // Create prototype entry
       setUploadStep("Creating prototype entry...");
       console.log('Creating prototype:', { 
         name: name.trim(),
@@ -186,7 +175,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
       console.log('Prototype created:', prototype);
 
-      // Upload file
       setUploadStep("Uploading file...");
       const filePath = `${prototype.id}/${file.name}`;
       console.log('Uploading file:', { filePath, fileSize: file.size });
@@ -202,13 +190,11 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
 
       console.log('File uploaded successfully:', { filePath });
 
-      // Update prototype with file path
       setUploadStep("Updating prototype metadata...");
       const { error: updateError } = await supabase
         .from('prototypes')
         .update({ 
           file_path: filePath,
-          // Set as 'client_side' to indicate we'll use StackBlitz for preview
           deployment_status: 'deployed',
           status: 'deployed'
         })
@@ -226,7 +212,6 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
         description: 'Prototype uploaded successfully',
       });
       
-      // Navigate to the prototype detail page
       navigate(`/prototype/${prototype.id}`);
       onOpenChange(false);
     } catch (error: any) {

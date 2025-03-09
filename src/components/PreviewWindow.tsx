@@ -31,7 +31,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         // Check if the prototype has a deployment URL in the database
         const { data: prototype, error: prototypeError } = await supabase
           .from('prototypes')
-          .select('deployment_status, deployment_url')
+          .select('deployment_status, deployment_url, file_path')
           .eq('id', prototypeId)
           .single();
 
@@ -41,10 +41,19 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
           return;
         }
 
+        console.log("Prototype data:", prototype);
+
         // If the prototype is deployed and has a URL, use it
         if (prototype?.deployment_status === 'deployed' && prototype?.deployment_url) {
           console.log("Using deployed URL from database:", prototype.deployment_url);
           setPreviewUrl(prototype.deployment_url);
+          return;
+        }
+
+        // If we have a file path but no deployment URL, use StackBlitz
+        if (prototype?.file_path) {
+          console.log("Prototype has file_path but no deployment_url, using StackBlitz");
+          setUseStackBlitz(true);
           return;
         }
 
@@ -62,6 +71,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         }
 
         // If we still don't have a URL, use StackBlitz
+        console.log("No URL found, falling back to StackBlitz");
         setUseStackBlitz(true);
       } catch (error) {
         console.error('Error fetching preview URL:', error);

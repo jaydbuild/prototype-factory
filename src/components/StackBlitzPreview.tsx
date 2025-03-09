@@ -33,9 +33,8 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
           return;
         }
 
-        let fileContent: string | ArrayBuffer | null = null;
-        let fileName: string | null = null;
-
+        let files: Record<string, string> = {};
+        
         console.log("Fetching prototype file data for ID:", prototypeId);
         
         // Get prototype details to find the file path
@@ -69,11 +68,9 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
         }
 
         // Get file name from path
-        fileName = prototype.file_path.split('/').pop() || 'index.html';
+        const fileName = prototype.file_path.split('/').pop() || 'index.html';
         
         // Process the file based on its type
-        const files: Record<string, string> = {};
-        
         if (fileName.endsWith('.zip')) {
           // Handle ZIP file
           console.log("Processing ZIP file");
@@ -97,7 +94,14 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
           );
           
           if (!indexFile) {
-            throw new Error('No index.html found in the ZIP file');
+            // If no index.html, try to find any HTML file
+            const anyHtmlFile = Object.keys(files).find(path => path.endsWith('.html'));
+            if (!anyHtmlFile) {
+              throw new Error('No HTML files found in the ZIP archive');
+            }
+            // Rename the first HTML file to index.html for simplicity
+            files['index.html'] = files[anyHtmlFile];
+            console.log("Using HTML file as index:", anyHtmlFile);
           }
         } else if (fileName.endsWith('.html')) {
           // Handle HTML file
@@ -163,7 +167,7 @@ export function StackBlitzPreview({ prototypeId, url, deploymentUrl }: StackBlit
           onLoad={() => setIsLoading(false)}
           onError={() => {
             setIsLoading(false);
-            setLoadError('Failed to load preview content');
+            setLoadError('Failed to load iframe content. Check console for details.');
           }}
         />
       </div>
