@@ -1,0 +1,56 @@
+/* Custom Sandpack styling fixes */
+.sp-wrapper {
+  height: 100% !important;
+  width: 100% !important;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: var(--background);
+}
+
+.sp-layout {
+  height: 100% !important;
+  display: flex;
+  flex-direction: row;
+}
+
+.sp-stack {
+  flex: 1;
+  height: 100% !important;
+  overflow: auto;
+}
+
+.sp-code-editor {
+  height: 100% !important;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 14px;
+}
+
+.sp-preview {
+  height: 100% !important;
+  overflow: auto;
+  background-color: white;
+}
+
+.sp-preview-container {
+  height: 100% !important;
+  width: 100%;
+}
+
+.sp-preview-iframe {
+  height: 100% !important;
+  width: 100%;
+  border: none;
+}
+
+/* Fix for split view */
+.sp-layout > div {
+  height: 100% !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sp-layout {
+    flex-direction: column;
+  }
+}

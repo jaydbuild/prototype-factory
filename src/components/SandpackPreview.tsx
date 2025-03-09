@@ -15,6 +15,7 @@ import { PreviewControls } from './preview/PreviewControls';
 import { FeedbackOverlay } from './feedback/FeedbackOverlay';
 import JSZip from 'jszip';
 import { Button } from '@/components/ui/button';
+import '@/styles/sandpack-fix.css';
 
 interface SandpackPreviewProps {
   prototypeId: string;
@@ -209,8 +210,12 @@ if (typeof window.menuitemfn === 'undefined') {
     loadProject();
   }, [prototypeId, url, deploymentUrl, toast]);
 
+  // Handle view mode change
   const handleViewModeChange = (mode: 'preview' | 'code' | 'split') => {
     setViewMode(mode);
+    
+    // Add analytics or other side effects if needed
+    console.log(`View mode changed to: ${mode}`);
   };
 
   const handleToggleFeedbackMode = () => {
@@ -359,42 +364,97 @@ if (typeof window.menuitemfn === 'undefined') {
       
       {isFilesReady && (
         <div className="h-full w-full">
-          <Sandpack
-            template="static"
-            files={files}
-            theme="dark"
-            options={{
-              showNavigator: false,
-              showTabs: false,
-              showLineNumbers: true,
-              showInlineErrors: true,
-              wrapContent: true,
-              editorHeight: "100%",
-              classes: {
-                "sp-wrapper": "h-full",
-                "sp-layout": "h-full",
-                "sp-stack": "h-full",
-                "sp-preview": "h-full"
-              },
-              visibleFiles: ['index.html'],
-              activeFile: 'index.html',
-              recompileMode: "delayed",
-              recompileDelay: 500
-            }}
-            customSetup={{
-              entry: "index.html"
-            }}
-            {...(viewMode === 'preview' ? { 
-              showEditor: false,
-              showPreview: true
-            } : viewMode === 'code' ? {
-              showEditor: true,
-              showPreview: false
-            } : {
-              showEditor: true,
-              showPreview: true
-            })}
-          />
+          {viewMode === 'preview' && (
+            <SandpackProvider
+              template="static"
+              files={files}
+              theme="dark"
+              options={{
+                classes: {
+                  "sp-wrapper": "h-full",
+                  "sp-layout": "h-full",
+                  "sp-stack": "h-full",
+                  "sp-preview": "h-full",
+                  "sp-preview-container": "h-full",
+                  "sp-preview-iframe": "h-full"
+                },
+                recompileMode: "delayed",
+                recompileDelay: 500
+              }}
+              customSetup={{
+                entry: "index.html"
+              }}
+            >
+              <SandpackPreviewComponent className="h-full w-full" />
+            </SandpackProvider>
+          )}
+          
+          {viewMode === 'code' && (
+            <Sandpack
+              template="static"
+              files={files}
+              theme="dark"
+              options={{
+                showNavigator: true,
+                showTabs: true,
+                showLineNumbers: true,
+                showInlineErrors: true,
+                wrapContent: true,
+                editorHeight: "100%",
+                classes: {
+                  "sp-wrapper": "h-full",
+                  "sp-layout": "h-full",
+                  "sp-stack": "h-full",
+                  "sp-code-editor": "h-full",
+                  "sp-tabs": "bg-background border-b border-border",
+                  "sp-tab-button": "text-muted-foreground hover:text-foreground",
+                  "sp-file-explorer": "border-r border-border"
+                },
+                visibleFiles: Object.keys(files),
+                activeFile: 'index.html',
+                recompileMode: "delayed",
+                recompileDelay: 500
+              }}
+              customSetup={{
+                entry: "index.html"
+              }}
+            />
+          )}
+          
+          {viewMode === 'split' && (
+            <Sandpack
+              template="static"
+              files={files}
+              theme="dark"
+              options={{
+                showNavigator: true,
+                showTabs: true,
+                showLineNumbers: true,
+                showInlineErrors: true,
+                wrapContent: true,
+                editorHeight: "100%",
+                classes: {
+                  "sp-wrapper": "h-full",
+                  "sp-layout": "h-full",
+                  "sp-stack": "h-full",
+                  "sp-preview": "h-full",
+                  "sp-preview-container": "h-full",
+                  "sp-preview-iframe": "h-full",
+                  "sp-code-editor": "h-full",
+                  "sp-tabs": "bg-background border-b border-border",
+                  "sp-tab-button": "text-muted-foreground hover:text-foreground",
+                  "sp-file-explorer": "border-r border-border"
+                },
+                visibleFiles: Object.keys(files),
+                activeFile: 'index.html',
+                recompileMode: "delayed",
+                recompileDelay: 500
+              }}
+              customSetup={{
+                entry: "index.html"
+              }}
+            />
+          )}
         </div>
       )}
     </div>
