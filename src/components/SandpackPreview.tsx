@@ -321,7 +321,7 @@ if (typeof window.menuitemfn === 'undefined') {
   };
   
   // Custom preview component that shows the correct file
-  const CustomPreview = ({ file }: { file: string }) => {
+  const CustomPreview = ({ file, hideNavigator = false }: { file: string, hideNavigator?: boolean }) => {
     const { sandpack } = useSandpack();
     const [refreshKey, setRefreshKey] = useState(0);
     const previousFileRef = useRef<string | null>(null);
@@ -338,28 +338,36 @@ if (typeof window.menuitemfn === 'undefined') {
         previousFileRef.current = file;
       }
     }, [file, sandpack]);
+
+    // Add custom CSS to hide the navigator bar
+    useEffect(() => {
+      if (hideNavigator) {
+        // Add a style element to hide the navigator
+        const styleElement = document.createElement('style');
+        styleElement.textContent = `
+          .sp-navigator {
+            display: none !important;
+          }
+          .sp-preview-container {
+            padding-top: 0 !important;
+          }
+        `;
+        document.head.appendChild(styleElement);
+        
+        return () => {
+          // Clean up the style element when component unmounts
+          document.head.removeChild(styleElement);
+        };
+      }
+    }, [hideNavigator]);
     
     return (
       <div className="h-full w-full relative">
         <SandpackPreviewComponent 
           className="h-full w-full" 
-          showNavigator={true} 
-          showRefreshButton={true}
+          showNavigator={!hideNavigator}
+          showRefreshButton={false}
         />
-        <div className="absolute top-2 right-2 z-10">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => {
-              // Force refresh by updating the key
-              setRefreshKey(prev => prev + 1);
-              console.log(`Manually refreshed preview for file: ${file}`);
-            }}
-          >
-            <RefreshCw className="h-4 w-4 mr-1" />
-            Refresh
-          </Button>
-        </div>
       </div>
     );
   };
@@ -526,6 +534,16 @@ if (typeof window.menuitemfn === 'undefined') {
           selectedDevice={selectedDevice}
           onDeviceSelection={handleDeviceSelection}
           deviceConfigs={deviceConfigs}
+          onRefresh={() => {
+            // Force refresh the preview
+            console.log(`Manually refreshed preview for file: ${activeFile}`);
+            // Create a temporary iframe to trigger a refresh
+            const iframe = document.querySelector('.sp-preview iframe') as HTMLIFrameElement;
+            if (iframe) {
+              iframe.src = iframe.src;
+            }
+          }}
+          onShare={onShare}
         />
         
         <div className="flex items-center gap-2">
@@ -537,17 +555,6 @@ if (typeof window.menuitemfn === 'undefined') {
               onClick={() => window.open(deploymentUrl, '_blank')}
             >
               Open Deployed Version
-            </Button>
-          )}
-          
-          {onShare && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={onShare}
-            >
-              Share
             </Button>
           )}
         </div>
@@ -598,7 +605,7 @@ if (typeof window.menuitemfn === 'undefined') {
       {isFilesReady && (
         <div className="h-full w-full">
           {viewMode === 'preview' && isPreviewable && (
-            <div className="h-full w-full flex items-center justify-center overflow-auto p-4">
+            <div className="h-full w-full flex items-center justify-center overflow-auto">
               <div style={getDevicePreviewStyle()}>
                 <SandpackProvider
                   key={`preview-${activeFile}-${deviceType}-${orientation}`}
@@ -622,7 +629,7 @@ if (typeof window.menuitemfn === 'undefined') {
                     entry: activeFile
                   }}
                 >
-                  <CustomPreview file={activeFile} />
+                  <CustomPreview file={activeFile} hideNavigator={true} />
                 </SandpackProvider>
               </div>
             </div>
@@ -701,7 +708,7 @@ if (typeof window.menuitemfn === 'undefined') {
                           entry: activeFile
                         }}
                       >
-                        <CustomPreview file={activeFile} />
+                        <CustomPreview file={activeFile} hideNavigator={true} />
                       </SandpackProvider>
                     </div>
                   </div>

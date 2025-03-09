@@ -14,7 +14,9 @@ import {
   RotateCcw,
   ZoomIn,
   ZoomOut,
-  Settings
+  Settings,
+  RefreshCw,
+  Share2
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -63,6 +65,9 @@ interface PreviewControlsProps {
   selectedDevice?: string;
   onDeviceSelection?: (deviceId: string) => void;
   deviceConfigs?: Record<string, DeviceConfig>;
+  // Refresh and share buttons
+  onRefresh?: () => void;
+  onShare?: () => void;
 }
 
 export function PreviewControls({
@@ -82,7 +87,10 @@ export function PreviewControls({
   onScaleChange,
   selectedDevice = '',
   onDeviceSelection,
-  deviceConfigs = {}
+  deviceConfigs = {},
+  // Refresh and share buttons
+  onRefresh,
+  onShare
 }: PreviewControlsProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -348,6 +356,32 @@ export function PreviewControls({
             </div>
           )}
         </div>
+      )}
+
+      {/* Refresh button */}
+      {onRefresh && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onRefresh}
+          title="Refresh preview"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </Button>
+      )}
+
+      {/* Share button */}
+      {onShare && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onShare}
+          title="Share prototype"
+        >
+          <Share2 className="h-3.5 w-3.5" />
+        </Button>
       )}
 
       {/* Hide/Unhide UI button */}
