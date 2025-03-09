@@ -1,4 +1,3 @@
-
 export type Prototype = {
   id: string;
   name: string;
@@ -16,4 +15,5 @@ export type Prototype = {
   processed_at: string | null;
   status: string | null;
   sandbox_config: Record<string, unknown> | null;
+  figma_url: string | null; // Added Figma URL field
 }

@@ -13,6 +13,7 @@ import { validatePrototypeZip } from '../utils/zip-utils';
 
 export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
+  const [figmaUrl, setFigmaUrl] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -55,7 +56,8 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
           name: name.trim(),
           created_by: session.user.id,
           url: null,
-          deployment_status: 'pending'
+          deployment_status: 'pending',
+          figma_url: figmaUrl.trim() || null
         })
         .select()
         .single();
@@ -192,6 +194,18 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
               placeholder="Enter prototype name"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="figmaUrl" className="text-right">
+              Figma URL
+            </Label>
+            <Input
+              id="figmaUrl"
+              value={figmaUrl}
+              onChange={(e) => setFigmaUrl(e.target.value)}
+              className="col-span-3"
+              placeholder="Enter Figma design URL (optional)"
             />
           </div>
         </div>

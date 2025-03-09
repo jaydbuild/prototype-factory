@@ -12,6 +12,7 @@ interface PreviewWindowProps {
 
 export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps) {
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [figmaUrl, setFigmaUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [useSandpack, setUseSandpack] = useState(false);
@@ -32,7 +33,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         // Check if the prototype has a deployment URL in the database
         const { data: prototype, error: prototypeError } = await supabase
           .from('prototypes')
-          .select('deployment_status, deployment_url, file_path')
+          .select('deployment_status, deployment_url, file_path, figma_url')
           .eq('id', prototypeId)
           .single();
 
@@ -44,15 +45,20 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
 
         console.log("Prototype data:", prototype);
 
+        // Store the Figma URL if available
+        if (prototype && 'figma_url' in prototype && prototype.figma_url) {
+          setFigmaUrl(prototype.figma_url as string);
+        }
+
         // If the prototype is deployed and has a URL, use it
-        if (prototype?.deployment_status === 'deployed' && prototype?.deployment_url) {
+        if (prototype && prototype.deployment_status === 'deployed' && prototype.deployment_url) {
           console.log("Using deployed URL from database:", prototype.deployment_url);
           setPreviewUrl(prototype.deployment_url);
           return;
         }
 
         // If we have a file path but no deployment URL, use Sandpack
-        if (prototype?.file_path) {
+        if (prototype && prototype.file_path) {
           console.log("Prototype has file_path but no deployment_url, using Sandpack");
           setUseSandpack(true);
           return;
@@ -92,6 +98,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
       prototypeId={prototypeId} 
       url={url} 
       deploymentUrl={previewUrl} 
+      figmaUrl={figmaUrl} 
       onShare={onShare}
     />;
   }

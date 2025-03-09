@@ -2,21 +2,22 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  MessageSquare, 
   Eye, 
   Code, 
-  ThumbsUp, 
-  ArrowLeft, 
-  EyeOff, 
+  MessageSquare, 
+  RefreshCw, 
   Smartphone, 
   Tablet, 
   Monitor, 
   RotateCcw,
+  Share2,
+  Figma,
+  ThumbsUp,
+  ArrowLeft,
+  EyeOff,
   ZoomIn,
   ZoomOut,
-  Settings,
-  RefreshCw,
-  Share2
+  Settings
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -50,8 +51,8 @@ interface DeviceConfig {
 }
 
 interface PreviewControlsProps {
-  onViewModeChange: (mode: 'preview' | 'code') => void;
-  viewMode: 'preview' | 'code';
+  onViewModeChange: (mode: 'preview' | 'code' | 'design') => void;
+  viewMode: 'preview' | 'code' | 'design';
   isFeedbackMode: boolean;
   onToggleFeedbackMode: () => void;
   showUI?: boolean;
@@ -70,6 +71,8 @@ interface PreviewControlsProps {
   // Refresh and share buttons
   onRefresh?: () => void;
   onShare?: () => void;
+  // Figma design availability
+  hasFigmaDesign?: boolean;
 }
 
 export function PreviewControls({
@@ -92,7 +95,9 @@ export function PreviewControls({
   deviceConfigs = {},
   // Refresh and share buttons
   onRefresh,
-  onShare
+  onShare,
+  // Figma design availability
+  hasFigmaDesign = false
 }: PreviewControlsProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -140,7 +145,7 @@ export function PreviewControls({
       {/* View mode toggle */}
       <Tabs 
         value={viewMode} 
-        onValueChange={(value) => onViewModeChange(value as 'preview' | 'code')}
+        onValueChange={(value) => onViewModeChange(value as 'preview' | 'code' | 'design')}
         className="w-auto"
       >
         <TabsList className="h-8">
@@ -151,6 +156,10 @@ export function PreviewControls({
           <TabsTrigger value="code" className="flex items-center gap-1 px-2 h-7">
             <Code className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Code</span>
+          </TabsTrigger>
+          <TabsTrigger value="design" className="flex items-center gap-1 px-2 h-7">
+            <Figma className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Design</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>

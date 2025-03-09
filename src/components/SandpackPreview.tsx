@@ -1,27 +1,27 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   SandpackProvider, 
-  SandpackPreview as SandpackPreviewComponent,
   SandpackCodeEditor,
   SandpackLayout,
-  SandpackFiles,
-  Sandpack,
+  SandpackPreview as SandpackPreviewComponent,
   useSandpack,
-  SandpackConsole
+  SandpackFiles,
+  SandpackPredefinedTemplate,
 } from '@codesandbox/sandpack-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { FeedbackOverlay } from './feedback/FeedbackOverlay';
+import { PreviewControls } from './preview/PreviewControls';
+import { FigmaUrlForm } from './FigmaUrlForm';
 import { Loader2, Eye, AlertCircle, RefreshCw, Smartphone, Tablet, Monitor, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
 import { FeedbackPoint as FeedbackPointType } from '@/types/feedback';
-import { PreviewControls } from './preview/PreviewControls';
-import { FeedbackOverlay } from './feedback/FeedbackOverlay';
 import JSZip from 'jszip';
-import { Button } from '@/components/ui/button';
 import '@/styles/sandpack-fix.css';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 // Device preview types
 type DeviceType = 'desktop' | 'tablet' | 'mobile' | 'custom';
@@ -57,15 +57,16 @@ interface SandpackPreviewProps {
   prototypeId: string;
   url?: string;
   deploymentUrl?: string;
+  figmaUrl?: string | null;
   onShare?: () => void;
 }
 
-export function SandpackPreview({ prototypeId, url, deploymentUrl, onShare }: SandpackPreviewProps) {
+export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onShare }: SandpackPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
+  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'design'>('preview');
   const [isFeedbackMode, setIsFeedbackMode] = useState(false);
   const [showUI, setShowUI] = useState(true);
   const [files, setFiles] = useState<SandpackFiles>({});
@@ -294,12 +295,17 @@ if (typeof window.menuitemfn === 'undefined') {
   };
 
   // Handle view mode change
-  const handleViewModeChange = (mode: 'preview' | 'code') => {
+  const handleViewModeChange = (mode: 'preview' | 'code' | 'design') => {
     setViewMode(mode);
     // Reset to desktop view when switching to code view
     if (mode === 'code') {
       setDeviceType('desktop');
       setOrientation('portrait');
+    }
+    
+    // Disable feedback mode when switching to code or design view
+    if (mode !== 'preview' && isFeedbackMode) {
+      setIsFeedbackMode(false);
     }
     
     // If trying to switch to preview mode but file isn't previewable, stay in code mode
@@ -454,7 +460,6 @@ if (typeof window.menuitemfn === 'undefined') {
         )}
         <SandpackPreviewComponent 
           className="h-full w-full" 
-          showNavigator={!hideNavigator}
           showRefreshButton={false}
         />
       </div>
@@ -605,6 +610,43 @@ if (typeof window.menuitemfn === 'undefined') {
 
   const sandpackKey = `preview-${prototypeId}`;
 
+  // Design view content
+  const renderDesignView = () => {
+    if (figmaUrl) {
+      // Convert Figma URL to embed URL if needed
+      const embedUrl = figmaUrl.includes('figma.com/embed') 
+        ? figmaUrl 
+        : figmaUrl.replace('figma.com/file', 'figma.com/embed');
+      
+      return (
+        <div className="w-full h-full flex flex-col">
+          <iframe 
+            src={embedUrl}
+            className="w-full h-full border-0"
+            allowFullScreen
+          />
+        </div>
+      );
+    } else {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-muted/20">
+          <div className="max-w-md text-center space-y-4">
+            <h3 className="text-lg font-medium">No Figma design linked</h3>
+            <p className="text-sm text-muted-foreground">
+              This prototype doesn't have a Figma design linked to it yet.
+            </p>
+            <div className="pt-4">
+              <FigmaUrlForm prototypeId={prototypeId} onFigmaUrlAdded={(url) => {
+                // Update the figmaUrl state when a URL is added
+                if (url) setFigmaUrl(url);
+              }} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">
       {/* Fixed-height header with controls */}
@@ -655,6 +697,7 @@ if (typeof window.menuitemfn === 'undefined') {
             }
           }}
           onShare={onShare}
+          hasFigmaDesign={!!figmaUrl} // Pass whether we have a Figma design
         />
         
         <div className="flex items-center gap-2">
@@ -740,7 +783,16 @@ if (typeof window.menuitemfn === 'undefined') {
                     },
                     recompileMode: "immediate",
                     recompileDelay: 0,
-                    activeFile: activeFile
+                    activeFile: activeFile,
+                    initMode: "immediate",
+                    fileResolver: {
+                      isFile: async (path: string) => {
+                        return Object.keys(files).includes(path);
+                      },
+                      readFile: async (path: string) => {
+                        return typeof files[path] === 'string' ? files[path] : files[path]?.code || '';
+                      }
+                    }
                   }}
                   customSetup={{
                     entry: activeFile
@@ -801,168 +853,156 @@ if (typeof window.menuitemfn === 'undefined') {
                     },
                     recompileMode: "immediate",
                     recompileDelay: 0,
+                    activeFile: activeFile,
+                    initMode: "immediate",
+                    fileResolver: {
+                      isFile: async (path: string) => {
+                        return Object.keys(files).includes(path);
+                      },
+                      readFile: async (path: string) => {
+                        return typeof files[path] === 'string' ? files[path] : files[path]?.code || '';
+                      }
+                    }
+                  }}
+                  customSetup={{
+                    entry: activeFile
+                  }}
+                >
+                  <SandpackCodeEditor />
+                </SandpackProvider>
+              </div>
+              
+              {/* Preview - takes 60% of the space */}
+              <div className="w-[60%] h-full">
+                <SandpackProvider
+                  key={`preview-${activeFile}`}
+                  template="static"
+                  files={files}
+                  theme="dark"
+                  options={{
+                    classes: {
+                      "sp-wrapper": "h-full",
+                      "sp-layout": "h-full",
+                      "sp-stack": "h-full",
+                      "sp-preview": "h-full",
+                      "sp-preview-container": "h-full",
+                      "sp-preview-iframe": "h-full"
+                    },
+                    recompileMode: "immediate",
+                    recompileDelay: 0,
                     activeFile: activeFile
                   }}
                   customSetup={{
                     entry: activeFile
                   }}
                 >
-                  <div className="flex h-full flex-col">
-                    {!isPreviewable && viewMode === 'preview' && (
-                      <div className="bg-muted/50 text-muted-foreground text-sm p-2 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>This file type cannot be previewed directly. Showing code view instead.</span>
-                      </div>
-                    )}
-                    <SandpackCodeEditor
-                      showTabs={true}
-                      showLineNumbers={true}
-                      showInlineErrors={true}
-                      wrapContent={true}
-                      className="h-full"
-                    />
-                    <FileChangeListener onFileChange={handleFileChange} />
-                  </div>
+                  <StablePreview 
+                    file={activeFile} 
+                    hideNavigator={true} 
+                  />
                 </SandpackProvider>
-              </div>
-              
-              {/* Preview - takes 60% of the space */}
-              <div className="w-[60%] h-full border-l border-border">
-                {isPreviewable ? (
-                  <div className="h-full w-full flex items-center justify-center overflow-auto">
-                    <div style={getDevicePreviewStyle()}>
-                      <SandpackProvider
-                        key={`split-preview-${prototypeId}`}
-                        template="static"
-                        files={files}
-                        theme="dark"
-                        options={{
-                          classes: {
-                            "sp-wrapper": "h-full",
-                            "sp-layout": "h-full",
-                            "sp-stack": "h-full",
-                            "sp-preview": "h-full",
-                            "sp-preview-container": "h-full",
-                            "sp-preview-iframe": "h-full"
-                          },
-                          recompileMode: "immediate",
-                          recompileDelay: 0,
-                          activeFile: activeFile
-                        }}
-                        customSetup={{
-                          entry: activeFile
-                        }}
-                      >
-                        <StablePreview file={activeFile} hideNavigator={true} />
-                      </SandpackProvider>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-muted/30">
-                    <div className="text-center p-6 max-w-md">
-                      <AlertCircle className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                      <h3 className="text-lg font-medium mb-2">No preview available</h3>
-                      <p className="text-sm text-muted-foreground">
-                        This file type cannot be previewed directly. You can view the code on the left.
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
+          
+          {/* Figma Design View */}
+          {viewMode === 'design' && (
+            <div className="h-full w-full flex items-center justify-center overflow-hidden">
+              {renderDesignView()}
+            </div>
+          )}
+          
+          {/* Custom Dimensions Dialog */}
+          <Dialog open={showCustomDimensionsDialog} onOpenChange={setShowCustomDimensionsDialog}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Custom Device Dimensions</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col space-y-1.5">
+                    <Label htmlFor="width">Width (px)</Label>
+                    <Input
+                      id="width"
+                      type="number"
+                      value={tempCustomDimensions.width}
+                      onChange={(e) => setTempCustomDimensions({
+                        ...tempCustomDimensions,
+                        width: parseInt(e.target.value) || 375
+                      })}
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1.5">
+                    <Label htmlFor="height">Height (px)</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      value={tempCustomDimensions.height}
+                      onChange={(e) => setTempCustomDimensions({
+                        ...tempCustomDimensions,
+                        height: parseInt(e.target.value) || 667
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Common dimensions:
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-6 text-xs" 
+                      onClick={() => setTempCustomDimensions({ width: 375, height: 667 })}
+                    >
+                      375×667
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-6 text-xs" 
+                      onClick={() => setTempCustomDimensions({ width: 390, height: 844 })}
+                    >
+                      390×844
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-6 text-xs" 
+                      onClick={() => setTempCustomDimensions({ width: 768, height: 1024 })}
+                    >
+                      768×1024
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-6 text-xs" 
+                      onClick={() => setTempCustomDimensions({ width: 1366, height: 768 })}
+                    >
+                      1366×768
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-6 text-xs" 
+                      onClick={() => setTempCustomDimensions({ width: 1920, height: 1080 })}
+                    >
+                      1920×1080
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCustomDimensionsDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveCustomDimensions}>
+                  Apply
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
-      
-      {/* Custom Dimensions Dialog */}
-      <Dialog open={showCustomDimensionsDialog} onOpenChange={setShowCustomDimensionsDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Custom Device Dimensions</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="width">Width (px)</Label>
-                <Input
-                  id="width"
-                  type="number"
-                  value={tempCustomDimensions.width}
-                  onChange={(e) => setTempCustomDimensions({
-                    ...tempCustomDimensions,
-                    width: parseInt(e.target.value) || 375
-                  })}
-                />
-              </div>
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="height">Height (px)</Label>
-                <Input
-                  id="height"
-                  type="number"
-                  value={tempCustomDimensions.height}
-                  onChange={(e) => setTempCustomDimensions({
-                    ...tempCustomDimensions,
-                    height: parseInt(e.target.value) || 667
-                  })}
-                />
-              </div>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Common dimensions:
-              <div className="flex flex-wrap gap-1 mt-1">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 375, height: 667 })}
-                >
-                  375×667
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 390, height: 844 })}
-                >
-                  390×844
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 768, height: 1024 })}
-                >
-                  768×1024
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 1366, height: 768 })}
-                >
-                  1366×768
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-6 text-xs" 
-                  onClick={() => setTempCustomDimensions({ width: 1920, height: 1080 })}
-                >
-                  1920×1080
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCustomDimensionsDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveCustomDimensions}>
-              Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
