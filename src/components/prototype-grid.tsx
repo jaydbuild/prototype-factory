@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import {
+import { 
   Select,
   SelectContent,
   SelectItem,
@@ -21,7 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import type { Prototype } from "@/types/prototype";
 import type { Collection } from "./prototype-collections";
 
@@ -38,6 +45,9 @@ export const PrototypeGrid = () => {
   const [selectedPrototypes, setSelectedPrototypes] = useState<string[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [isAddToCollectionDialogOpen, setIsAddToCollectionDialogOpen] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [newCollectionColor, setNewCollectionColor] = useState("#6366F1");
+  const [selectedCollectionTab, setSelectedCollectionTab] = useState<string>("existing");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -221,7 +231,7 @@ export const PrototypeGrid = () => {
           .upsert({ 
             prototype_id: prototypeId, 
             collection_id: collectionId 
-          } as PrototypeCollection)
+          })
       );
 
       await Promise.all(promises);
@@ -238,6 +248,47 @@ export const PrototypeGrid = () => {
       toast({
         title: "Error",
         description: "Failed to add to collection",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateNewCollection = async () => {
+    if (!newCollectionName.trim()) {
+      toast({
+        title: "Error",
+        description: "Collection name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('collections')
+        .insert({
+          name: newCollectionName.trim(),
+          color: newCollectionColor,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        await handleAddToCollection(data.id);
+      }
+
+      setNewCollectionName("");
+      setNewCollectionColor("#6366F1");
+      setSelectedCollectionTab("existing");
+      
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create collection",
         variant: "destructive",
       });
     }
@@ -370,35 +421,72 @@ export const PrototypeGrid = () => {
         ))}
       </div>
 
-      <AddPrototypeDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-      />
-
       <Dialog open={isAddToCollectionDialogOpen} onOpenChange={setIsAddToCollectionDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Add to Collection</DialogTitle>
+            <DialogDescription>
+              Choose an existing collection or create a new one
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto">
-              {collections.map((collection) => (
-                <Button
-                  key={collection.id}
-                  variant="outline"
-                  className="justify-start"
-                  style={{ borderColor: collection.color }}
-                  onClick={() => handleAddToCollection(collection.id)}
-                >
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2" 
-                    style={{ backgroundColor: collection.color }}
+          
+          <Tabs value={selectedCollectionTab} onValueChange={setSelectedCollectionTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="existing">Existing</TabsTrigger>
+              <TabsTrigger value="new">New Collection</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="existing" className="py-4">
+              <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto">
+                {collections.map((collection) => (
+                  <Button
+                    key={collection.id}
+                    variant="outline"
+                    className="justify-start"
+                    style={{ borderColor: collection.color }}
+                    onClick={() => handleAddToCollection(collection.id)}
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2" 
+                      style={{ backgroundColor: collection.color }}
+                    />
+                    {collection.name}
+                  </Button>
+                ))}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="new" className="py-4">
+              <div className="grid gap-4">
+                <div className="grid w-full items-center gap-1.5">
+                  <Input
+                    placeholder="Collection name"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
                   />
-                  {collection.name}
+                </div>
+                <div className="grid w-full items-center gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="color"
+                      value={newCollectionColor}
+                      onChange={(e) => setNewCollectionColor(e.target.value)}
+                      className="w-12 h-8 p-1"
+                    />
+                    <Input
+                      value={newCollectionColor}
+                      onChange={(e) => setNewCollectionColor(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleCreateNewCollection}>
+                  Create and Add
                 </Button>
-              ))}
-            </div>
-          </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddToCollectionDialogOpen(false)}>
               Cancel
@@ -406,6 +494,11 @@ export const PrototypeGrid = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddPrototypeDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+      />
     </div>
   );
 };
