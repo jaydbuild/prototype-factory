@@ -1,27 +1,64 @@
+
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { isValidFigmaUrl } from "@/utils/figma-utils";
+import { AlertCircle } from "lucide-react";
 
 interface FigmaUrlFormProps {
   prototypeId: string;
   onFigmaUrlAdded?: (url: string) => void;
+  initialUrl?: string;
 }
 
-export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded }: FigmaUrlFormProps) {
-  const [figmaUrl, setFigmaUrl] = useState("");
+export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded, initialUrl = "" }: FigmaUrlFormProps) {
+  const [figmaUrl, setFigmaUrl] = useState(initialUrl);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Validate URL on change
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setFigmaUrl(url);
+    
+    // Clear validation error when input is emptied
+    if (!url.trim()) {
+      setValidationError(null);
+      return;
+    }
+    
+    // Only show validation errors after user has typed something substantial
+    if (url.includes('figma.com') && !isValidFigmaUrl(url)) {
+      setValidationError('Please enter a valid Figma file URL (e.g., https://www.figma.com/file/abc123/DesignName)');
+    } else {
+      setValidationError(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!figmaUrl.trim()) {
+    const trimmedUrl = figmaUrl.trim();
+    
+    if (!trimmedUrl) {
       toast({
         title: "Error",
-        description: "Please enter a valid Figma URL",
+        description: "Please enter a Figma URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Final validation before submission
+    if (!isValidFigmaUrl(trimmedUrl)) {
+      setValidationError('Please enter a valid Figma file URL (e.g., https://www.figma.com/file/abc123/DesignName)');
+      toast({
+        title: "Invalid Figma URL",
+        description: "Please enter a valid Figma file URL",
         variant: "destructive",
       });
       return;
@@ -30,12 +67,12 @@ export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded }: FigmaUrlFormProps
     try {
       setIsSubmitting(true);
 
-      // First, try to directly update the database using a function call
+      // Call the Supabase function to update the prototype
       const { error: functionError } = await supabase.functions
         .invoke('update-prototype-figma-url', {
           body: { 
             prototypeId,
-            figmaUrl: figmaUrl.trim()
+            figmaUrl: trimmedUrl
           }
         });
           
@@ -46,16 +83,13 @@ export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded }: FigmaUrlFormProps
 
       toast({
         title: "Success",
-        description: "Figma URL added successfully",
+        description: "Figma design linked successfully",
       });
       
       // Call the callback with the new URL
       if (onFigmaUrlAdded) {
-        onFigmaUrlAdded(figmaUrl.trim());
+        onFigmaUrlAdded(trimmedUrl);
       }
-      
-      // Clear the input
-      setFigmaUrl("");
     } catch (error: any) {
       console.error('Error adding Figma URL:', error);
       toast({
@@ -75,10 +109,18 @@ export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded }: FigmaUrlFormProps
         <Input
           id="figmaUrl"
           value={figmaUrl}
-          onChange={(e) => setFigmaUrl(e.target.value)}
+          onChange={handleUrlChange}
           placeholder="https://www.figma.com/file/..."
-          className="w-full"
+          className={`w-full ${validationError ? 'border-destructive' : ''}`}
         />
+        
+        {validationError && (
+          <div className="flex items-start gap-2 text-destructive text-xs mt-1">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>{validationError}</span>
+          </div>
+        )}
+        
         <p className="text-xs text-muted-foreground">
           Enter the URL of your Figma design to link it to this prototype
         </p>
@@ -86,9 +128,9 @@ export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded }: FigmaUrlFormProps
       <Button 
         type="submit" 
         className="w-full"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !!validationError}
       >
-        {isSubmitting ? "Adding..." : "Add Figma Design"}
+        {isSubmitting ? "Adding..." : initialUrl ? "Update Figma Design" : "Add Figma Design"}
       </Button>
     </form>
   );
