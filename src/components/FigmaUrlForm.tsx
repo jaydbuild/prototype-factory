@@ -30,30 +30,18 @@ export function FigmaUrlForm({ prototypeId, onFigmaUrlAdded }: FigmaUrlFormProps
     try {
       setIsSubmitting(true);
 
-      // Update the prototype with the Figma URL
-      // Using a direct update with type assertion to handle the case where figma_url is not in the type yet
-      const { error } = await supabase
-        .from('prototypes')
-        .update({ 
-          figma_url: figmaUrl.trim() 
-        } as any)
-        .eq('id', prototypeId);
-
-      if (error) {
-        console.error('Error updating Figma URL:', error);
-        
-        // Fallback approach - try to use a function to update
-        const { error: functionError } = await supabase.functions
-          .invoke('update-prototype-figma-url', {
-            body: { 
-              prototypeId,
-              figmaUrl: figmaUrl.trim()
-            }
-          });
+      // First, try to directly update the database using a function call
+      const { error: functionError } = await supabase.functions
+        .invoke('update-prototype-figma-url', {
+          body: { 
+            prototypeId,
+            figmaUrl: figmaUrl.trim()
+          }
+        });
           
-        if (functionError) {
-          throw new Error(functionError.message || 'Failed to update Figma URL');
-        }
+      if (functionError) {
+        console.error('Error calling function:', functionError);
+        throw new Error(functionError.message || 'Failed to update Figma URL');
       }
 
       toast({

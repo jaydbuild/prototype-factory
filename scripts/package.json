@@ -1,0 +1,12 @@
+{
+  "name": "supabase-scripts",
+  "version": "1.0.0",
+  "description": "Scripts for Supabase database management",
+  "type": "module",
+  "scripts": {
+    "add-figma-url": "node add_figma_url_column.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.4"
+  }
+}

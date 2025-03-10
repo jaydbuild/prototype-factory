@@ -146,6 +146,38 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
           </DialogDescription>
         </DialogHeader>
         
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="col-span-3"
+              placeholder="Enter prototype name"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="figmaUrl" className="text-right">
+              Figma URL
+            </Label>
+            <div className="col-span-3 space-y-1">
+              <Input
+                id="figmaUrl"
+                value={figmaUrl}
+                onChange={(e) => setFigmaUrl(e.target.value)}
+                className="w-full"
+                placeholder="https://www.figma.com/file/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Link your Figma design to view it alongside your prototype
+              </p>
+            </div>
+          </div>
+        </div>
+        
         <div {...getRootProps()} className="group relative">
           <div className={`flex h-64 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed 
             ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/50'} 
@@ -182,32 +214,6 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
             </div>
           </div>
           <input {...getInputProps()} />
-        </div>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Name
-            </Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
-              placeholder="Enter prototype name"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="figmaUrl" className="text-right">
-              Figma URL
-            </Label>
-            <Input
-              id="figmaUrl"
-              value={figmaUrl}
-              onChange={(e) => setFigmaUrl(e.target.value)}
-              className="col-span-3"
-              placeholder="Enter Figma design URL (optional)"
-            />
-          </div>
         </div>
         <DialogFooter>
           <Button

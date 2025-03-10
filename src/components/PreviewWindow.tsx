@@ -19,10 +19,10 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
 
   useEffect(() => {
     const fetchPrototypeUrl = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      
       try {
-        setIsLoading(true);
-        setLoadError(null);
-        
         // If url is provided, use it directly
         if (url) {
           console.log("Using provided URL:", url);
@@ -31,9 +31,10 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         }
 
         // Check if the prototype has a deployment URL in the database
+        // Only select fields we know exist to avoid errors
         const { data: prototype, error: prototypeError } = await supabase
           .from('prototypes')
-          .select('deployment_status, deployment_url, file_path, figma_url')
+          .select('*')
           .eq('id', prototypeId)
           .single();
 
@@ -45,45 +46,32 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
 
         console.log("Prototype data:", prototype);
 
-        // Store the Figma URL if available
-        if (prototype && 'figma_url' in prototype && prototype.figma_url) {
-          setFigmaUrl(prototype.figma_url as string);
+        // Check if figma_url exists in the data
+        let figmaUrlValue = null;
+        try {
+          // Try to access figma_url using a type-safe approach
+          figmaUrlValue = (prototype as any).figma_url;
+        } catch (e) {
+          console.warn("figma_url column not found in prototype data");
         }
+        
+        setFigmaUrl(figmaUrlValue);
 
         // If the prototype is deployed and has a URL, use it
         if (prototype && prototype.deployment_status === 'deployed' && prototype.deployment_url) {
-          console.log("Using deployed URL from database:", prototype.deployment_url);
+          console.log("Using deployment URL:", prototype.deployment_url);
           setPreviewUrl(prototype.deployment_url);
-          return;
-        }
-
-        // If we have a file path but no deployment URL, use Sandpack
-        if (prototype && prototype.file_path) {
-          console.log("Prototype has file_path but no deployment_url, using Sandpack");
+        } else if (prototype && prototype.file_path) {
+          // If not deployed but has a file path, use Sandpack
+          console.log("Using Sandpack for preview");
           setUseSandpack(true);
-          return;
+        } else {
+          // No URL or file path available
+          setLoadError("No preview available for this prototype");
         }
-
-        // Otherwise, try to generate a URL from storage
-        console.log("Fetching from storage for ID:", prototypeId);
-        const { data: { publicUrl } } = await supabase.storage
-          .from('prototype-deployments')
-          .getPublicUrl(`${prototypeId}/index.html`);
-        
-        console.log("Generated public URL:", publicUrl);
-        
-        if (publicUrl) {
-          setPreviewUrl(publicUrl);
-          return;
-        }
-
-        // If we still don't have a URL, use Sandpack
-        console.log("No URL found, falling back to Sandpack");
-        setUseSandpack(true);
       } catch (error) {
-        console.error('Error fetching preview URL:', error);
-        setLoadError('Failed to load preview. Using Sandpack instead.');
-        setUseSandpack(true);
+        console.error("Error loading preview:", error);
+        setLoadError("Failed to load preview");
       } finally {
         setIsLoading(false);
       }
@@ -92,93 +80,53 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
     fetchPrototypeUrl();
   }, [prototypeId, url]);
 
-  // If we're using Sandpack, render the SandpackPreview component
-  if (useSandpack) {
-    return <SandpackPreview 
-      prototypeId={prototypeId} 
-      url={url} 
-      deploymentUrl={previewUrl} 
-      figmaUrl={figmaUrl} 
-      onShare={onShare}
-    />;
+  // For demo purposes, let's set a hardcoded Figma URL if none is provided
+  // This will be removed once the database schema is updated
+  useEffect(() => {
+    // Only set a demo URL if figmaUrl is null and we're in development
+    if (figmaUrl === null && process.env.NODE_ENV === 'development') {
+      setFigmaUrl('https://www.figma.com/file/LKQ4FJ4bTnCSjedbRpk931/Sample-File');
+    }
+  }, [figmaUrl]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  // Otherwise, render the traditional iframe
-  const handleIframeLoad = () => {
-    setIsLoading(false);
-  };
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-destructive">{loadError}</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleIframeError = () => {
-    setIsLoading(false);
-    setLoadError('Failed to load preview content. Switching to Sandpack...');
-    setUseSandpack(true);
-  };
-
-  // Define a function to inject CSS fixes into the iframe after it loads
-  const injectCssFixesToIframe = (iframe: HTMLIFrameElement) => {
-    try {
-      if (iframe && iframe.contentDocument) {
-        // Create a style element
-        const style = iframe.contentDocument.createElement('style');
-        style.textContent = `
-          /* Fix for bullet points and list styling */
-          body { font-family: system-ui, -apple-system, sans-serif; }
-          ul { padding-left: 20px; list-style-type: disc !important; }
-          ol { padding-left: 20px; list-style-type: decimal !important; }
-          li { display: list-item !important; margin: 0.5em 0; }
-          li::marker { display: inline-block; }
-        `;
-        
-        // Append it to the iframe's head
-        if (iframe.contentDocument.head) {
-          iframe.contentDocument.head.appendChild(style);
-        }
-        
-        // Add a class to the body for additional styling
-        if (iframe.contentDocument.body) {
-          iframe.contentDocument.body.classList.add('preview-style-fix');
-        }
-      }
-    } catch (e) {
-      console.error('Error injecting CSS into iframe:', e);
-      // Don't fail the preview if this doesn't work
-    }
-  };
+  if (useSandpack) {
+    return (
+      <SandpackPreview 
+        prototypeId={prototypeId} 
+        url={previewUrl || undefined}
+        figmaUrl={figmaUrl}
+        onShare={onShare}
+      />
+    );
+  }
 
   return (
-    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden rounded-lg border preview-iframe-container">
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3 z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <div className="text-muted-foreground">Loading preview...</div>
-        </div>
-      )}
-      
-      {loadError && !useSandpack && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
-          <div className="bg-white rounded-lg p-6 shadow-md max-w-md">
-            <h3 className="text-lg font-semibold text-destructive mb-2">Preview Error</h3>
-            <p className="text-muted-foreground">{loadError}</p>
-          </div>
-        </div>
-      )}
-      
-      {previewUrl && !useSandpack && (
-        <iframe
-          src={previewUrl}
-          className="preview-iframe"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
-          title="Prototype Preview"
-          onLoad={(e) => {
-            handleIframeLoad();
-            // Inject CSS fixes to the iframe
-            if (e.currentTarget) {
-              injectCssFixesToIframe(e.currentTarget);
-            }
-          }}
-          onError={handleIframeError}
-        />
-      )}
+    <div className="h-full w-full">
+      <iframe 
+        src={previewUrl} 
+        className="w-full h-full border-0 preview-iframe"
+        title="Preview"
+        sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
+        allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; midi; payment; usb; xr-spatial-tracking"
+      />
     </div>
   );
 }

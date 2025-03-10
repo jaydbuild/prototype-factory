@@ -66,7 +66,7 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onS
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'design'>('preview');
+  const [viewMode, setViewMode] = useState<'preview' | 'code' | 'split' | 'design'>('preview');
   const [isFeedbackMode, setIsFeedbackMode] = useState(false);
   const [showUI, setShowUI] = useState(true);
   const [files, setFiles] = useState<SandpackFiles>({});
@@ -82,6 +82,7 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onS
   const [showCustomDimensionsDialog, setShowCustomDimensionsDialog] = useState(false);
   const [tempCustomDimensions, setTempCustomDimensions] = useState({ width: 375, height: 667 });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [tempFigmaUrl, setTempFigmaUrl] = useState('');
   const { toast } = useToast();
   
   const {
@@ -295,7 +296,7 @@ if (typeof window.menuitemfn === 'undefined') {
   };
 
   // Handle view mode change
-  const handleViewModeChange = (mode: 'preview' | 'code' | 'design') => {
+  const handleViewModeChange = (mode: 'preview' | 'code' | 'split' | 'design') => {
     setViewMode(mode);
     // Reset to desktop view when switching to code view
     if (mode === 'code') {
@@ -610,42 +611,94 @@ if (typeof window.menuitemfn === 'undefined') {
 
   const sandpackKey = `preview-${prototypeId}`;
 
-  // Design view content
-  const renderDesignView = () => {
-    if (figmaUrl) {
-      // Convert Figma URL to embed URL if needed
-      const embedUrl = figmaUrl.includes('figma.com/embed') 
-        ? figmaUrl 
-        : figmaUrl.replace('figma.com/file', 'figma.com/embed');
-      
-      return (
-        <div className="w-full h-full flex flex-col">
-          <iframe 
-            src={embedUrl}
-            className="w-full h-full border-0"
-            allowFullScreen
-          />
-        </div>
-      );
-    } else {
-      return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-muted/20">
-          <div className="max-w-md text-center space-y-4">
-            <h3 className="text-lg font-medium">No Figma design linked</h3>
-            <p className="text-sm text-muted-foreground">
-              This prototype doesn't have a Figma design linked to it yet.
-            </p>
-            <div className="pt-4">
-              <FigmaUrlForm prototypeId={prototypeId} onFigmaUrlAdded={(url) => {
-                // Update the figmaUrl state when a URL is added
-                if (url) setFigmaUrl(url);
-              }} />
+  // Function to handle adding a Figma URL
+  const handleAddFigmaUrl = () => {
+    if (!tempFigmaUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid Figma URL",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Update the figmaUrl state
+    setFigmaUrl(tempFigmaUrl.trim());
+    
+    // Show success message
+    toast({
+      title: "Success",
+      description: "Figma URL added successfully",
+    });
+    
+    // Clear the input
+    setTempFigmaUrl("");
+  };
+
+  // Function to render Figma iframe if URL exists
+  const renderFigmaIframe = () => {
+    if (!figmaUrl) return null;
+    
+    // Convert Figma URL to embed URL if needed
+    const embedUrl = figmaUrl.includes('figma.com/embed') 
+      ? figmaUrl 
+      : figmaUrl.replace('figma.com/file', 'figma.com/embed');
+    
+    return (
+      <div className="w-full h-full flex flex-col">
+        <iframe 
+          src={embedUrl}
+          className="w-full h-full border-0"
+          allowFullScreen
+        />
+      </div>
+    );
+  };
+
+  // Function to render Figma URL form
+  const renderFigmaUrlForm = () => {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-background">
+        <div className="max-w-md text-center space-y-4 bg-white p-8 rounded-lg shadow-sm">
+          <h3 className="text-xl font-medium">Add Figma Design</h3>
+          <p className="text-sm text-muted-foreground">
+            Enter the URL of your Figma design to view it here.
+          </p>
+          <div className="pt-4">
+            <div className="space-y-2">
+              <label htmlFor="figmaUrl" className="text-sm font-medium text-left block">Figma Design URL</label>
+              <input
+                id="figmaUrl"
+                value={tempFigmaUrl}
+                onChange={(e) => setTempFigmaUrl(e.target.value)}
+                placeholder="https://www.figma.com/file/..."
+                className="w-full px-3 py-2 border rounded-md text-sm"
+              />
+              <p className="text-xs text-muted-foreground text-left">
+                Example: https://www.figma.com/file/LKQ4FJ4bTnCSjedbRpk931/Sample-File
+              </p>
             </div>
+            <button 
+              onClick={handleAddFigmaUrl}
+              className="mt-4 w-full py-2 px-4 bg-primary text-primary-foreground rounded-md text-sm font-medium"
+            >
+              Add Figma Design
+            </button>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
   };
+
+  useEffect(() => {
+    if (viewMode === 'design') {
+      // If we're already in design mode, make sure the form is visible
+      const designContainer = document.querySelector('[data-design-view]');
+      if (designContainer) {
+        designContainer.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [viewMode]);
 
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">
@@ -697,7 +750,7 @@ if (typeof window.menuitemfn === 'undefined') {
             }
           }}
           onShare={onShare}
-          hasFigmaDesign={!!figmaUrl} // Pass whether we have a Figma design
+          hasFigmaDesign={!!figmaUrl || !!tempFigmaUrl} // Pass whether we have a Figma design or temp URL
         />
         
         <div className="flex items-center gap-2">
@@ -907,8 +960,8 @@ if (typeof window.menuitemfn === 'undefined') {
           
           {/* Figma Design View */}
           {viewMode === 'design' && (
-            <div className="h-full w-full flex items-center justify-center overflow-hidden">
-              {renderDesignView()}
+            <div className="h-full w-full flex items-center justify-center overflow-hidden" data-design-view>
+              {figmaUrl ? renderFigmaIframe() : renderFigmaUrlForm()}
             </div>
           )}
           

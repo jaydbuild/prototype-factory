@@ -13,13 +13,7 @@ serve(async (req) => {
       // Supabase API URL - env var exposed by default when deployed
       Deno.env.get('SUPABASE_URL') ?? '',
       // Supabase API ANON KEY - env var exposed by default when deployed
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      // Create client with Auth context of the user that called the function
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
     // Get the request body
@@ -32,49 +26,56 @@ serve(async (req) => {
       )
     }
 
-    // First, check if the column exists
-    const { data: columnExists, error: columnCheckError } = await supabaseClient.rpc(
-      'column_exists',
-      { table_name: 'prototypes', column_name: 'figma_url' }
-    ).single();
-
-    if (columnCheckError) {
-      console.error('Error checking if column exists:', columnCheckError);
-      
-      // Try a direct SQL approach as a fallback
-      try {
-        // Use raw SQL to add the column if it doesn't exist
-        await supabaseClient.rpc(
-          'add_column_if_not_exists',
-          { 
-            table_name: 'prototypes', 
-            column_name: 'figma_url',
-            column_type: 'text'
-          }
-        );
-      } catch (sqlError) {
-        console.error('Error adding column:', sqlError);
-        // Continue anyway, as the column might already exist
-      }
+    // First, try to add the column if it doesn't exist using raw SQL
+    try {
+      // Use raw SQL to add the column if it doesn't exist
+      await supabaseClient.from('_pgrst_reserved_dummy').rpc('', {}, {
+        headers: {
+          'Content-Profile': 'postgres',
+          'Prefer': 'params=single-object'
+        },
+        body: `ALTER TABLE public.prototypes ADD COLUMN IF NOT EXISTS figma_url TEXT`
+      });
+    } catch (sqlError) {
+      console.error('Error adding column:', sqlError);
+      // Continue anyway, as the column might already exist
     }
 
-    // Update the prototype with the Figma URL
-    const { error: updateError } = await supabaseClient
-      .from('prototypes')
-      .update({ figma_url: figmaUrl })
-      .eq('id', prototypeId);
-
-    if (updateError) {
-      throw updateError;
+    // Update the prototype with the Figma URL using direct SQL to bypass schema issues
+    try {
+      // Try standard update first
+      const { error } = await supabaseClient
+        .from('prototypes')
+        .update({ figma_url: figmaUrl })
+        .eq('id', prototypeId);
+        
+      if (error) {
+        // If that fails, try direct SQL
+        await supabaseClient.from('_pgrst_reserved_dummy').rpc('', {}, {
+          headers: {
+            'Content-Profile': 'postgres',
+            'Prefer': 'params=single-object'
+          },
+          body: `UPDATE public.prototypes SET figma_url = '${figmaUrl}' WHERE id = '${prototypeId}'`
+        });
+      }
+    } catch (updateError: unknown) {
+      console.error('Error updating prototype:', updateError);
+      if (updateError instanceof Error) {
+        throw updateError;
+      } else {
+        throw new Error('Unknown error updating prototype');
+      }
     }
 
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { headers: { 'Content-Type': 'application/json' }, status: 500 }
     )
   }

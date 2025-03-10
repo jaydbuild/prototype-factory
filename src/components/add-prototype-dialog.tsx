@@ -17,6 +17,7 @@ interface AddPrototypeDialogProps {
 
 export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogProps) {
   const [name, setName] = useState("");
+  const [figmaUrl, setFigmaUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<string>("");
   const [fileValidationStatus, setFileValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
@@ -163,7 +164,8 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
           name: name.trim(),
           created_by: sessionData.session.user.id,
           url: 'pending',
-          deployment_status: 'processing'
+          deployment_status: 'processing',
+          figma_url: figmaUrl.trim() || null
         })
         .select()
         .single();
@@ -258,6 +260,18 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
               onChange={(e) => setName(e.target.value)}
               disabled={isUploading}
             />
+          </div>
+          <div className="grid gap-2">
+            <Input
+              id="figmaUrl"
+              placeholder="Figma design URL (optional)"
+              value={figmaUrl}
+              onChange={(e) => setFigmaUrl(e.target.value)}
+              disabled={isUploading}
+            />
+            <p className="text-xs text-muted-foreground">
+              Link your Figma design to view it alongside your prototype
+            </p>
           </div>
           <div 
             {...getRootProps()} 

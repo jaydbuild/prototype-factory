@@ -51,8 +51,8 @@ interface DeviceConfig {
 }
 
 interface PreviewControlsProps {
-  onViewModeChange: (mode: 'preview' | 'code' | 'design') => void;
-  viewMode: 'preview' | 'code' | 'design';
+  onViewModeChange: (mode: 'preview' | 'code' | 'split' | 'design') => void;
+  viewMode: 'preview' | 'code' | 'split' | 'design';
   isFeedbackMode: boolean;
   onToggleFeedbackMode: () => void;
   showUI?: boolean;
@@ -145,7 +145,7 @@ export function PreviewControls({
       {/* View mode toggle */}
       <Tabs 
         value={viewMode} 
-        onValueChange={(value) => onViewModeChange(value as 'preview' | 'code' | 'design')}
+        onValueChange={(value) => onViewModeChange(value as 'preview' | 'code' | 'split' | 'design')}
         className="w-auto"
       >
         <TabsList className="h-8">
