@@ -50,7 +50,6 @@ export const PrototypeGrid = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all prototype-collection mappings
   const { data: prototypeCollections = {} } = useQuery({
     queryKey: ['prototype-collections'],
     queryFn: async () => {
@@ -77,12 +76,10 @@ export const PrototypeGrid = () => {
     }
   });
 
-  // Fetch collections with prototype counts
   const { data: collections = [] } = useQuery({
     queryKey: ['collections-with-counts'],
     queryFn: async () => {
       try {
-        // First get all collections
         const { data: collectionsData, error: collectionsError } = await supabase
           .from('collections')
           .select('*')
@@ -90,14 +87,12 @@ export const PrototypeGrid = () => {
 
         if (collectionsError) throw collectionsError;
         
-        // Get counts for each collection by querying prototype_collections directly
         const { data: countsData, error: countsError } = await supabase
           .from('prototype_collections')
           .select('collection_id, prototype_id');
           
         if (countsError) throw countsError;
         
-        // Process counts client-side
         const countMap: Record<string, number> = {};
         (countsData || []).forEach((item: any) => {
           if (!countMap[item.collection_id]) {
@@ -141,15 +136,12 @@ export const PrototypeGrid = () => {
         
         let filteredData = data || [];
         
-        // Filter based on collections
         if (selectedCollection) {
-          // Show only prototypes in the selected collection
           filteredData = filteredData.filter(item => {
             const prototypeCollectionIds = prototypeCollections[item.id] || [];
             return prototypeCollectionIds.includes(selectedCollection);
           });
         } else {
-          // Show only prototypes not in any collection
           filteredData = filteredData.filter(item => {
             return !prototypeCollections[item.id] || prototypeCollections[item.id].length === 0;
           });
@@ -254,27 +246,23 @@ export const PrototypeGrid = () => {
     }
 
     try {
-      // First, remove selected prototypes from any existing collections
-      for (const prototypeId of selectedPrototypes) {
-        const { error } = await supabase
-          .from('prototype_collections')
-          .delete()
-          .eq('prototype_id', prototypeId);
-        
-        if (error) throw error;
-      }
+      const { error: deleteError } = await supabase
+        .from('prototype_collections')
+        .delete()
+        .in('prototype_id', selectedPrototypes);
+      
+      if (deleteError) throw deleteError;
 
-      // Then add them to the selected collection
-      const promises = selectedPrototypes.map(prototypeId => 
-        supabase
-          .from('prototype_collections')
-          .upsert({ 
-            prototype_id: prototypeId, 
-            collection_id: collectionId 
-          })
-      );
+      const newAssociations = selectedPrototypes.map(prototypeId => ({
+        prototype_id: prototypeId,
+        collection_id: collectionId
+      }));
 
-      await Promise.all(promises);
+      const { error: insertError } = await supabase
+        .from('prototype_collections')
+        .insert(newAssociations);
+
+      if (insertError) throw insertError;
 
       toast({
         title: "Success",
@@ -307,7 +295,7 @@ export const PrototypeGrid = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data: newCollection, error: collectionError } = await supabase
         .from('collections')
         .insert({
           name: newCollectionName.trim(),
@@ -316,10 +304,10 @@ export const PrototypeGrid = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (collectionError) throw collectionError;
 
-      if (data) {
-        await handleAddToCollection(data.id);
+      if (newCollection) {
+        await handleAddToCollection(newCollection.id);
       }
 
       setNewCollectionName("");
