@@ -18,3 +18,7 @@ export interface Prototype {
   figma_url: string | null;
   sandbox_config: Record<string, unknown> | null;
 }
+
+export interface CollectionWithCount extends Collection {
+  prototypeCount: number;
+}

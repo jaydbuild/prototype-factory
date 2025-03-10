@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -51,6 +52,7 @@ export const PrototypeGrid = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch all prototype-collection mappings
   const { data: prototypeCollections = {} } = useQuery({
     queryKey: ['prototype-collections'],
     queryFn: async () => {
@@ -77,26 +79,46 @@ export const PrototypeGrid = () => {
     }
   });
 
+  // Fetch collections with prototype counts
   const { data: collections = [] } = useQuery({
-    queryKey: ['collections'],
+    queryKey: ['collections-with-counts'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        // First get all collections
+        const { data: collectionsData, error: collectionsError } = await supabase
           .from('collections')
           .select('*')
           .order('name') as { data: Collection[] | null, error: any };
 
-        if (error) throw error;
-        return data || [];
+        if (collectionsError) throw collectionsError;
+        
+        // Get counts for each collection
+        const { data: countsData, error: countsError } = await supabase
+          .from('prototype_collections')
+          .select('collection_id, count(*)', { count: 'exact' })
+          .group('collection_id');
+          
+        if (countsError) throw countsError;
+        
+        // Merge collections with counts
+        const countMap: Record<string, number> = {};
+        (countsData || []).forEach((item: any) => {
+          countMap[item.collection_id] = item.count;
+        });
+        
+        return (collectionsData || []).map(collection => ({
+          ...collection,
+          prototypeCount: countMap[collection.id] || 0
+        }));
       } catch (error) {
-        console.error('Error fetching collections:', error);
+        console.error('Error fetching collections with counts:', error);
         return [];
       }
     }
   });
 
   const { data: prototypes = [], isLoading } = useQuery({
-    queryKey: ['prototypes', sortBy, searchTerm, selectedCollection],
+    queryKey: ['prototypes', sortBy, searchTerm, selectedCollection, prototypeCollections],
     queryFn: async () => {
       try {
         let query = supabase
@@ -119,10 +141,17 @@ export const PrototypeGrid = () => {
         
         let filteredData = data || [];
         
+        // Filter based on collections
         if (selectedCollection) {
+          // Show only prototypes in the selected collection
           filteredData = filteredData.filter(item => {
             const prototypeCollectionIds = prototypeCollections[item.id] || [];
             return prototypeCollectionIds.includes(selectedCollection);
+          });
+        } else {
+          // Show only prototypes not in any collection
+          filteredData = filteredData.filter(item => {
+            return !prototypeCollections[item.id] || prototypeCollections[item.id].length === 0;
           });
         }
         
@@ -225,6 +254,17 @@ export const PrototypeGrid = () => {
     }
 
     try {
+      // First, remove selected prototypes from any existing collections
+      for (const prototypeId of selectedPrototypes) {
+        const { error } = await supabase
+          .from('prototype_collections')
+          .delete()
+          .eq('prototype_id', prototypeId);
+        
+        if (error) throw error;
+      }
+
+      // Then add them to the selected collection
       const promises = selectedPrototypes.map(prototypeId => 
         supabase
           .from('prototype_collections')
@@ -242,7 +282,10 @@ export const PrototypeGrid = () => {
       });
 
       setIsAddToCollectionDialogOpen(false);
+      setSelectedPrototypes([]);
       queryClient.invalidateQueries({ queryKey: ['prototype-collections'] });
+      queryClient.invalidateQueries({ queryKey: ['collections-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['prototypes'] });
     } catch (error) {
       console.error('Error adding to collection:', error);
       toast({
@@ -284,6 +327,7 @@ export const PrototypeGrid = () => {
       setSelectedCollectionTab("existing");
       
       queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.invalidateQueries({ queryKey: ['collections-with-counts'] });
     } catch (error) {
       console.error('Error creating collection:', error);
       toast({
@@ -395,6 +439,8 @@ export const PrototypeGrid = () => {
                           .eq('collection_id', collectionId);
                         
                         queryClient.invalidateQueries({ queryKey: ['prototype-collections'] });
+                        queryClient.invalidateQueries({ queryKey: ['collections-with-counts'] });
+                        queryClient.invalidateQueries({ queryKey: ['prototypes'] });
                         
                         toast({
                           title: "Success",
@@ -426,7 +472,8 @@ export const PrototypeGrid = () => {
           <DialogHeader>
             <DialogTitle>Add to Collection</DialogTitle>
             <DialogDescription>
-              Choose an existing collection or create a new one
+              Choose an existing collection or create a new one. 
+              Prototypes will be moved from individual view to the collection.
             </DialogDescription>
           </DialogHeader>
           
@@ -438,19 +485,24 @@ export const PrototypeGrid = () => {
             
             <TabsContent value="existing" className="py-4">
               <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto">
-                {collections.map((collection) => (
+                {collections.map((collection: any) => (
                   <Button
                     key={collection.id}
                     variant="outline"
-                    className="justify-start"
+                    className="justify-between"
                     style={{ borderColor: collection.color }}
                     onClick={() => handleAddToCollection(collection.id)}
                   >
-                    <div 
-                      className="w-3 h-3 rounded-full mr-2" 
-                      style={{ backgroundColor: collection.color }}
-                    />
-                    {collection.name}
+                    <div className="flex items-center">
+                      <div 
+                        className="w-3 h-3 rounded-full mr-2" 
+                        style={{ backgroundColor: collection.color }}
+                      />
+                      {collection.name}
+                    </div>
+                    <span className="text-muted-foreground text-xs">
+                      {collection.prototypeCount} prototype{collection.prototypeCount !== 1 ? 's' : ''}
+                    </span>
                   </Button>
                 ))}
               </div>

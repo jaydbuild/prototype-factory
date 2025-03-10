@@ -22,6 +22,7 @@ export type Collection = {
   color?: string;
   created_at: string;
   created_by: string;
+  prototypeCount?: number;
 }
 
 export function PrototypeCollections({ 
@@ -37,20 +38,39 @@ export function PrototypeCollections({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch collections
+  // Fetch collections with prototype counts
   const { data: collections = [], isLoading } = useQuery({
-    queryKey: ['collections'],
+    queryKey: ['collections-with-counts'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        // First get all collections
+        const { data: collectionsData, error: collectionsError } = await supabase
           .from('collections')
           .select('*')
           .order('name') as { data: Collection[] | null, error: any };
 
-        if (error) throw error;
-        return data as Collection[];
+        if (collectionsError) throw collectionsError;
+        
+        // Get counts for each collection
+        const { data: countsData, error: countsError } = await supabase
+          .from('prototype_collections')
+          .select('collection_id, count(*)', { count: 'exact' })
+          .group('collection_id');
+          
+        if (countsError) throw countsError;
+        
+        // Merge collections with counts
+        const countMap: Record<string, number> = {};
+        (countsData || []).forEach((item: any) => {
+          countMap[item.collection_id] = item.count;
+        });
+        
+        return (collectionsData || []).map(collection => ({
+          ...collection,
+          prototypeCount: countMap[collection.id] || 0
+        }));
       } catch (error: any) {
-        console.error('Error fetching collections:', error);
+        console.error('Error fetching collections with counts:', error);
         toast({
           title: "Error",
           description: "Failed to fetch collections",
@@ -92,7 +112,7 @@ export function PrototypeCollections({
       setIsCreateDialogOpen(false);
       
       // Refresh collections
-      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.invalidateQueries({ queryKey: ['collections-with-counts'] });
     } catch (error: any) {
       console.error('Error creating collection:', error);
       toast({
@@ -124,19 +144,22 @@ export function PrototypeCollections({
           className="cursor-pointer"
           onClick={() => onSelectCollection(null)}
         >
-          All
+          All Uncategorized
         </Badge>
         
         {collections.map((collection) => (
           <Badge
             key={collection.id}
             variant={selectedCollection === collection.id ? "default" : "outline"}
-            className="cursor-pointer"
+            className="cursor-pointer flex items-center"
             style={{ backgroundColor: selectedCollection === collection.id ? collection.color : 'transparent' }}
             onClick={() => onSelectCollection(collection.id)}
           >
             <Folder className="h-3 w-3 mr-1" />
             {collection.name}
+            <span className="ml-1 opacity-70 text-xs">
+              ({collection.prototypeCount || 0})
+            </span>
           </Badge>
         ))}
       </div>
