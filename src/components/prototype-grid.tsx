@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { AddPrototypeDialog } from "./add-prototype-dialog";
-import { PrototypeCollections } from "./prototype-collections";
+import { PrototypeCollections, PrototypeCollectionTag } from "./prototype-collections";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +23,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import type { Prototype } from "@/types/prototype";
+import type { Collection } from "./prototype-collections";
+
+interface PrototypeCollection {
+  prototype_id: string;
+  collection_id: string;
+}
 
 export const PrototypeGrid = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -36,20 +41,18 @@ export const PrototypeGrid = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch prototype-collection mappings
   const { data: prototypeCollections = {} } = useQuery({
     queryKey: ['prototype-collections'],
     queryFn: async () => {
       try {
         const { data, error } = await supabase
           .from('prototype_collections')
-          .select('prototype_id, collection_id');
+          .select('prototype_id, collection_id') as { data: PrototypeCollection[] | null, error: any };
 
         if (error) throw error;
 
-        // Convert to a more usable format: { prototypeId: [collectionId1, collectionId2, ...] }
         const mapping: Record<string, string[]> = {};
-        data.forEach(item => {
+        (data || []).forEach(item => {
           if (!mapping[item.prototype_id]) {
             mapping[item.prototype_id] = [];
           }
@@ -64,7 +67,6 @@ export const PrototypeGrid = () => {
     }
   });
 
-  // Fetch collections for the collection dialog
   const { data: collections = [] } = useQuery({
     queryKey: ['collections'],
     queryFn: async () => {
@@ -72,10 +74,10 @@ export const PrototypeGrid = () => {
         const { data, error } = await supabase
           .from('collections')
           .select('*')
-          .order('name');
+          .order('name') as { data: Collection[] | null, error: any };
 
         if (error) throw error;
-        return data;
+        return data || [];
       } catch (error) {
         console.error('Error fetching collections:', error);
         return [];
@@ -107,7 +109,6 @@ export const PrototypeGrid = () => {
         
         let filteredData = data || [];
         
-        // Filter by collection if one is selected
         if (selectedCollection) {
           filteredData = filteredData.filter(item => {
             const prototypeCollectionIds = prototypeCollections[item.id] || [];
@@ -116,7 +117,6 @@ export const PrototypeGrid = () => {
         }
         
         return filteredData.map((item): Prototype => {
-          // Handle sandbox_config parsing and type conversion
           let parsedSandboxConfig: Record<string, unknown> | null = null;
           if (item.sandbox_config) {
             if (typeof item.sandbox_config === 'string') {
@@ -221,7 +221,7 @@ export const PrototypeGrid = () => {
           .upsert({ 
             prototype_id: prototypeId, 
             collection_id: collectionId 
-          })
+          } as PrototypeCollection)
       );
 
       await Promise.all(promises);
@@ -245,7 +245,6 @@ export const PrototypeGrid = () => {
 
   return (
     <div className="container mx-auto py-8">
-      {/* Collections Filter */}
       <PrototypeCollections 
         selectedCollection={selectedCollection}
         onSelectCollection={setSelectedCollection}
@@ -331,7 +330,7 @@ export const PrototypeGrid = () => {
               className="absolute top-2 left-2 z-10 h-4 w-4"
             />
             <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-1 max-w-[70%] justify-end">
-              {prototypeCollections[prototype.id]?.map(collectionId => (
+              {(prototypeCollections[prototype.id] || [])?.map(collectionId => (
                 <div key={collectionId} onClick={(e) => e.stopPropagation()}>
                   <PrototypeCollectionTag 
                     prototypeId={prototype.id}
@@ -376,7 +375,6 @@ export const PrototypeGrid = () => {
         onOpenChange={setIsAddDialogOpen}
       />
 
-      {/* Add to Collection Dialog */}
       <Dialog open={isAddToCollectionDialogOpen} onOpenChange={setIsAddToCollectionDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

@@ -45,7 +45,7 @@ export function PrototypeCollections({
         const { data, error } = await supabase
           .from('collections')
           .select('*')
-          .order('name');
+          .order('name') as { data: Collection[] | null, error: any };
 
         if (error) throw error;
         return data as Collection[];
@@ -78,9 +78,7 @@ export function PrototypeCollections({
         .insert({
           name: newCollectionName.trim(),
           color: newCollectionColor,
-        })
-        .select()
-        .single();
+        }) as { data: Collection | null, error: any };
 
       if (error) throw error;
 
@@ -214,7 +212,7 @@ export function PrototypeCollectionTag({
           .from('collections')
           .select('*')
           .eq('id', collectionId)
-          .single();
+          .single() as { data: Collection | null, error: any };
 
         if (error) throw error;
         return data as Collection;

@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      collections: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content: string
@@ -90,6 +117,39 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      prototype_collections: {
+        Row: {
+          collection_id: string
+          created_at: string
+          prototype_id: string
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          prototype_id: string
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          prototype_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prototype_collections_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prototype_collections_prototype_id_fkey"
+            columns: ["prototype_id"]
+            isOneToOne: false
+            referencedRelation: "prototypes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prototype_feedback: {
         Row: {
