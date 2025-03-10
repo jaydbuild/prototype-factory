@@ -79,6 +79,7 @@ export const PrototypeGrid = () => {
             bundle_path: item.bundle_path,
             processed_at: item.processed_at,
             status: item.status,
+            figma_url: item.figma_url, // Added this line to include figma_url
             sandbox_config: parsedSandboxConfig
           };
         });
