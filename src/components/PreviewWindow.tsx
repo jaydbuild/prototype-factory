@@ -1,10 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { SandpackPreview } from './SandpackPreview';
-import { FigmaPreview } from './FigmaPreview';
-import { FigmaUrlForm } from './FigmaUrlForm';
 import '@/styles/PreviewIframe.css';
 
 interface PreviewWindowProps {
@@ -19,7 +16,6 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [useSandpack, setUseSandpack] = useState(false);
-  const [isShowingFigmaForm, setIsShowingFigmaForm] = useState(false);
 
   useEffect(() => {
     const fetchPrototypeUrl = async () => {
@@ -35,6 +31,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         }
 
         // Check if the prototype has a deployment URL in the database
+        // Only select fields we know exist to avoid errors
         const { data: prototype, error: prototypeError } = await supabase
           .from('prototypes')
           .select('*')
@@ -54,10 +51,11 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         try {
           // Try to access figma_url using a type-safe approach
           figmaUrlValue = (prototype as any).figma_url;
-          setFigmaUrl(figmaUrlValue);
         } catch (e) {
           console.warn("figma_url column not found in prototype data");
         }
+        
+        setFigmaUrl(figmaUrlValue);
 
         // If the prototype is deployed and has a URL, use it
         if (prototype && prototype.deployment_status === 'deployed' && prototype.deployment_url) {
@@ -82,10 +80,14 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
     fetchPrototypeUrl();
   }, [prototypeId, url]);
 
-  const handleFigmaUrlAdded = (newFigmaUrl: string) => {
-    setFigmaUrl(newFigmaUrl);
-    setIsShowingFigmaForm(false);
-  };
+  // For demo purposes, let's set a hardcoded Figma URL if none is provided
+  // This will be removed once the database schema is updated
+  useEffect(() => {
+    // Only set a demo URL if figmaUrl is null and we're in development
+    if (figmaUrl === null && process.env.NODE_ENV === 'development') {
+      setFigmaUrl('https://www.figma.com/file/LKQ4FJ4bTnCSjedbRpk931/Sample-File');
+    }
+  }, [figmaUrl]);
 
   if (isLoading) {
     return (
@@ -100,46 +102,6 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <p className="text-destructive">{loadError}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show Figma design if explicitly requested or if showing the form
-  if (isShowingFigmaForm) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full">
-          <FigmaUrlForm 
-            prototypeId={prototypeId} 
-            onFigmaUrlAdded={handleFigmaUrlAdded}
-            initialUrl={figmaUrl || ""}
-          />
-          <button 
-            onClick={() => setIsShowingFigmaForm(false)}
-            className="mt-4 text-sm text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // If we have a Figma URL, show the Figma preview
-  if (figmaUrl) {
-    return (
-      <div className="h-full w-full flex flex-col">
-        <div className="p-2 flex justify-end">
-          <button 
-            onClick={() => setIsShowingFigmaForm(true)}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Change Figma URL
-          </button>
-        </div>
-        <div className="flex-1">
-          <FigmaPreview figmaUrl={figmaUrl} />
         </div>
       </div>
     );
