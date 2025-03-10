@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -15,15 +14,7 @@ import { Plus, Folder, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-
-export type Collection = {
-  id: string;
-  name: string;
-  color?: string;
-  created_at: string;
-  created_by: string;
-  prototypeCount?: number;
-}
+import { Collection } from "@/types/prototype";
 
 export function PrototypeCollections({ 
   selectedCollection, 
@@ -51,18 +42,20 @@ export function PrototypeCollections({
 
         if (collectionsError) throw collectionsError;
         
-        // Get counts for each collection
+        // Get counts for each collection by querying prototype_collections directly
         const { data: countsData, error: countsError } = await supabase
           .from('prototype_collections')
-          .select('collection_id, count(*)', { count: 'exact' })
-          .group('collection_id');
+          .select('collection_id, prototype_id');
           
         if (countsError) throw countsError;
         
-        // Merge collections with counts
+        // Process counts client-side
         const countMap: Record<string, number> = {};
         (countsData || []).forEach((item: any) => {
-          countMap[item.collection_id] = item.count;
+          if (!countMap[item.collection_id]) {
+            countMap[item.collection_id] = 0;
+          }
+          countMap[item.collection_id]++;
         });
         
         return (collectionsData || []).map(collection => ({

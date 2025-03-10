@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -30,8 +29,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import type { Prototype } from "@/types/prototype";
-import type { Collection } from "./prototype-collections";
+import type { Prototype, Collection } from "@/types/prototype";
 
 interface PrototypeCollection {
   prototype_id: string;
@@ -92,18 +90,20 @@ export const PrototypeGrid = () => {
 
         if (collectionsError) throw collectionsError;
         
-        // Get counts for each collection
+        // Get counts for each collection by querying prototype_collections directly
         const { data: countsData, error: countsError } = await supabase
           .from('prototype_collections')
-          .select('collection_id, count(*)', { count: 'exact' })
-          .group('collection_id');
+          .select('collection_id, prototype_id');
           
         if (countsError) throw countsError;
         
-        // Merge collections with counts
+        // Process counts client-side
         const countMap: Record<string, number> = {};
         (countsData || []).forEach((item: any) => {
-          countMap[item.collection_id] = item.count;
+          if (!countMap[item.collection_id]) {
+            countMap[item.collection_id] = 0;
+          }
+          countMap[item.collection_id]++;
         });
         
         return (collectionsData || []).map(collection => ({

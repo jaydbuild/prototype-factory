@@ -19,6 +19,15 @@ export interface Prototype {
   sandbox_config: Record<string, unknown> | null;
 }
 
+export interface Collection {
+  id: string;
+  name: string;
+  color?: string;
+  created_at: string;
+  created_by: string;
+  prototypeCount?: number;
+}
+
 export interface CollectionWithCount extends Collection {
   prototypeCount: number;
 }
