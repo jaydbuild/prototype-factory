@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { 
   SandpackProvider, 
   SandpackCodeEditor,
@@ -20,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
 import { FeedbackPoint as FeedbackPointType } from '@/types/feedback';
+import { useIframeStability } from '@/hooks/use-iframe-stability';
 import JSZip from 'jszip';
 import '@/styles/sandpack-fix.css';
 
@@ -61,6 +63,122 @@ interface SandpackPreviewProps {
   onShare?: () => void;
 }
 
+// More stable preview component that prevents white screen issues
+const StablePreview = memo(({ file, hideNavigator = false }: { file: string, hideNavigator?: boolean }) => {
+  const { sandpack } = useSandpack();
+  const previousFileRef = useRef<string | null>(null);
+  const { isIframeReady } = useIframeStability({ 
+    containerSelector: '.sp-preview',
+    readyCheckInterval: 150
+  });
+  
+  // Force the preview to update when the file changes, but only if needed
+  useEffect(() => {
+    try {
+      // Only update if the file has actually changed
+      if (sandpack && file && previousFileRef.current !== file) {
+        // Set the active file in Sandpack
+        sandpack.setActiveFile(file);
+        console.log(`Set active file to: ${file}`);
+        
+        // Update the ref to track the current file
+        previousFileRef.current = file;
+      }
+    } catch (error) {
+      console.error("Error setting active file:", error);
+    }
+  }, [file, sandpack]);
+
+  // Add custom CSS to hide the navigator bar
+  useEffect(() => {
+    if (!hideNavigator) return;
+    
+    try {
+      // Use a class-based approach instead of directly manipulating the DOM
+      const styleId = 'sandpack-custom-styles';
+      let styleElement = document.getElementById(styleId) as HTMLStyleElement;
+      
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = styleId;
+        document.head.appendChild(styleElement);
+      }
+      
+      styleElement.textContent = `
+        .sp-navigator {
+          display: none !important;
+        }
+        .sp-preview-container {
+          padding-top: 0 !important;
+        }
+        /* Hide the "Open Sandbox" FAB button */
+        .sp-button.sp-preview-actions {
+          display: none !important;
+        }
+        /* Hide the CodeSandbox export button */
+        .sp-c-kwibBT.sp-preview-actions,
+        .sp-preview-actions {
+          display: none !important;
+        }
+      `;
+    } catch (error) {
+      console.error("Error applying custom styles:", error);
+    }
+  }, [hideNavigator]);
+  
+  return (
+    <div className="h-full w-full relative">
+      {!isIframeReady && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      )}
+      <SandpackPreviewComponent 
+        className="h-full w-full" 
+        showRefreshButton={false}
+      />
+    </div>
+  );
+});
+
+StablePreview.displayName = 'StablePreview';
+
+// Custom component to listen for file changes
+const FileChangeListener = memo(({ onFileChange }: { onFileChange: (file: string) => void }) => {
+  const { sandpack } = useSandpack();
+  const [currentFile, setCurrentFile] = useState<string>(sandpack.activeFile || '');
+  
+  useEffect(() => {
+    // Handle initial file selection
+    if (sandpack.activeFile && sandpack.activeFile !== currentFile) {
+      onFileChange(sandpack.activeFile);
+      setCurrentFile(sandpack.activeFile);
+      console.log(`Initial active file: ${sandpack.activeFile}`);
+    }
+    
+    // Set up a listener for file changes
+    const handleFileChange = () => {
+      if (sandpack.activeFile && sandpack.activeFile !== currentFile) {
+        onFileChange(sandpack.activeFile);
+        setCurrentFile(sandpack.activeFile);
+        console.log(`Active file changed to: ${sandpack.activeFile}`);
+      }
+    };
+    
+    // Add event listener for Sandpack's file changes
+    document.addEventListener('sandpack-file-change', handleFileChange);
+    
+    return () => {
+      // Remove event listener
+      document.removeEventListener('sandpack-file-change', handleFileChange);
+    };
+  }, [sandpack, onFileChange, currentFile]);
+  
+  return null;
+});
+
+FileChangeListener.displayName = 'FileChangeListener';
+
 export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onShare }: SandpackPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -82,7 +200,7 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onS
   const [showCustomDimensionsDialog, setShowCustomDimensionsDialog] = useState(false);
   const [tempCustomDimensions, setTempCustomDimensions] = useState({ width: 375, height: 667 });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [tempFigmaUrl, setTempFigmaUrl] = useState('');
+  const [figmaUrlState, setFigmaUrlState] = useState<string | null>(figmaUrl || null);
   const { toast } = useToast();
   
   const {
@@ -101,6 +219,13 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onS
   const updateFeedbackPoint = useCallback((updatedFeedback: FeedbackPointType) => {
     updateFeedbackPointFromHook(updatedFeedback);
   }, [updateFeedbackPointFromHook]);
+
+  useEffect(() => {
+    // Update figmaUrlState when figmaUrl prop changes
+    if (figmaUrl !== undefined) {
+      setFigmaUrlState(figmaUrl);
+    }
+  }, [figmaUrl]);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -269,7 +394,7 @@ if (typeof window.menuitemfn === 'undefined') {
   }, [prototypeId, url, deploymentUrl, toast]);
 
   // Check if a file is previewable
-  const checkIsPreviewable = (filename: string) => {
+  const checkIsPreviewable = useCallback((filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
     
     // Files that can be previewed directly
@@ -286,17 +411,17 @@ if (typeof window.menuitemfn === 'undefined') {
     }
     
     return false;
-  };
+  }, [files]);
   
   // Handle file change
-  const handleFileChange = (file: string) => {
+  const handleFileChange = useCallback((file: string) => {
     console.log(`File change detected: ${file}`);
     setActiveFile(file);
     setIsPreviewable(checkIsPreviewable(file));
-  };
+  }, [checkIsPreviewable]);
 
   // Handle view mode change
-  const handleViewModeChange = (mode: 'preview' | 'code' | 'split' | 'design') => {
+  const handleViewModeChange = useCallback((mode: 'preview' | 'code' | 'split' | 'design') => {
     setViewMode(mode);
     // Reset to desktop view when switching to code view
     if (mode === 'code') {
@@ -318,10 +443,10 @@ if (typeof window.menuitemfn === 'undefined') {
       });
       setViewMode('code');
     }
-  };
+  }, [isFeedbackMode, isPreviewable, activeFile, toast]);
 
   // Handle toggle feedback mode
-  const handleToggleFeedbackMode = () => {
+  const handleToggleFeedbackMode = useCallback(() => {
     if (!isFeedbackMode && !currentUser) {
       toast({
         title: "Authentication required",
@@ -341,168 +466,15 @@ if (typeof window.menuitemfn === 'undefined') {
     } else {
       setIsFeedbackMode(!isFeedbackMode);
     }
-  };
+  }, [isFeedbackMode, currentUser, viewMode, handleViewModeChange, toast]);
 
   // Handle toggle UI
-  const handleToggleUI = () => {
+  const handleToggleUI = useCallback(() => {
     setShowUI(!showUI);
-  };
-  
-  // More stable preview component that prevents white screen issues
-  const StablePreview = ({ file, hideNavigator = false }: { file: string, hideNavigator?: boolean }) => {
-    const { sandpack } = useSandpack();
-    const previousFileRef = useRef<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    
-    // Force the preview to update when the file changes
-    useEffect(() => {
-      try {
-        // Only update if the file has actually changed
-        if (sandpack && file && previousFileRef.current !== file) {
-          // Set the active file in Sandpack
-          sandpack.setActiveFile(file);
-          console.log(`Set active file to: ${file}`);
-          
-          // Update the ref to track the current file
-          previousFileRef.current = file;
-        }
-      } catch (error) {
-        console.error("Error setting active file:", error);
-      }
-    }, [file, sandpack]);
+  }, [showUI]);
 
-    // Add custom CSS to hide the navigator bar
-    useEffect(() => {
-      if (!hideNavigator) return;
-      
-      try {
-        // Use a class-based approach instead of directly manipulating the DOM
-        const styleId = 'sandpack-custom-styles';
-        let styleElement = document.getElementById(styleId) as HTMLStyleElement;
-        
-        if (!styleElement) {
-          styleElement = document.createElement('style');
-          styleElement.id = styleId;
-          document.head.appendChild(styleElement);
-        }
-        
-        styleElement.textContent = `
-          .sp-navigator {
-            display: none !important;
-          }
-          .sp-preview-container {
-            padding-top: 0 !important;
-          }
-          /* Hide the "Open Sandbox" FAB button */
-          .sp-button.sp-preview-actions {
-            display: none !important;
-          }
-          /* Hide the CodeSandbox export button */
-          .sp-c-kwibBT.sp-preview-actions,
-          .sp-preview-actions {
-            display: none !important;
-          }
-        `;
-        
-        return () => {
-          // We don't remove the style element to prevent flashing
-          // when components remount
-        };
-      } catch (error) {
-        console.error("Error applying custom styles:", error);
-      }
-    }, [hideNavigator]);
-    
-    // Handle iframe load events
-    useEffect(() => {
-      const handleIframeLoad = () => {
-        setIsLoading(false);
-      };
-      
-      // Use MutationObserver to detect when iframe is added to the DOM
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'childList') {
-            const iframe = document.querySelector('.sp-preview iframe');
-            if (iframe) {
-              iframe.addEventListener('load', handleIframeLoad);
-              observer.disconnect();
-              break;
-            }
-          }
-        }
-      });
-      
-      // Start observing the document body
-      observer.observe(document.body, { childList: true, subtree: true });
-      
-      // Check if iframe already exists
-      const iframe = document.querySelector('.sp-preview iframe');
-      if (iframe) {
-        iframe.addEventListener('load', handleIframeLoad);
-        observer.disconnect();
-      }
-      
-      return () => {
-        observer.disconnect();
-        const iframe = document.querySelector('.sp-preview iframe');
-        if (iframe) {
-          iframe.removeEventListener('load', handleIframeLoad);
-        }
-      };
-    }, []);
-    
-    return (
-      <div className="h-full w-full relative">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-          </div>
-        )}
-        <SandpackPreviewComponent 
-          className="h-full w-full" 
-          showRefreshButton={false}
-        />
-      </div>
-    );
-  };
-
-  // Custom component to listen for file changes
-  const FileChangeListener = ({ onFileChange }: { onFileChange: (file: string) => void }) => {
-    const { sandpack } = useSandpack();
-    const [currentFile, setCurrentFile] = useState<string>(sandpack.activeFile || '');
-    
-    useEffect(() => {
-      // Handle initial file selection
-      if (sandpack.activeFile && sandpack.activeFile !== currentFile) {
-        onFileChange(sandpack.activeFile);
-        setCurrentFile(sandpack.activeFile);
-        console.log(`Initial active file: ${sandpack.activeFile}`);
-      }
-      
-      // Set up a listener for file changes
-      const handleFileChange = () => {
-        if (sandpack.activeFile && sandpack.activeFile !== currentFile) {
-          onFileChange(sandpack.activeFile);
-          setCurrentFile(sandpack.activeFile);
-          console.log(`Active file changed to: ${sandpack.activeFile}`);
-        }
-      };
-      
-      // Add event listener for Sandpack's file changes
-      document.addEventListener('sandpack-file-change', handleFileChange);
-      
-      return () => {
-        // Remove event listener
-        document.removeEventListener('sandpack-file-change', handleFileChange);
-      };
-    }, [sandpack, onFileChange, currentFile]);
-    
-    return null;
-  };
-
-  // Helper function to get device dimensions
-  const getDeviceDimensions = () => {
+  // Helper function to get device dimensions - memoized
+  const getDeviceDimensions = useCallback(() => {
     if (deviceType === 'desktop') {
       return { width: '100%', height: '100%' };
     }
@@ -534,10 +506,10 @@ if (typeof window.menuitemfn === 'undefined') {
       default:
         return { width: '100%', height: '100%' };
     }
-  };
+  }, [deviceType, orientation, customDimensions, selectedDevice]);
 
-  // Apply device preview styling
-  const getDevicePreviewStyle = () => {
+  // Apply device preview styling - memoized
+  const getDevicePreviewStyle = useCallback(() => {
     if (deviceType === 'desktop') {
       return {
         width: '100%',
@@ -560,10 +532,10 @@ if (typeof window.menuitemfn === 'undefined') {
       transform: scale !== 1 ? `scale(${scale})` : 'none',
       transformOrigin: 'center top'
     };
-  };
+  }, [deviceType, getDeviceDimensions, scale]);
   
   // Handle device type change
-  const handleDeviceTypeChange = (type: DeviceType) => {
+  const handleDeviceTypeChange = useCallback((type: DeviceType) => {
     setDeviceType(type);
     
     // Set a default device for each type
@@ -582,10 +554,10 @@ if (typeof window.menuitemfn === 'undefined') {
     
     // Reset scale when changing device type
     setScale(1);
-  };
+  }, [customDimensions]);
 
   // Handle specific device selection
-  const handleDeviceSelection = (deviceId: string) => {
+  const handleDeviceSelection = useCallback((deviceId: string) => {
     setSelectedDevice(deviceId);
     
     // Set the appropriate device type based on the selected device
@@ -596,24 +568,22 @@ if (typeof window.menuitemfn === 'undefined') {
     } else if (deviceId === 'laptop' || deviceId === 'desktop') {
       setDeviceType('desktop');
     }
-  };
+  }, []);
   
   // Handle scale change
-  const handleScaleChange = (newScale: number) => {
+  const handleScaleChange = useCallback((newScale: number) => {
     setScale(newScale);
-  };
+  }, []);
 
   // Handle saving custom dimensions
-  const handleSaveCustomDimensions = () => {
+  const handleSaveCustomDimensions = useCallback(() => {
     setCustomDimensions(tempCustomDimensions);
     setShowCustomDimensionsDialog(false);
-  };
-
-  const sandpackKey = `preview-${prototypeId}`;
+  }, [tempCustomDimensions]);
 
   // Function to handle adding a Figma URL
-  const handleAddFigmaUrl = () => {
-    if (!tempFigmaUrl.trim()) {
+  const handleAddFigmaUrl = useCallback((url: string) => {
+    if (!url.trim()) {
       toast({
         title: "Error",
         description: "Please enter a valid Figma URL",
@@ -623,26 +593,28 @@ if (typeof window.menuitemfn === 'undefined') {
     }
     
     // Update the figmaUrl state
-    setFigmaUrl(tempFigmaUrl.trim());
+    setFigmaUrlState(url.trim());
     
     // Show success message
     toast({
       title: "Success",
       description: "Figma URL added successfully",
     });
-    
-    // Clear the input
-    setTempFigmaUrl("");
-  };
+  }, [toast]);
+
+  // Function to handle figma URL added from the FigmaUrlForm component
+  const handleFigmaUrlAdded = useCallback((url: string) => {
+    setFigmaUrlState(url);
+  }, []);
 
   // Function to render Figma iframe if URL exists
-  const renderFigmaIframe = () => {
-    if (!figmaUrl) return null;
+  const renderFigmaIframe = useCallback(() => {
+    if (!figmaUrlState) return null;
     
     // Convert Figma URL to embed URL if needed
-    const embedUrl = figmaUrl.includes('figma.com/embed') 
-      ? figmaUrl 
-      : figmaUrl.replace('figma.com/file', 'figma.com/embed');
+    const embedUrl = figmaUrlState.includes('figma.com/embed') 
+      ? figmaUrlState 
+      : figmaUrlState.replace('figma.com/file', 'figma.com/embed');
     
     return (
       <div className="w-full h-full flex flex-col">
@@ -653,52 +625,10 @@ if (typeof window.menuitemfn === 'undefined') {
         />
       </div>
     );
-  };
+  }, [figmaUrlState]);
 
-  // Function to render Figma URL form
-  const renderFigmaUrlForm = () => {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-background">
-        <div className="max-w-md text-center space-y-4 bg-white p-8 rounded-lg shadow-sm">
-          <h3 className="text-xl font-medium">Add Figma Design</h3>
-          <p className="text-sm text-muted-foreground">
-            Enter the URL of your Figma design to view it here.
-          </p>
-          <div className="pt-4">
-            <div className="space-y-2">
-              <label htmlFor="figmaUrl" className="text-sm font-medium text-left block">Figma Design URL</label>
-              <input
-                id="figmaUrl"
-                value={tempFigmaUrl}
-                onChange={(e) => setTempFigmaUrl(e.target.value)}
-                placeholder="https://www.figma.com/file/..."
-                className="w-full px-3 py-2 border rounded-md text-sm"
-              />
-              <p className="text-xs text-muted-foreground text-left">
-                Example: https://www.figma.com/file/LKQ4FJ4bTnCSjedbRpk931/Sample-File
-              </p>
-            </div>
-            <button 
-              onClick={handleAddFigmaUrl}
-              className="mt-4 w-full py-2 px-4 bg-primary text-primary-foreground rounded-md text-sm font-medium"
-            >
-              Add Figma Design
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  useEffect(() => {
-    if (viewMode === 'design') {
-      // If we're already in design mode, make sure the form is visible
-      const designContainer = document.querySelector('[data-design-view]');
-      if (designContainer) {
-        designContainer.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  }, [viewMode]);
+  // Generate a stable key for SandpackProvider to prevent unnecessary remounts
+  const sandpackKey = useCallback(() => `preview-${prototypeId}-${activeFile}`, [prototypeId, activeFile]);
 
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">
@@ -714,7 +644,7 @@ if (typeof window.menuitemfn === 'undefined') {
           deviceType={deviceType}
           orientation={orientation}
           onDeviceChange={handleDeviceTypeChange}
-          onOrientationChange={() => setOrientation(orientation === 'portrait' ? 'landscape' : 'portrait')}
+          onOrientationChange={() => setOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')}
           onScaleChange={handleScaleChange}
           scale={scale}
           selectedDevice={selectedDevice}
@@ -728,29 +658,40 @@ if (typeof window.menuitemfn === 'undefined') {
             // Create a temporary iframe to trigger a refresh
             const iframe = document.querySelector('.sp-preview iframe') as HTMLIFrameElement;
             if (iframe) {
-              iframe.src = iframe.src;
+              // Store current src
+              const currentSrc = iframe.src;
+              
+              // Add a timestamp to force refresh without changing actual content
+              const refreshSrc = currentSrc.includes('?') 
+                ? `${currentSrc}&_refresh=${Date.now()}` 
+                : `${currentSrc}?_refresh=${Date.now()}`;
+                
+              iframe.src = refreshSrc;
               
               // Listen for the iframe to load
-              iframe.onload = () => {
+              const onLoad = () => {
                 // Reset refreshing state after a short delay to ensure the UI updates
                 setTimeout(() => {
                   setIsRefreshing(false);
-                }, 500);
+                }, 300);
+                iframe.removeEventListener('load', onLoad);
               };
+              
+              iframe.addEventListener('load', onLoad);
               
               // Fallback timeout in case onload doesn't fire
               setTimeout(() => {
                 setIsRefreshing(false);
-              }, 5000);
+              }, 3000);
             } else {
               // If iframe not found, reset state after a short delay
               setTimeout(() => {
                 setIsRefreshing(false);
-              }, 1000);
+              }, 500);
             }
           }}
           onShare={onShare}
-          hasFigmaDesign={!!figmaUrl || !!tempFigmaUrl} // Pass whether we have a Figma design or temp URL
+          hasFigmaDesign={!!figmaUrlState} 
         />
         
         <div className="flex items-center gap-2">
@@ -821,7 +762,7 @@ if (typeof window.menuitemfn === 'undefined') {
               >
                 {/* Stable SandpackProvider that doesn't remount when toggling feedback */}
                 <SandpackProvider
-                  key={sandpackKey}
+                  key={sandpackKey()}
                   template="static"
                   files={files}
                   theme="dark"
@@ -961,7 +902,14 @@ if (typeof window.menuitemfn === 'undefined') {
           {/* Figma Design View */}
           {viewMode === 'design' && (
             <div className="h-full w-full flex items-center justify-center overflow-hidden" data-design-view>
-              {figmaUrl ? renderFigmaIframe() : renderFigmaUrlForm()}
+              {figmaUrlState ? renderFigmaIframe() : (
+                <div className="w-full h-full">
+                  <FigmaUrlForm 
+                    prototypeId={prototypeId}
+                    onFigmaUrlAdded={handleFigmaUrlAdded}
+                  />
+                </div>
+              )}
             </div>
           )}
           

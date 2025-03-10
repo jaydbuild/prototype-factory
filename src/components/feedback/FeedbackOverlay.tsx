@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackUser } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
 import { CommentThread } from './CommentThread';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useIframeStability } from '@/hooks/use-iframe-stability';
 
 interface FeedbackOverlayProps {
   prototypeId: string;
@@ -40,87 +42,25 @@ export function FeedbackOverlay({
   const [newFeedbackPosition, setNewFeedbackPosition] = useState<{ x: number, y: number } | null>(null);
   const [newFeedbackContent, setNewFeedbackContent] = useState('');
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackPointType | null>(null);
-  const [iframeReady, setIframeReady] = useState(false);
   const [isInteractingWithComment, setIsInteractingWithComment] = useState(false);
+  
+  // Use the custom hook for iframe stability
+  const { isIframeReady, refreshCheck } = useIframeStability({
+    containerSelector: '.sp-preview',
+    readyCheckInterval: 150,
+    maxRetries: 40
+  });
 
+  // Refresh iframe check when feedback mode changes
   useEffect(() => {
-    if (!isFeedbackMode) {
-      setIframeReady(false);
-      return;
+    if (isFeedbackMode) {
+      refreshCheck();
     }
+  }, [isFeedbackMode, refreshCheck]);
 
-    let isMounted = true;
-    let checkTimer: NodeJS.Timeout | null = null;
-    
-    const checkIframe = () => {
-      try {
-        const iframe = document.querySelector('.sp-preview iframe');
-        
-        if (iframe) {
-          const rect = iframe.getBoundingClientRect();
-          
-          if (rect.width > 0 && rect.height > 0) {
-            if (isMounted) {
-              setIframeReady(true);
-            }
-            return;
-          }
-        }
-        
-        if (isMounted) {
-          checkTimer = setTimeout(checkIframe, 100);
-        }
-      } catch (error) {
-        console.error('Error checking iframe:', error);
-        if (isMounted) {
-          checkTimer = setTimeout(checkIframe, 500); 
-        }
-      }
-    };
-    
-    checkIframe();
-    
-    const handleIframeLoad = () => {
-      if (isMounted) {
-        setIframeReady(true);
-      }
-    };
-    
-    const iframe = document.querySelector('.sp-preview iframe');
-    if (iframe) {
-      iframe.addEventListener('load', handleIframeLoad);
-    }
-    
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          const newIframe = document.querySelector('.sp-preview iframe');
-          if (newIframe) {
-            newIframe.addEventListener('load', handleIframeLoad);
-            checkIframe(); 
-          }
-        }
-      }
-    });
-    
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    return () => {
-      isMounted = false;
-      observer.disconnect();
-      
-      if (checkTimer) {
-        clearTimeout(checkTimer);
-      }
-      
-      if (iframe) {
-        iframe.removeEventListener('load', handleIframeLoad);
-      }
-    };
-  }, [isFeedbackMode]);
-
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isFeedbackMode || !overlayRef.current || !iframeReady) return;
+  // Use memoized handler for overlay clicks to prevent unnecessary recreations
+  const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isFeedbackMode || !overlayRef.current || !isIframeReady) return;
     
     // If we're already interacting with a comment, don't add a new one
     if (isInteractingWithComment) {
@@ -149,15 +89,16 @@ export function FeedbackOverlay({
     } catch (error) {
       console.error('Error handling overlay click:', error);
     }
-  };
+  }, [isFeedbackMode, isIframeReady, isInteractingWithComment]);
 
-  const handleFeedbackPointClick = (feedback: FeedbackPointType) => {
+  // Memoized handlers for feedback interactions
+  const handleFeedbackPointClick = useCallback((feedback: FeedbackPointType) => {
     setIsInteractingWithComment(true);
     setSelectedFeedback(feedback);
     setNewFeedbackPosition(null);
-  };
+  }, []);
 
-  const handleCancelNewFeedback = (e: React.MouseEvent) => {
+  const handleCancelNewFeedback = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     
@@ -165,9 +106,9 @@ export function FeedbackOverlay({
     setNewFeedbackContent('');
     
     setTimeout(() => setIsInteractingWithComment(false), 100);
-  };
+  }, []);
 
-  const handleSubmitNewFeedback = async (e: React.MouseEvent) => {
+  const handleSubmitNewFeedback = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     
@@ -216,9 +157,9 @@ export function FeedbackOverlay({
       });
       setIsInteractingWithComment(false);
     }
-  };
+  }, [newFeedbackPosition, newFeedbackContent, currentUser, prototypeId, onFeedbackAdded, toast]);
 
-  const handleUpdateFeedbackStatus = async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {
+  const handleUpdateFeedbackStatus = useCallback(async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -252,9 +193,9 @@ export function FeedbackOverlay({
         description: "Failed to update status. Please try again."
       });
     }
-  };
+  }, [selectedFeedback, currentUser, onFeedbackUpdated, toast]);
 
-  const handleAddReply = (content: string, e?: React.MouseEvent) => {
+  const handleAddReply = useCallback((content: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -264,16 +205,16 @@ export function FeedbackOverlay({
       title: "Reply added",
       description: "Your reply has been added to the feedback."
     });
-  };
+  }, [toast]);
   
-  const handleCloseCommentThread = (e: React.MouseEvent) => {
+  const handleCloseCommentThread = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     
     setSelectedFeedback(null);
     
     setTimeout(() => setIsInteractingWithComment(false), 100);
-  };
+  }, []);
 
   if (!isFeedbackMode) {
     return null;
@@ -282,16 +223,16 @@ export function FeedbackOverlay({
   return (
     <div 
       ref={overlayRef}
-      className={`absolute inset-0 ${iframeReady ? 'cursor-crosshair' : 'cursor-wait'} ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      className={`absolute inset-0 ${isIframeReady ? 'cursor-crosshair' : 'cursor-wait'} ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
       onClick={handleOverlayClick}
     >
-      {!iframeReady && isFeedbackMode && (
+      {!isIframeReady && isFeedbackMode && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/30 z-10">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
       )}
       
-      {iframeReady && feedbackPoints.map(feedback => (
+      {isIframeReady && feedbackPoints.map(feedback => (
         <div 
           key={feedback.id} 
           className="feedback-point"
@@ -306,7 +247,7 @@ export function FeedbackOverlay({
         </div>
       ))}
       
-      {iframeReady && selectedFeedback && (
+      {isIframeReady && selectedFeedback && (
         <div 
           className="absolute comment-thread z-40"
           style={{
@@ -327,7 +268,7 @@ export function FeedbackOverlay({
         </div>
       )}
       
-      {iframeReady && newFeedbackPosition && (
+      {isIframeReady && newFeedbackPosition && (
         <div 
           className="absolute feedback-form z-40"
           style={{

@@ -213,6 +213,7 @@ export type Database = {
           deployment_provider: string | null
           deployment_status: string | null
           deployment_url: string | null
+          figma_url: string | null
           file_path: string | null
           id: string
           name: string
@@ -234,6 +235,7 @@ export type Database = {
           deployment_provider?: string | null
           deployment_status?: string | null
           deployment_url?: string | null
+          figma_url?: string | null
           file_path?: string | null
           id?: string
           name: string
@@ -255,6 +257,7 @@ export type Database = {
           deployment_provider?: string | null
           deployment_status?: string | null
           deployment_url?: string | null
+          figma_url?: string | null
           file_path?: string | null
           id?: string
           name?: string
