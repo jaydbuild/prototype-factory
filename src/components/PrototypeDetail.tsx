@@ -1,21 +1,16 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewWindow } from "./PreviewWindow";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Share2, RefreshCw, AlertTriangle } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 
 export const PrototypeDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [processingTimeout, setProcessingTimeout] = useState(false);
-
-  const searchParams = new URLSearchParams(location.search);
-  const fromCollection = searchParams.get('fromCollection');
 
   const { 
     data: prototype, 
@@ -63,82 +58,6 @@ export const PrototypeDetail = () => {
     }
   }, [prototype?.deployment_status, refetch]);
 
-  const handleGoBack = () => {
-    if (fromCollection) {
-      navigate(`/dashboard?collection=${fromCollection}`);
-    } else {
-      navigate('/dashboard');
-    }
-  };
-
-  const handleRefresh = () => {
-    setProcessingTimeout(false);
-    refetch();
-  };
-
-  const handleForceComplete = async () => {
-    if (!id) return;
-    
-    try {
-      let deploymentUrl = prototype?.deployment_url;
-      
-      if (!deploymentUrl) {
-        try {
-          const { data } = await supabase.storage
-            .from('prototype-deployments')
-            .getPublicUrl(`${id}/index.html`);
-          
-          if (data && data.publicUrl) {
-            deploymentUrl = data.publicUrl;
-            console.log("Generated deployment URL:", deploymentUrl);
-          }
-        } catch (error) {
-          console.error("Error generating deployment URL:", error);
-        }
-      }
-      
-      await supabase
-        .from('prototypes')
-        .update({
-          deployment_status: 'deployed',
-          status: 'deployed',
-          deployment_url: deploymentUrl,
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', id);
-      
-      toast({
-        title: "Status updated",
-        description: "Prototype marked as deployed"
-      });
-      
-      refetch();
-    } catch (error) {
-      console.error("Error in handleForceComplete:", error);
-      toast({
-        variant: "destructive",
-        title: "Error updating status",
-        description: "Failed to update prototype status"
-      });
-    }
-  };
-
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast({
-        title: "Link copied",
-        description: "Prototype link copied to clipboard",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to copy link",
-      });
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -164,42 +83,18 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden">
-      <div className="flex items-center gap-2 p-2 bg-background border-b">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleGoBack}
-          className="flex items-center gap-1"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
-        
-        <div className="flex-1"></div>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleShare}
-          className="flex items-center gap-1"
-        >
-          <Share2 className="h-4 w-4" />
-          Share
-        </Button>
-      </div>
-      
       <div className="flex-1 min-h-0 relative">
         <div className="absolute inset-0">
           {id && (
             <PreviewWindow 
               prototypeId={id}
-              url={prototype.deployment_url}
+              url={prototype?.deployment_url}
               onShare={handleShare}
             />
           )}
         </div>
 
-        {prototype.deployment_status === 'processing' && (
+        {prototype?.deployment_status === 'processing' && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80">
             <div className="bg-white rounded-lg p-6 shadow-lg max-w-md">
               <div className="flex items-center gap-3 mb-4">
@@ -237,7 +132,7 @@ export const PrototypeDetail = () => {
           </div>
         )}
 
-        {prototype.deployment_status === 'failed' && (
+        {prototype?.deployment_status === 'failed' && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80">
             <div className="bg-white rounded-lg p-6 shadow-lg max-w-md">
               <h2 className="text-xl font-semibold text-destructive mb-2">Deployment Failed</h2>
