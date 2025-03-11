@@ -53,16 +53,12 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
           
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
             {prototype.file_path ? (
-              <span
-                className="px-2 py-1 bg-secondary rounded-full text-xs flex items-center gap-1"
-              >
+              <span className="px-2 py-1 bg-secondary rounded-full text-xs flex items-center gap-1">
                 <FileUp className="w-3 h-3" />
                 Uploaded
               </span>
             ) : (
-              <span
-                className="px-2 py-1 bg-secondary rounded-full text-xs"
-              >
+              <span className="px-2 py-1 bg-secondary rounded-full text-xs">
                 Link
               </span>
             )}

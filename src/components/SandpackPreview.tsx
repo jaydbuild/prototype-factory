@@ -179,6 +179,7 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onS
   const [tempCustomDimensions, setTempCustomDimensions] = useState({ width: 375, height: 667 });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [figmaUrlState, setFigmaUrlState] = useState<string | null>(figmaUrl || null);
+  const [sandpackMounted, setSandpackMounted] = useState(false);
   const { toast } = useToast();
   
   const {
@@ -370,14 +371,11 @@ if (typeof window.menuitemfn === 'undefined') {
 
   const sandpackKey = useCallback(() => `preview-${prototypeId}`, [prototypeId]);
 
-  const isInitialMount = useRef(true);
-  
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+    if (isFilesReady && !sandpackMounted) {
+      setSandpackMounted(true);
     }
-  }, []);
+  }, [isFilesReady]);
 
   const handleViewModeChange = useCallback((mode: 'preview' | 'code' | 'split' | 'design') => {
     setViewMode(mode);
@@ -675,7 +673,7 @@ if (typeof window.menuitemfn === 'undefined') {
       
       {isFilesReady && (
         <div className="h-full w-full">
-          {viewMode === 'preview' && isPreviewable && (
+          <div className={`h-full w-full ${viewMode !== 'preview' ? 'hidden' : ''}`}>
             <div className="h-full w-full flex items-center justify-center overflow-auto">
               <div 
                 style={getDevicePreviewStyle()} 
@@ -683,7 +681,7 @@ if (typeof window.menuitemfn === 'undefined') {
                 className="relative"
               >
                 <SandpackProvider
-                  key={sandpackKey()}
+                  key={`preview-${prototypeId}`}
                   template="static"
                   files={files}
                   theme="dark"
@@ -743,9 +741,9 @@ if (typeof window.menuitemfn === 'undefined') {
                 </div>
               </div>
             </div>
-          )}
-          
-          {(viewMode === 'code' || !isPreviewable) && (
+          </div>
+
+          <div className={`h-full w-full ${viewMode !== 'code' ? 'hidden' : ''}`}>
             <div className="flex h-full w-full">
               <div className="w-[40%] h-full">
                 <SandpackProvider
@@ -814,21 +812,19 @@ if (typeof window.menuitemfn === 'undefined') {
                 </SandpackProvider>
               </div>
             </div>
-          )}
-          
-          {viewMode === 'design' && (
-            <div className="h-full w-full flex items-center justify-center overflow-hidden" data-design-view>
-              {figmaUrlState ? renderFigmaIframe() : (
-                <div className="w-full h-full">
-                  <FigmaUrlForm 
-                    prototypeId={prototypeId}
-                    onFigmaUrlAdded={handleFigmaUrlAdded}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-          
+          </div>
+
+          <div className={`h-full w-full ${viewMode !== 'design' ? 'hidden' : ''}`}>
+            {figmaUrlState ? renderFigmaIframe() : (
+              <div className="w-full h-full">
+                <FigmaUrlForm 
+                  prototypeId={prototypeId}
+                  onFigmaUrlAdded={handleFigmaUrlAdded}
+                />
+              </div>
+            )}
+          </div>
+
           <Dialog open={showCustomDimensionsDialog} onOpenChange={setShowCustomDimensionsDialog}>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>

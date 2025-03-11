@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,16 +31,15 @@ const NavigationWrapper = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Handle back button
     const handlePopState = () => {
-      const params = new URLSearchParams(location.search);
-      const fromCollection = params.get('fromCollection');
-      
       if (location.pathname.includes('/prototype/')) {
+        const params = new URLSearchParams(location.search);
+        const fromCollection = params.get('fromCollection');
+        
         if (fromCollection) {
-          navigate(`/dashboard?collection=${fromCollection}`);
+          navigate(`/dashboard?collection=${fromCollection}`, { replace: true });
         } else {
-          navigate('/dashboard');
+          navigate('/dashboard', { replace: true });
         }
       }
     };
@@ -58,7 +56,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch initial session
     const fetchSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -72,7 +69,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     fetchSession();
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -83,7 +79,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Show loading state
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -95,7 +90,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // Redirect to auth if no session
   if (!session) {
     return <Navigate to="/auth" replace />;
   }
