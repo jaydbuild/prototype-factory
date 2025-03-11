@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -75,7 +76,7 @@ export const PrototypeDetail = () => {
         <div className="bg-card p-6 rounded-lg shadow-sm border">
           <h2 className="text-xl font-semibold mb-2">Prototype not found</h2>
           <p className="text-muted-foreground mb-4">The prototype you're looking for doesn't exist or has been deleted.</p>
-          <Button onClick={handleGoBack}>Go Back</Button>
+          <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
         </div>
       </div>
     );
@@ -85,13 +86,7 @@ export const PrototypeDetail = () => {
     <div className="fixed inset-0 flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 relative">
         <div className="absolute inset-0">
-          {id && (
-            <PreviewWindow 
-              prototypeId={id}
-              url={prototype?.deployment_url}
-              onShare={handleShare}
-            />
-          )}
+          {id && <PreviewWindow prototypeId={id} url={prototype?.deployment_url} />}
         </div>
 
         {prototype?.deployment_status === 'processing' && (
@@ -111,23 +106,15 @@ export const PrototypeDetail = () => {
                   <div>
                     <p className="text-sm font-medium text-amber-800">Taking longer than expected</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      The deployment is taking longer than usual. You can continue waiting or try to force complete the deployment.
+                      The deployment is taking longer than usual. You can continue waiting or try again later.
                     </p>
                   </div>
                 </div>
               )}
               
-              <div className="flex gap-2">
-                <Button onClick={handleRefresh} disabled={isRefetching}>
-                  {isRefetching ? 'Checking...' : 'Check Status'}
-                </Button>
-                
-                {processingTimeout && (
-                  <Button variant="outline" onClick={handleForceComplete}>
-                    Force Complete
-                  </Button>
-                )}
-              </div>
+              <Button onClick={() => refetch()} disabled={isRefetching}>
+                {isRefetching ? 'Checking...' : 'Check Status'}
+              </Button>
             </div>
           </div>
         )}
@@ -137,15 +124,12 @@ export const PrototypeDetail = () => {
             <div className="bg-white rounded-lg p-6 shadow-lg max-w-md">
               <h2 className="text-xl font-semibold text-destructive mb-2">Deployment Failed</h2>
               <p className="text-muted-foreground mb-4">
-                There was an issue deploying your prototype. Please try uploading it again or force complete the deployment.
+                There was an issue deploying your prototype. Please try uploading it again.
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={handleGoBack}>Go Back</Button>
-                <Button onClick={handleRefresh} disabled={isRefetching}>
+                <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
+                <Button onClick={() => refetch()} disabled={isRefetching}>
                   {isRefetching ? 'Checking...' : 'Check Again'}
-                </Button>
-                <Button variant="outline" onClick={handleForceComplete}>
-                  Force Complete
                 </Button>
               </div>
             </div>
