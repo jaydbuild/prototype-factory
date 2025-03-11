@@ -6,9 +6,12 @@ import type { Prototype } from "@/types/prototype";
 
 interface PrototypeCardProps {
   prototype: Prototype;
+  onSelect?: (prototype: Prototype) => void;
+  isSelected?: boolean;
+  collectionId?: string;
 }
 
-export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
+export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }: PrototypeCardProps) {
   if (!prototype) return null;
   
   const timestamp = prototype.created_at ? parseISO(prototype.created_at) : new Date();
@@ -18,7 +21,10 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
 
   return (
     <div className="group relative bg-card rounded-lg border shadow-sm hover:shadow-md transition-shadow">
-      <Link to={`/prototype/${prototype.id}`} className="block">
+      <Link 
+        to={`/prototype/${prototype.id}${collectionId ? `?fromCollection=${collectionId}` : ''}`}
+        className="block relative aspect-video overflow-hidden rounded-md"
+      >
         <div className="aspect-video w-full bg-muted rounded-t-lg overflow-hidden relative">
           {prototype.preview_image ? (
             <img
@@ -84,4 +90,4 @@ export const PrototypeCard = ({ prototype }: PrototypeCardProps) => {
       </Link>
     </div>
   );
-};
+}

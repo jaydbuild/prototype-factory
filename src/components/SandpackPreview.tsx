@@ -368,6 +368,17 @@ if (typeof window.menuitemfn === 'undefined') {
     setIsPreviewable(checkIsPreviewable(file));
   }, [checkIsPreviewable]);
 
+  const sandpackKey = useCallback(() => `preview-${prototypeId}`, [prototypeId]);
+
+  const isInitialMount = useRef(true);
+  
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+  }, []);
+
   const handleViewModeChange = useCallback((mode: 'preview' | 'code' | 'split' | 'design') => {
     setViewMode(mode);
     if (mode === 'code') {
@@ -553,8 +564,6 @@ if (typeof window.menuitemfn === 'undefined') {
       </div>
     );
   }, [figmaUrlState]);
-
-  const sandpackKey = useCallback(() => `preview-${prototypeId}-${activeFile}`, [prototypeId, activeFile]);
 
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">

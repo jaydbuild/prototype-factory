@@ -1,8 +1,9 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 import Index from "./pages/Index";
@@ -25,6 +26,32 @@ const queryClient = new QueryClient({
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
+
+const NavigationWrapper = ({ children }: { children: React.ReactNode }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Handle back button
+    const handlePopState = () => {
+      const params = new URLSearchParams(location.search);
+      const fromCollection = params.get('fromCollection');
+      
+      if (location.pathname.includes('/prototype/')) {
+        if (fromCollection) {
+          navigate(`/dashboard?collection=${fromCollection}`);
+        } else {
+          navigate('/dashboard');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate, location]);
+
+  return <>{children}</>;
+};
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -85,32 +112,34 @@ const AppContent = () => {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
-          element={hasSkippedLogin ? <Navigate to="/dashboard" /> : <LoginPage />}
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Index />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/prototype/:id"
-          element={
-            <ProtectedRoute>
-              <PrototypeDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <Toaster />
-      <Sonner />
+      <NavigationWrapper>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/"
+            element={hasSkippedLogin ? <Navigate to="/dashboard" /> : <LoginPage />}
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/prototype/:id"
+            element={
+              <ProtectedRoute>
+                <PrototypeDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <Toaster />
+        <Sonner />
+      </NavigationWrapper>
     </BrowserRouter>
   );
 };
