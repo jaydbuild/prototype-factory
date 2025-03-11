@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewWindow } from "./PreviewWindow";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Share2, RefreshCw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Share2, RefreshCw, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 
 export const PrototypeDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [processingTimeout, setProcessingTimeout] = useState(false);
+
+  const searchParams = new URLSearchParams(location.search);
+  const fromCollection = searchParams.get('fromCollection');
 
   const { 
     data: prototype, 
@@ -40,15 +44,12 @@ export const PrototypeDetail = () => {
     }
   });
 
-  // Set up polling when prototype is in processing state
   useEffect(() => {
     if (prototype?.deployment_status === 'processing') {
-      // Set up polling
       const intervalId = setInterval(() => {
         refetch();
       }, 5000);
       
-      // Set up timeout after 60 seconds of processing
       const timeoutId = setTimeout(() => {
         setProcessingTimeout(true);
       }, 60000);
@@ -58,10 +59,17 @@ export const PrototypeDetail = () => {
         clearTimeout(timeoutId);
       };
     } else {
-      // Reset timeout if status changes
       setProcessingTimeout(false);
     }
   }, [prototype?.deployment_status, refetch]);
+
+  const handleGoBack = () => {
+    if (fromCollection) {
+      navigate(`/dashboard?collection=${fromCollection}`);
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   const handleRefresh = () => {
     setProcessingTimeout(false);
@@ -72,11 +80,9 @@ export const PrototypeDetail = () => {
     if (!id) return;
     
     try {
-      // Get the deployment URL from storage or generate one
       let deploymentUrl = prototype?.deployment_url;
       
       if (!deploymentUrl) {
-        // Check if we can generate a URL from storage
         try {
           const { data } = await supabase.storage
             .from('prototype-deployments')
@@ -88,11 +94,9 @@ export const PrototypeDetail = () => {
           }
         } catch (error) {
           console.error("Error generating deployment URL:", error);
-          // Continue even without a deployment URL, we'll use Sandpack instead
         }
       }
       
-      // Force the prototype to be marked as deployed
       await supabase
         .from('prototypes')
         .update({
@@ -152,7 +156,7 @@ export const PrototypeDetail = () => {
         <div className="bg-card p-6 rounded-lg shadow-sm border">
           <h2 className="text-xl font-semibold mb-2">Prototype not found</h2>
           <p className="text-muted-foreground mb-4">The prototype you're looking for doesn't exist or has been deleted.</p>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
+          <Button onClick={handleGoBack}>Go Back</Button>
         </div>
       </div>
     );
@@ -160,8 +164,31 @@ export const PrototypeDetail = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden">
+      <div className="flex items-center gap-2 p-2 bg-background border-b">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleGoBack}
+          className="flex items-center gap-1"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+        
+        <div className="flex-1"></div>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleShare}
+          className="flex items-center gap-1"
+        >
+          <Share2 className="h-4 w-4" />
+          Share
+        </Button>
+      </div>
+      
       <div className="flex-1 min-h-0 relative">
-        {/* Preview */}
         <div className="absolute inset-0">
           {id && (
             <PreviewWindow 
@@ -218,7 +245,7 @@ export const PrototypeDetail = () => {
                 There was an issue deploying your prototype. Please try uploading it again or force complete the deployment.
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+                <Button variant="outline" onClick={handleGoBack}>Go Back</Button>
                 <Button onClick={handleRefresh} disabled={isRefetching}>
                   {isRefetching ? 'Checking...' : 'Check Again'}
                 </Button>

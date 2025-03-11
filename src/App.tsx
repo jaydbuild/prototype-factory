@@ -27,27 +27,6 @@ interface ProtectedRouteProps {
 }
 
 const NavigationWrapper = ({ children }: { children: React.ReactNode }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    const handlePopState = () => {
-      if (location.pathname.includes('/prototype/')) {
-        const params = new URLSearchParams(location.search);
-        const fromCollection = params.get('fromCollection');
-        
-        if (fromCollection) {
-          navigate(`/dashboard?collection=${fromCollection}`, { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [navigate, location]);
-
   return <>{children}</>;
 };
 
