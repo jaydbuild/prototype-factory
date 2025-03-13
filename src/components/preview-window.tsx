@@ -1,11 +1,12 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 export function PreviewWindow({ deploymentId }: { deploymentId: string }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const getPublicUrl = async () => {
@@ -18,6 +19,13 @@ export function PreviewWindow({ deploymentId }: { deploymentId: string }) {
     };
 
     getPublicUrl();
+
+    // Clean up on unmount
+    return () => {
+      if (iframeRef.current) {
+        iframeRef.current.src = 'about:blank';
+      }
+    };
   }, [deploymentId]);
 
   return (
@@ -28,9 +36,10 @@ export function PreviewWindow({ deploymentId }: { deploymentId: string }) {
         </div>
       )}
       <iframe
+        ref={iframeRef}
         src={previewUrl}
         className="h-full w-full border-none"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation allow-top-navigation-by-user-activation"
         title="Prototype Preview"
         onLoad={() => setIsLoading(false)}
       />

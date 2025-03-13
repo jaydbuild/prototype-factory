@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { SandpackPreview } from './SandpackPreview';
@@ -18,6 +18,17 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [useSandpack, setUseSandpack] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
+  // Create an effect to handle iframe cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (iframeRef.current) {
+        // Clean up any iframe resources
+        iframeRef.current.src = 'about:blank';
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchPrototypeUrl = async () => {
@@ -134,6 +145,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
   return (
     <div className="h-full w-full">
       <iframe 
+        ref={iframeRef}
         src={previewUrl} 
         className="w-full h-full border-0 preview-iframe"
         title="Preview"

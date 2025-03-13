@@ -27,6 +27,13 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     if (iframeRef.current) {
       iframeRef.current.src = deploymentUrl || 'about:blank';
     }
+
+    // Clean up on unmount
+    return () => {
+      if (iframeRef.current) {
+        iframeRef.current.src = 'about:blank';
+      }
+    };
   }, [deploymentUrl]);
 
   if (!deploymentUrl) {
@@ -37,8 +44,18 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     );
   }
 
-  // Construct sandbox permissions
-  const sandboxPermissions = sandboxConfig?.permissions?.join(' ') || 'allow-scripts';
+  // Construct sandbox permissions with proper navigation permissions
+  const defaultPermissions = [
+    'allow-scripts', 
+    'allow-same-origin', 
+    'allow-forms', 
+    'allow-popups', 
+    'allow-top-navigation-by-user-activation'
+  ];
+  
+  const sandboxPermissions = sandboxConfig?.permissions?.length 
+    ? [...sandboxConfig.permissions, 'allow-top-navigation-by-user-activation'].join(' ')
+    : defaultPermissions.join(' ');
 
   return (
     <div className={`relative w-full h-full ${className}`}>

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
 import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -17,6 +17,7 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
   const [isRefreshing, setIsRefreshing] = useState(false)
   const supabase = useSupabaseClient()
   const { toast } = useToast()
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const loadPreview = async (showToast = false) => {
     try {
@@ -116,6 +117,13 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
 
   useEffect(() => {
     loadPreview()
+
+    // Clean up on unmount
+    return () => {
+      if (iframeRef.current) {
+        iframeRef.current.src = 'about:blank';
+      }
+    };
   }, [prototypeId])
 
   if (isLoading) {
@@ -138,9 +146,10 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
       
       {previewUrl ? (
         <iframe
+          ref={iframeRef}
           src={previewUrl}
           className="w-full h-[600px] border rounded-lg"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
           allow="accelerometer; camera; encrypted-media; display-capture; geolocation; gyroscope; microphone; midi; payment; web-share"
           loading="lazy"
         />

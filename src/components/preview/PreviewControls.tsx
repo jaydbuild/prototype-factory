@@ -21,7 +21,7 @@ import {
   Download
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -107,6 +107,7 @@ export function PreviewControls({
 }: PreviewControlsProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showScaleControls, setShowScaleControls] = useState(false);
 
   // Group devices by category for the dropdown menu
@@ -135,14 +136,28 @@ export function PreviewControls({
     return deviceType.charAt(0).toUpperCase() + deviceType.slice(1);
   };
 
+  // Handle back navigation properly
+  const handleBackClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if we can go back in history
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // Fallback to dashboard if no history
+      navigate('/dashboard');
+    }
+  };
+
   return (
     <div className="flex items-center gap-2 p-1 rounded-lg backdrop-blur-sm bg-background/80 shadow-md">
-      {/* Back button */}
+      {/* Back button with improved handling */}
       <Button
         variant="ghost"
         size="icon"
         className="h-7 w-7"
-        onClick={() => navigate(-1)}
+        onClick={handleBackClick}
         title="Back to dashboard"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
