@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseIframeStabilityOptions {
@@ -65,10 +64,9 @@ export function useIframeStability({
       
       if (iframe) {
         const rect = iframe.getBoundingClientRect();
-        const contentWindow = iframe.contentWindow;
         
-        // Check if iframe has dimensions and content
-        if (rect.width > 0 && rect.height > 0 && contentWindow && contentWindow.document) {
+        // Check if iframe has dimensions
+        if (rect.width > 0 && rect.height > 0) {
           setIsIframeReady(true);
           if (onReady) onReady();
           retryCountRef.current = 0;
