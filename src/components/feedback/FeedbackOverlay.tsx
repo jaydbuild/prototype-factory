@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
@@ -9,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useIframeStability } from '@/hooks/use-iframe-stability';
 import { useElementTargeting } from '@/hooks/use-element-targeting';
-import { Toggle } from '@/components/ui/toggle';
 import { Crosshair, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface FeedbackOverlayProps {
@@ -45,7 +45,6 @@ export function FeedbackOverlay({
   const [newFeedbackContent, setNewFeedbackContent] = useState('');
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackPointType | null>(null);
   const [isInteractingWithComment, setIsInteractingWithComment] = useState(false);
-  const [elementHighlightEnabled, setElementHighlightEnabled] = useState(true);
   const [currentHoveredElements, setCurrentHoveredElements] = useState<Element[]>([]);
   const [currentElementIndex, setCurrentElementIndex] = useState(0);
   
@@ -163,11 +162,11 @@ export function FeedbackOverlay({
   
   // Display feedback points with element targeting
   useEffect(() => {
-    if (!isFeedbackMode || !isIframeReady || !elementHighlightEnabled) return;
+    if (!isFeedbackMode || !isIframeReady) return;
     
     // This effect will be used for highlighting elements when hovering over feedback points
     // The implementation is in the handleFeedbackPointHover function
-  }, [isFeedbackMode, isIframeReady, elementHighlightEnabled]);
+  }, [isFeedbackMode, isIframeReady]);
 
   // Use memoized handler for overlay clicks to prevent unnecessary recreations
   const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -222,13 +221,13 @@ export function FeedbackOverlay({
     setNewFeedbackPosition(null);
     
     // If feedback has element targeting, highlight the element
-    if (elementHighlightEnabled && feedback.element_target) {
+    if (feedback.element_target) {
       const element = findElementByTarget(feedback.element_target);
       if (element) {
         highlightElement(element);
       }
     }
-  }, [elementHighlightEnabled, findElementByTarget, highlightElement]);
+  }, [findElementByTarget, highlightElement]);
 
   const handleCancelNewFeedback = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -329,13 +328,15 @@ export function FeedbackOverlay({
             ? {
                 selector: data.element_selector,
                 xpath: data.element_xpath,
-                metadata: data.element_metadata ? {
-                  tagName: data.element_metadata.tagName,
-                  text: data.element_metadata.text,
-                  attributes: data.element_metadata.attributes,
-                  elementType: data.element_metadata.elementType,
-                  displayName: data.element_metadata.displayName
-                } : null
+                metadata: data.element_metadata && typeof data.element_metadata === 'object'
+                  ? {
+                      tagName: typeof data.element_metadata.tagName === 'string' ? data.element_metadata.tagName : undefined,
+                      text: typeof data.element_metadata.text === 'string' ? data.element_metadata.text : undefined,
+                      attributes: typeof data.element_metadata.attributes === 'object' ? data.element_metadata.attributes : undefined,
+                      elementType: typeof data.element_metadata.elementType === 'string' ? data.element_metadata.elementType : undefined,
+                      displayName: typeof data.element_metadata.displayName === 'string' ? data.element_metadata.displayName : undefined
+                    }
+                  : null
               }
             : undefined
         };
@@ -412,13 +413,15 @@ export function FeedbackOverlay({
             ? {
                 selector: data.element_selector,
                 xpath: data.element_xpath,
-                metadata: data.element_metadata ? {
-                  tagName: data.element_metadata.tagName,
-                  text: data.element_metadata.text,
-                  attributes: data.element_metadata.attributes,
-                  elementType: data.element_metadata.elementType,
-                  displayName: data.element_metadata.displayName
-                } : null
+                metadata: data.element_metadata && typeof data.element_metadata === 'object'
+                  ? {
+                      tagName: typeof data.element_metadata.tagName === 'string' ? data.element_metadata.tagName : undefined,
+                      text: typeof data.element_metadata.text === 'string' ? data.element_metadata.text : undefined,
+                      attributes: typeof data.element_metadata.attributes === 'object' ? data.element_metadata.attributes : undefined,
+                      elementType: typeof data.element_metadata.elementType === 'string' ? data.element_metadata.elementType : undefined,
+                      displayName: typeof data.element_metadata.displayName === 'string' ? data.element_metadata.displayName : undefined
+                    }
+                  : null
               }
             : undefined
         };
@@ -495,23 +498,6 @@ export function FeedbackOverlay({
         </div>
       )}
       
-      {/* Element Highlight Toggle - Keep it for user convenience */}
-      {isIframeReady && isFeedbackMode && (
-        <div className="absolute top-3 right-3 z-50 flex gap-2">
-          <div className="bg-background border rounded-md p-1 shadow-md flex items-center gap-1">
-            <Toggle
-              pressed={elementHighlightEnabled}
-              onPressedChange={setElementHighlightEnabled}
-              size="sm"
-              className="data-[state=on]:bg-primary"
-              aria-label="Highlight elements"
-            >
-              <div className="w-4 h-4 bg-blue-400/20 border border-blue-400 rounded-sm"></div>
-            </Toggle>
-          </div>
-        </div>
-      )}
-      
       {/* Element Navigation Controls (when hovering) */}
       {isIframeReady && currentHoveredElements.length > 0 && (
         <div className="absolute bottom-4 right-4 z-50 bg-background rounded-md shadow-md border p-2">
@@ -562,7 +548,7 @@ export function FeedbackOverlay({
             isSelected={selectedFeedback?.id === feedback.id}
             commentCount={0}
             onMouseEnter={() => {
-              if (elementHighlightEnabled && feedback.element_target) {
+              if (feedback.element_target) {
                 const element = findElementByTarget(feedback.element_target);
                 if (element) highlightElement(element);
               }
