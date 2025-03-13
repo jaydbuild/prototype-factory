@@ -191,48 +191,70 @@ export function useElementTargeting({
   // Highlight an element in the iframe
   const highlightElement = useCallback((element: Element | null) => {
     try {
+      const iframe = getIframe();
+      if (!iframe) {
+        console.log("No iframe found for highlighting");
+        return;
+      }
+
+      // Remove existing highlight
       if (!element) {
-        if (highlightRef.current) {
+        if (highlightRef.current && highlightRef.current.parentElement) {
           highlightRef.current.style.display = 'none';
         }
         return;
       }
       
-      const iframe = getIframe();
-      if (!iframe || !iframe.contentDocument) return;
+      console.log("Highlighting element:", element.tagName);
       
       const position = getElementPosition(element);
-      if (!position) return;
+      if (!position) {
+        console.log("Could not get element position");
+        return;
+      }
       
+      // Create highlight element if it doesn't exist
       if (!highlightRef.current) {
         highlightRef.current = document.createElement('div');
         highlightRef.current.className = 'element-highlight';
         highlightRef.current.style.position = 'absolute';
         highlightRef.current.style.pointerEvents = 'none';
-        highlightRef.current.style.border = '2px solid #3b82f6';
-        highlightRef.current.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-        highlightRef.current.style.zIndex = '9999';
-        highlightRef.current.style.transition = 'all 0.2s ease-out';
+        highlightRef.current.style.border = '3px solid #3b82f6';
+        highlightRef.current.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+        highlightRef.current.style.zIndex = '99999';
+        highlightRef.current.style.transition = 'all 0.15s ease-out';
         highlightRef.current.style.borderRadius = '3px';
-        iframe.parentElement?.appendChild(highlightRef.current);
+        highlightRef.current.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.5)';
+        
+        // Add to appropriate container (preview container)
+        const previewContainer = iframe.closest('.sp-preview');
+        if (previewContainer) {
+          previewContainer.style.position = 'relative';
+          previewContainer.appendChild(highlightRef.current);
+        } else {
+          iframe.parentElement?.appendChild(highlightRef.current);
+        }
       }
       
       const highlight = highlightRef.current;
       highlight.style.display = 'block';
-      highlight.style.left = `${position.x - (position.width / 2)}%`;
-      highlight.style.top = `${position.y - (position.height / 2)}%`;
-      highlight.style.width = `${position.width}%`;
-      highlight.style.height = `${position.height}%`;
       
-      // Add tag indicator
+      // Position based on the iframe's position
+      const iframeRect = iframe.getBoundingClientRect();
+      highlight.style.left = `${iframeRect.left + window.scrollX + (position.x - position.width/2) * iframeRect.width / 100}px`;
+      highlight.style.top = `${iframeRect.top + window.scrollY + (position.y - position.height/2) * iframeRect.height / 100}px`;
+      highlight.style.width = `${position.width * iframeRect.width / 100}px`;
+      highlight.style.height = `${position.height * iframeRect.height / 100}px`;
+      
+      // Add tag indicator as a pseudo-element via a data attribute
       const tagName = element.tagName.toLowerCase();
       highlight.setAttribute('data-element', tagName);
       
-      // Add subtle animation to draw attention
+      // Add attention-getting animation
       highlight.animate([
-        { boxShadow: '0 0 0 rgba(59, 130, 246, 0.3)' },
-        { boxShadow: '0 0 8px rgba(59, 130, 246, 0.6)' },
-        { boxShadow: '0 0 0 rgba(59, 130, 246, 0.3)' }
+        { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 0 rgba(59, 130, 246, 0.3)' },
+        { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 10px rgba(59, 130, 246, 0.6)' },
+        { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 0 rgba(59, 130, 246, 0.3)' }
       ], {
         duration: 1200,
         iterations: 2
@@ -244,10 +266,14 @@ export function useElementTargeting({
   
   // Start element selection mode
   const startElementSelection = useCallback(() => {
+    console.log("Starting element selection mode");
     setIsSelectingElement(true);
     
     const iframe = getIframe();
-    if (!iframe || !iframe.contentDocument) return () => {};
+    if (!iframe || !iframe.contentDocument) {
+      console.log("No iframe found for element selection");
+      return () => {};
+    }
     
     // Set cursor to indicate element selection mode
     if (iframe.style) {
@@ -256,13 +282,11 @@ export function useElementTargeting({
     
     // Add mouseover event to highlight elements
     const handleMouseOver = (event: MouseEvent) => {
-      if (!isSelectingElement) return;
-      
-      event.stopPropagation();
       const target = event.target as Element;
-      if (target && target.nodeType === Node.ELEMENT_NODE) {
-        highlightElement(target);
-      }
+      if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
+      
+      console.log("Mouse over element:", target.tagName);
+      highlightElement(target);
     };
     
     // Add click event to select an element
@@ -274,11 +298,23 @@ export function useElementTargeting({
       
       const target = event.target as Element;
       if (target && target.nodeType === Node.ELEMENT_NODE) {
+        console.log("Selected element:", target.tagName);
         setTargetedElement(target);
         const target_info = generateElementTarget(target);
         setElementTarget(target_info);
         
         // Keep highlighting the selected element
+        highlightElement(target);
+      }
+    };
+    
+    // Handle mouse movement to track hovered elements
+    const handleMouseMove = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
+      
+      // Only update if different from current highlight to avoid flickering
+      if (targetedElement !== target) {
         highlightElement(target);
       }
     };
@@ -300,13 +336,16 @@ export function useElementTargeting({
       }
     };
     
+    // Attach all event listeners
     iframe.contentDocument.addEventListener('mouseover', handleMouseOver);
+    iframe.contentDocument.addEventListener('mousemove', handleMouseMove);
     iframe.contentDocument.addEventListener('click', handleClick);
     document.addEventListener('keydown', handleKeyDown);
     
     return () => {
       if (iframe.contentDocument) {
         iframe.contentDocument.removeEventListener('mouseover', handleMouseOver);
+        iframe.contentDocument.removeEventListener('mousemove', handleMouseMove);
         iframe.contentDocument.removeEventListener('click', handleClick);
       }
       document.removeEventListener('keydown', handleKeyDown);
@@ -314,7 +353,7 @@ export function useElementTargeting({
         iframe.style.cursor = '';
       }
     };
-  }, [isSelectingElement, highlightElement, generateElementTarget, getIframe]);
+  }, [isSelectingElement, highlightElement, generateElementTarget, getIframe, targetedElement]);
   
   // Cancel element selection mode
   const cancelElementSelection = useCallback(() => {
@@ -444,9 +483,22 @@ export function useElementTargeting({
     };
   }, [enabled, targetedElement, getIframe, highlightElement]);
   
+  // Start element selection when enabled
+  useEffect(() => {
+    if (enabled) {
+      console.log("Element targeting enabled, starting selection mode");
+      const cleanup = startElementSelection();
+      return cleanup;
+    } else {
+      console.log("Element targeting disabled");
+      cancelElementSelection();
+    }
+  }, [enabled, startElementSelection, cancelElementSelection]);
+  
   // Clean up highlight on unmount
   useEffect(() => {
     return () => {
+      console.log("Cleaning up element targeting");
       if (highlightRef.current && highlightRef.current.parentElement) {
         highlightRef.current.parentElement.removeChild(highlightRef.current);
         highlightRef.current = null;

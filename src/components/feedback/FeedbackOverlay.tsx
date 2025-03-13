@@ -100,59 +100,33 @@ export function FeedbackOverlay({
     targetedElement,
     elementTarget,
     isSelectingElement,
-    startElementSelection,
     cancelElementSelection,
     getElementPosition,
     highlightElement,
     findElementByTarget,
     generateElementTarget
   } = useElementTargeting({
-    enabled: isFeedbackMode // Always enabled when feedback mode is on
+    enabled: isFeedbackMode && isIframeReady // Enable targeting when feedback mode is on and iframe is ready
   });
 
   // Refresh iframe check when feedback mode changes
   useEffect(() => {
+    console.log("Feedback mode:", isFeedbackMode, "Iframe ready:", isIframeReady);
     if (isFeedbackMode) {
       refreshCheck();
     }
   }, [isFeedbackMode, refreshCheck]);
   
-  // Handle element selection mode - now automatically enabled when feedback mode is on
+  // For debugging - log when currentHoveredElements changes
   useEffect(() => {
-    if (isFeedbackMode && isIframeReady && !isSelectingElement) {
-      const cleanup = startElementSelection();
-      return cleanup;
+    if (currentHoveredElements.length > 0) {
+      console.log(`Currently hovering over ${currentHoveredElements.length} elements, showing index ${currentElementIndex}`);
     }
-  }, [isFeedbackMode, isIframeReady, isSelectingElement, startElementSelection]);
+  }, [currentHoveredElements, currentElementIndex]);
   
-  // Handle element selection and cycling through parent elements
+  // Handle key presses for element navigation
   useEffect(() => {
     if (!isFeedbackMode || !isIframeReady) return;
-    
-    const iframe = document.querySelector('.sp-preview iframe') as HTMLIFrameElement;
-    if (!iframe || !iframe.contentDocument) return;
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      // Get element under cursor
-      const target = e.target as Element;
-      if (!target) return;
-      
-      // Build parent chain
-      const parentChain: Element[] = [];
-      let currentElem: Element | null = target;
-      
-      // Collect element and its parents, up to 5 levels
-      while (currentElem && parentChain.length < 6) {
-        parentChain.push(currentElem);
-        currentElem = currentElem.parentElement;
-      }
-      
-      setCurrentHoveredElements(parentChain);
-      setCurrentElementIndex(0); // Reset to target element (most specific)
-      
-      // Highlight the currently selected element in the chain
-      highlightElement(parentChain[currentElementIndex]);
-    };
     
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isFeedbackMode || currentHoveredElements.length === 0) return;
@@ -176,20 +150,11 @@ export function FeedbackOverlay({
           return newIndex;
         });
       }
-      
-      // Escape to cancel element selection
-      if (e.key === 'Escape') {
-        cancelElementSelection();
-      }
     };
     
-    iframe.contentDocument.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('keydown', handleKeyDown);
     
     return () => {
-      if (iframe.contentDocument) {
-        iframe.contentDocument.removeEventListener('mousemove', handleMouseMove);
-      }
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [
@@ -197,18 +162,9 @@ export function FeedbackOverlay({
     isIframeReady, 
     highlightElement, 
     currentHoveredElements, 
-    currentElementIndex,
-    cancelElementSelection
+    currentElementIndex
   ]);
   
-  // Display feedback points with element targeting
-  useEffect(() => {
-    if (!isFeedbackMode || !isIframeReady) return;
-    
-    // This effect will be used for highlighting elements when hovering over feedback points
-    // The implementation is in the handleFeedbackPointHover function
-  }, [isFeedbackMode, isIframeReady]);
-
   // Use memoized handler for overlay clicks to prevent unnecessary recreations
   const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isFeedbackMode || !overlayRef.current || !isIframeReady) return;
@@ -325,7 +281,13 @@ export function FeedbackOverlay({
       let targetData: ElementTarget | null = null;
       if (currentHoveredElements.length > 0 && currentElementIndex < currentHoveredElements.length) {
         const selectedElement = currentHoveredElements[currentElementIndex];
-        targetData = generateElementTarget(selectedElement);
+        // Generate element target data and ensure attributes are properly converted to strings
+        const rawTargetData = generateElementTarget(selectedElement);
+        targetData = {
+          selector: rawTargetData.selector,
+          xpath: rawTargetData.xpath,
+          metadata: safelyConvertElementMetadata(rawTargetData.metadata)
+        };
       }
       
       // Prepare feedback data including element targeting
@@ -506,6 +468,27 @@ export function FeedbackOverlay({
     setCurrentElementIndex(newIndex);
     highlightElement(currentHoveredElements[newIndex]);
   }, [currentHoveredElements, currentElementIndex, highlightElement]);
+
+  // Effect to collect hovered elements from the element targeting hook
+  useEffect(() => {
+    if (!isFeedbackMode || !isIframeReady) return;
+    
+    // Listen for the targetedElement changes from the element targeting hook
+    if (targetedElement) {
+      // Build parent chain
+      const parentChain: Element[] = [];
+      let currentElem: Element | null = targetedElement;
+      
+      // Collect element and its parents (up to 6 levels)
+      while (currentElem && parentChain.length < 6) {
+        parentChain.push(currentElem);
+        currentElem = currentElem.parentElement;
+      }
+      
+      setCurrentHoveredElements(parentChain);
+      setCurrentElementIndex(0); // Always start with the most specific element
+    }
+  }, [isFeedbackMode, isIframeReady, targetedElement]);
 
   if (!isFeedbackMode) {
     return null;
