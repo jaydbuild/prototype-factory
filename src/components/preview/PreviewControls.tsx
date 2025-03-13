@@ -17,7 +17,8 @@ import {
   EyeOff,
   ZoomIn,
   ZoomOut,
-  Settings
+  Settings,
+  Download
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -73,6 +74,9 @@ interface PreviewControlsProps {
   onShare?: () => void;
   // Figma design availability
   hasFigmaDesign?: boolean;
+  // New props for download and share
+  filesUrl?: string;
+  onDownload?: () => void;
 }
 
 export function PreviewControls({
@@ -97,7 +101,9 @@ export function PreviewControls({
   onRefresh,
   onShare,
   // Figma design availability
-  hasFigmaDesign = false
+  hasFigmaDesign = false,
+  filesUrl,
+  onDownload
 }: PreviewControlsProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -157,10 +163,12 @@ export function PreviewControls({
             <Code className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Code</span>
           </TabsTrigger>
-          <TabsTrigger value="design" className="flex items-center gap-1 px-2 h-7">
-            <Figma className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Design</span>
-          </TabsTrigger>
+          {hasFigmaDesign && (
+            <TabsTrigger value="design" className="flex items-center gap-1 px-2 h-7">
+              <Figma className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Design</span>
+            </TabsTrigger>
+          )}
         </TabsList>
       </Tabs>
 
@@ -394,18 +402,34 @@ export function PreviewControls({
         </Button>
       )}
 
-      {/* Share button */}
-      {onShare && (
+      <div className="flex-1" /> {/* Spacer */}
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-2">
+        {/* Download button */}
+        {filesUrl && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onDownload}
+            title="Download Files"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </Button>
+        )}
+
+        {/* Share button */}
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
           onClick={onShare}
-          title="Share prototype"
+          title="Share Prototype"
         >
           <Share2 className="h-3.5 w-3.5" />
         </Button>
-      )}
+      </div>
 
       {/* Hide/Unhide UI button */}
       {onToggleUI && (

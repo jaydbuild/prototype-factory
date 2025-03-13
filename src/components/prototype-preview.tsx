@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
 import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Button } from '@/components/ui/button'
-import { RefreshCw } from 'lucide-react'
+import { PreviewControls } from '@/components/preview/PreviewControls'
 
 interface PrototypePreviewProps {
   prototypeId: string
@@ -12,6 +11,7 @@ interface PrototypePreviewProps {
 
 export function PrototypePreview({ prototypeId, className = '' }: PrototypePreviewProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [filesUrl, setFilesUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const supabase = useSupabaseClient()
@@ -21,20 +21,40 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
     try {
       setIsRefreshing(true)
       
-      // Trigger bundling
-      const { data, error } = await supabase.functions.invoke('bundle-prototype', {
-        body: { prototypeId }
-      })
+      // Get prototype data including file_path
+      const { data: prototypeData, error: prototypeError } = await supabase
+        .from('prototypes')
+        .select('preview_url, files_url, file_path')
+        .eq('id', prototypeId)
+        .single()
 
-      if (error) throw error
+      if (prototypeError) {
+        console.error('Failed to load prototype:', prototypeError)
+        throw prototypeError
+      }
 
-      setPreviewUrl(data.previewUrl)
+      if (prototypeData) {
+        // Set preview URL
+        setPreviewUrl(prototypeData.preview_url)
+        
+        // Get download URL if file_path exists
+        if (prototypeData.file_path) {
+          const { data: { publicUrl } } = await supabase
+            .storage
+            .from('prototype-uploads')
+            .getPublicUrl(prototypeData.file_path)
+          
+          setFilesUrl(publicUrl)
+        } else {
+          setFilesUrl(null)
+        }
 
-      if (showToast) {
-        toast({
-          title: 'Preview Updated',
-          description: 'The preview has been refreshed with the latest changes.',
-        })
+        if (showToast) {
+          toast({
+            title: 'Preview Updated',
+            description: 'The preview has been refreshed with the latest changes.',
+          })
+        }
       }
     } catch (error) {
       console.error('Preview error:', error)
@@ -49,6 +69,50 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
     }
   }
 
+  const handleDownload = async () => {
+    if (!filesUrl) {
+      toast({
+        title: 'Download Error',
+        description: 'No files available for download.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      window.open(filesUrl, '_blank')
+      toast({
+        title: 'Download Started',
+        description: 'Your files will download in a new tab.',
+      })
+    } catch (error) {
+      console.error('Download error:', error)
+      toast({
+        title: 'Download Error',
+        description: 'Failed to download files. Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = window.location.href
+      await navigator.clipboard.writeText(shareUrl)
+      toast({
+        title: 'Link Copied!',
+        description: 'Prototype link has been copied to clipboard.',
+      })
+    } catch (error) {
+      console.error('Share error:', error)
+      toast({
+        title: 'Share Error',
+        description: 'Failed to copy link. Please try manually copying the URL.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   useEffect(() => {
     loadPreview()
   }, [prototypeId])
@@ -60,15 +124,15 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
   return (
     <div className={`relative ${className}`}>
       <div className="absolute top-4 right-4 z-10">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => loadPreview(true)}
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh Preview
-        </Button>
+        <PreviewControls
+          viewMode="preview"
+          onViewModeChange={() => {}}
+          isFeedbackMode={false}
+          onToggleFeedbackMode={() => {}}
+          filesUrl={filesUrl || undefined}
+          onDownload={handleDownload}
+          onShare={handleShare}
+        />
       </div>
       
       {previewUrl ? (
