@@ -25,7 +25,7 @@ export interface FeedbackPoint {
     height?: number;
   };
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
   status: FeedbackStatus;
   element_target?: ElementTarget;
 }

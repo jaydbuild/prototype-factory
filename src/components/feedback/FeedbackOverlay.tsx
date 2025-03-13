@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIframeStability } from '@/hooks/use-iframe-stability';
 import { useElementTargeting } from '@/hooks/use-element-targeting';
 import { Toggle } from '@/components/ui/toggle';
-import { Crosshair, X } from 'lucide-react';
+import { Crosshair, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface FeedbackOverlayProps {
   prototypeId: string;
@@ -48,6 +48,8 @@ export function FeedbackOverlay({
   const [isInteractingWithComment, setIsInteractingWithComment] = useState(false);
   const [isElementSelectMode, setIsElementSelectMode] = useState(false);
   const [elementHighlightEnabled, setElementHighlightEnabled] = useState(true);
+  const [currentHoveredElements, setCurrentHoveredElements] = useState<Element[]>([]);
+  const [currentElementIndex, setCurrentElementIndex] = useState(0);
   
   // Use the custom hooks for iframe stability and element targeting
   const { isIframeReady, refreshCheck } = useIframeStability({
@@ -57,15 +59,17 @@ export function FeedbackOverlay({
   });
   
   const {
+    targetedElement,
     elementTarget,
     isSelectingElement,
     startElementSelection,
     cancelElementSelection,
     getElementPosition,
     highlightElement,
-    findElementByTarget
+    findElementByTarget,
+    generateElementTarget
   } = useElementTargeting({
-    enabled: isFeedbackMode
+    enabled: isFeedbackMode && isElementSelectMode
   });
 
   // Refresh iframe check when feedback mode changes
@@ -83,28 +87,93 @@ export function FeedbackOverlay({
     }
   }, [isElementSelectMode, isFeedbackMode, isIframeReady, isSelectingElement, startElementSelection]);
   
+  // Handle element selection and cycling through parent elements
+  useEffect(() => {
+    if (!isFeedbackMode || !isElementSelectMode || !isIframeReady) return;
+    
+    const iframe = document.querySelector('.sp-preview iframe') as HTMLIFrameElement;
+    if (!iframe || !iframe.contentDocument) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isElementSelectMode) return;
+      
+      // Get element under cursor
+      const target = e.target as Element;
+      if (!target) return;
+      
+      // Build parent chain
+      const parentChain: Element[] = [];
+      let currentElem: Element | null = target;
+      
+      // Collect element and its parents, up to 5 levels
+      while (currentElem && parentChain.length < 6) {
+        parentChain.push(currentElem);
+        currentElem = currentElem.parentElement;
+      }
+      
+      setCurrentHoveredElements(parentChain);
+      setCurrentElementIndex(0); // Reset to target element (most specific)
+      
+      // Highlight the currently selected element in the chain
+      highlightElement(parentChain[currentElementIndex]);
+    };
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isElementSelectMode || currentHoveredElements.length === 0) return;
+      
+      // Up arrow to select parent element
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCurrentElementIndex(prev => {
+          const newIndex = Math.min(prev + 1, currentHoveredElements.length - 1);
+          highlightElement(currentHoveredElements[newIndex]);
+          return newIndex;
+        });
+      }
+      
+      // Down arrow to select child element
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCurrentElementIndex(prev => {
+          const newIndex = Math.max(prev - 1, 0);
+          highlightElement(currentHoveredElements[newIndex]);
+          return newIndex;
+        });
+      }
+      
+      // Escape to cancel element selection
+      if (e.key === 'Escape') {
+        cancelElementSelection();
+        setIsElementSelectMode(false);
+      }
+    };
+    
+    iframe.contentDocument.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      if (iframe.contentDocument) {
+        iframe.contentDocument.removeEventListener('mousemove', handleMouseMove);
+      }
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    isFeedbackMode, 
+    isElementSelectMode, 
+    isIframeReady, 
+    highlightElement, 
+    currentHoveredElements, 
+    currentElementIndex,
+    cancelElementSelection
+  ]);
+  
   // Display feedback points with element targeting
   useEffect(() => {
     if (!isFeedbackMode || !isIframeReady || !elementHighlightEnabled) return;
     
-    // Highlight targeted elements when hovering over feedback points
-    const handleFeedbackPointHover = (feedback: FeedbackPointType | null) => {
-      if (!feedback || !feedback.element_target) {
-        highlightElement(null);
-        return;
-      }
-      
-      const element = findElementByTarget(feedback.element_target);
-      if (element) {
-        highlightElement(element);
-      } else {
-        highlightElement(null);
-      }
-    };
-    
-    // Attach this function to the feedback points (would need component changes)
-    // This would be added in the FeedbackPoint component
-  }, [isFeedbackMode, isIframeReady, elementHighlightEnabled, highlightElement, findElementByTarget]);
+    // This effect will be used for highlighting elements when hovering over feedback points
+    // The implementation is in the handleFeedbackPointHover function
+  }, [isFeedbackMode, isIframeReady, elementHighlightEnabled]);
 
   // Use memoized handler for overlay clicks to prevent unnecessary recreations
   const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -166,6 +235,7 @@ export function FeedbackOverlay({
     
     setNewFeedbackPosition(null);
     setNewFeedbackContent('');
+    setIsElementSelectMode(false);
     
     setTimeout(() => setIsInteractingWithComment(false), 100);
     
@@ -196,16 +266,38 @@ export function FeedbackOverlay({
     }
 
     try {
+      // Use the position from the targeted element if available
+      let feedbackPosition = newFeedbackPosition || { x: 50, y: 50 };
+      
+      // If we have a targeted element, get its position
+      if (currentHoveredElements.length > 0 && currentElementIndex < currentHoveredElements.length) {
+        const selectedElement = currentHoveredElements[currentElementIndex];
+        const position = getElementPosition(selectedElement);
+        if (position) {
+          feedbackPosition = {
+            x: position.x,
+            y: position.y
+          };
+        }
+      }
+      
+      // Get element target data if we have a selected element
+      let targetData = null;
+      if (currentHoveredElements.length > 0 && currentElementIndex < currentHoveredElements.length) {
+        const selectedElement = currentHoveredElements[currentElementIndex];
+        targetData = generateElementTarget(selectedElement);
+      }
+      
       // Prepare feedback data including element targeting
       const feedbackData = {
         prototype_id: prototypeId,
         created_by: currentUser.id,
         content: newFeedbackContent,
-        position: newFeedbackPosition || { x: 50, y: 50 }, // Default position if using element targeting
+        position: feedbackPosition,
         status: 'open',
-        element_selector: elementTarget?.selector || null,
-        element_xpath: elementTarget?.xpath || null,
-        element_metadata: elementTarget?.metadata || null
+        element_selector: targetData?.selector || null,
+        element_xpath: targetData?.xpath || null,
+        element_metadata: targetData?.metadata || null
       };
 
       const { data, error } = await supabase
@@ -217,14 +309,25 @@ export function FeedbackOverlay({
       if (error) throw error;
 
       if (data) {
-        // Convert the data to match our FeedbackPoint type with element_target
+        // Convert the database response to match our FeedbackPoint type
         const feedback: FeedbackPointType = {
-          ...data,
-          element_target: elementTarget ? {
-            selector: elementTarget.selector,
-            xpath: elementTarget.xpath,
-            metadata: elementTarget.metadata
-          } : undefined
+          id: data.id,
+          prototype_id: data.prototype_id,
+          created_by: data.created_by,
+          content: data.content,
+          position: typeof data.position === 'string' 
+            ? JSON.parse(data.position) 
+            : data.position,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          status: data.status as FeedbackPointType['status'],
+          element_target: data.element_selector || data.element_xpath || data.element_metadata
+            ? {
+                selector: data.element_selector,
+                xpath: data.element_xpath,
+                metadata: data.element_metadata
+              }
+            : undefined
         };
         
         onFeedbackAdded(feedback);
@@ -238,6 +341,7 @@ export function FeedbackOverlay({
       setNewFeedbackContent('');
       highlightElement(null);
       setIsElementSelectMode(false);
+      setCurrentHoveredElements([]);
       
       setTimeout(() => setIsInteractingWithComment(false), 100);
     } catch (error) {
@@ -249,7 +353,19 @@ export function FeedbackOverlay({
       });
       setIsInteractingWithComment(false);
     }
-  }, [newFeedbackPosition, newFeedbackContent, currentUser, prototypeId, onFeedbackAdded, toast, elementTarget, highlightElement]);
+  }, [
+    newFeedbackPosition, 
+    newFeedbackContent, 
+    currentUser, 
+    prototypeId, 
+    onFeedbackAdded, 
+    toast, 
+    currentHoveredElements, 
+    currentElementIndex, 
+    generateElementTarget,
+    getElementPosition,
+    highlightElement
+  ]);
 
   const handleUpdateFeedbackStatus = useCallback(async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {
     if (e) {
@@ -270,10 +386,25 @@ export function FeedbackOverlay({
       if (error) throw error;
 
       if (data) {
-        // Include element_target in the updated feedback
+        // Create a properly typed feedback point from the database response
         const updatedFeedback: FeedbackPointType = {
-          ...data as FeedbackPointType,
-          element_target: selectedFeedback.element_target
+          id: data.id,
+          prototype_id: data.prototype_id,
+          created_by: data.created_by,
+          content: data.content,
+          position: typeof data.position === 'string' 
+            ? JSON.parse(data.position) 
+            : data.position,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          status: data.status as FeedbackPointType['status'],
+          element_target: data.element_selector || data.element_xpath || data.element_metadata
+            ? {
+                selector: data.element_selector,
+                xpath: data.element_xpath,
+                metadata: data.element_metadata
+              }
+            : undefined
         };
         
         onFeedbackUpdated(updatedFeedback);
@@ -319,10 +450,28 @@ export function FeedbackOverlay({
     if (isElementSelectMode) {
       cancelElementSelection();
       setIsElementSelectMode(false);
+      setCurrentHoveredElements([]);
     } else {
       setIsElementSelectMode(true);
     }
   }, [isElementSelectMode, cancelElementSelection]);
+  
+  // Helper for traversing element hierarchy
+  const selectParentElement = useCallback(() => {
+    if (currentHoveredElements.length === 0) return;
+    
+    const newIndex = Math.min(currentElementIndex + 1, currentHoveredElements.length - 1);
+    setCurrentElementIndex(newIndex);
+    highlightElement(currentHoveredElements[newIndex]);
+  }, [currentHoveredElements, currentElementIndex, highlightElement]);
+  
+  const selectChildElement = useCallback(() => {
+    if (currentHoveredElements.length === 0) return;
+    
+    const newIndex = Math.max(currentElementIndex - 1, 0);
+    setCurrentElementIndex(newIndex);
+    highlightElement(currentHoveredElements[newIndex]);
+  }, [currentHoveredElements, currentElementIndex, highlightElement]);
 
   if (!isFeedbackMode) {
     return null;
@@ -331,7 +480,7 @@ export function FeedbackOverlay({
   return (
     <div 
       ref={overlayRef}
-      className={`absolute inset-0 ${isIframeReady ? 'cursor-crosshair' : 'cursor-wait'} ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      className={`absolute inset-0 ${isIframeReady ? isElementSelectMode ? 'cursor-crosshair' : 'cursor-default' : 'cursor-wait'} ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
       onClick={handleOverlayClick}
     >
       {!isIframeReady && isFeedbackMode && (
@@ -362,6 +511,43 @@ export function FeedbackOverlay({
             >
               <div className="w-4 h-4 bg-blue-400/20 border border-blue-400 rounded-sm"></div>
             </Toggle>
+          </div>
+        </div>
+      )}
+      
+      {/* Element Navigation Controls (when in element select mode and hovering) */}
+      {isElementSelectMode && isIframeReady && currentHoveredElements.length > 0 && (
+        <div className="absolute bottom-4 right-4 z-50 bg-background rounded-md shadow-md border p-2">
+          <div className="text-xs text-muted-foreground mb-1">
+            Element {currentElementIndex + 1} of {currentHoveredElements.length}
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={selectParentElement}
+              disabled={currentElementIndex >= currentHoveredElements.length - 1}
+              className="h-8 px-2"
+            >
+              <ChevronUp className="h-4 w-4 mr-1" /> Parent
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={selectChildElement}
+              disabled={currentElementIndex <= 0}
+              className="h-8 px-2"
+            >
+              <ChevronDown className="h-4 w-4 mr-1" /> Child
+            </Button>
+          </div>
+          <div className="text-xs mt-1 text-muted-foreground">
+            {currentHoveredElements[currentElementIndex]?.tagName.toLowerCase()}
+            {currentHoveredElements[currentElementIndex]?.id ? ` #${currentHoveredElements[currentElementIndex]?.id}` : ''}
+            {currentHoveredElements[currentElementIndex]?.className ? ` .${currentHoveredElements[currentElementIndex]?.className.split(' ')[0]}` : ''}
+          </div>
+          <div className="text-[10px] mt-1 text-muted-foreground italic">
+            Use arrow keys ↑↓ to navigate elements
           </div>
         </div>
       )}
@@ -416,28 +602,44 @@ export function FeedbackOverlay({
       )}
       
       {/* New Feedback Form */}
-      {isIframeReady && (newFeedbackPosition || elementTarget) && (
+      {isIframeReady && (newFeedbackPosition || (currentHoveredElements.length > 0 && isElementSelectMode)) && (
         <div 
           className="absolute feedback-form z-40"
           style={newFeedbackPosition ? {
             left: `${newFeedbackPosition.x}%`,
             top: `${newFeedbackPosition.y}%`,
             transform: 'translate(10px, -50%)'
-          } : {
-            left: '50%',
-            top: '30%',
-            transform: 'translate(-50%, -50%)'
-          }}
+          } : currentHoveredElements.length > 0 ? (() => {
+              const element = currentHoveredElements[currentElementIndex];
+              const position = getElementPosition(element);
+              return position ? {
+                left: `${position.x}%`,
+                top: `${position.y}%`,
+                transform: 'translate(10px, -50%)'
+              } : {
+                left: '50%',
+                top: '30%',
+                transform: 'translate(-50%, -50%)'
+              };
+            })() : {
+              left: '50%',
+              top: '30%',
+              transform: 'translate(-50%, -50%)'
+            }
+          }
           onClick={(e) => e.stopPropagation()} 
         >
           <Card className="w-72">
             <CardContent className="p-3">
-              {elementTarget && elementTarget.metadata?.displayName && (
+              {currentHoveredElements.length > 0 && currentElementIndex < currentHoveredElements.length && isElementSelectMode && (
                 <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                   <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[10px] border border-blue-200">
-                    {elementTarget.metadata.tagName}
+                    {currentHoveredElements[currentElementIndex]?.tagName.toLowerCase()}
                   </span>
-                  <span className="truncate">{elementTarget.metadata.displayName}</span>
+                  <span className="truncate">
+                    {currentHoveredElements[currentElementIndex]?.textContent?.trim().substring(0, 20) || 'No text content'}
+                    {currentHoveredElements[currentElementIndex]?.textContent?.trim().length > 20 ? '...' : ''}
+                  </span>
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -445,6 +647,7 @@ export function FeedbackOverlay({
                     onClick={() => {
                       highlightElement(null);
                       setIsElementSelectMode(false);
+                      setCurrentHoveredElements([]);
                     }}
                   >
                     <X className="h-3 w-3" />

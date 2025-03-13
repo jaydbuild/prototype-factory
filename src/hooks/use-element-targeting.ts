@@ -1,4 +1,3 @@
-
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { ElementTarget } from '@/types/feedback';
 
@@ -130,7 +129,7 @@ export function useElementTargeting({
     };
     
     // Get important attributes
-    const attributesToCapture = ['class', 'href', 'src', 'alt', 'title', 'role', 'aria-label'];
+    const attributesToCapture = ['class', 'href', 'src', 'alt', 'title', 'role', 'aria-label', 'name', 'placeholder'];
     attributesToCapture.forEach(attr => {
       const value = element.getAttribute(attr);
       if (value) {
@@ -144,6 +143,7 @@ export function useElementTargeting({
       const label = element.getAttribute('aria-label') || 
                    element.getAttribute('title') || 
                    element.getAttribute('alt') ||
+                   element.getAttribute('placeholder') ||
                    element.textContent?.trim();
       if (label) {
         metadata.displayName = label.substring(0, 30);
@@ -213,6 +213,7 @@ export function useElementTargeting({
         highlightRef.current.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
         highlightRef.current.style.zIndex = '9999';
         highlightRef.current.style.transition = 'all 0.2s ease-out';
+        highlightRef.current.style.borderRadius = '3px';
         iframe.parentElement?.appendChild(highlightRef.current);
       }
       
@@ -222,6 +223,20 @@ export function useElementTargeting({
       highlight.style.top = `${position.y}%`;
       highlight.style.width = `${position.width}%`;
       highlight.style.height = `${position.height}%`;
+      
+      // Add tag indicator
+      const tagName = element.tagName.toLowerCase();
+      highlight.setAttribute('data-element', tagName);
+      
+      // Add subtle animation to draw attention
+      highlight.animate([
+        { boxShadow: '0 0 0 rgba(59, 130, 246, 0.3)' },
+        { boxShadow: '0 0 8px rgba(59, 130, 246, 0.6)' },
+        { boxShadow: '0 0 0 rgba(59, 130, 246, 0.3)' }
+      ], {
+        duration: 1200,
+        iterations: 2
+      });
     } catch (error) {
       console.error('Error highlighting element:', error);
     }
@@ -232,7 +247,7 @@ export function useElementTargeting({
     setIsSelectingElement(true);
     
     const iframe = getIframe();
-    if (!iframe || !iframe.contentDocument) return;
+    if (!iframe || !iframe.contentDocument) return () => {};
     
     // Set cursor to indicate element selection mode
     if (iframe.style) {
@@ -259,25 +274,41 @@ export function useElementTargeting({
       setTargetedElement(target);
       const target_info = generateElementTarget(target);
       setElementTarget(target_info);
-      setIsSelectingElement(false);
       
-      if (iframe.style) {
-        iframe.style.cursor = '';
+      // Keep highlighting the selected element
+      highlightElement(target);
+      
+      // Don't exit selection mode automatically
+      // We now use a toggle button for this
+    };
+    
+    // Setup keyboard navigation for element selection
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isSelectingElement) return;
+      
+      if (event.key === 'Escape') {
+        // Cancel element selection on Escape
+        event.preventDefault();
+        setIsSelectingElement(false);
+        if (iframe.style) {
+          iframe.style.cursor = '';
+        }
+        highlightElement(null);
+        setTargetedElement(null);
+        setElementTarget(null);
       }
-      
-      // Remove event listeners
-      iframe.contentDocument?.removeEventListener('mouseover', handleMouseOver);
-      iframe.contentDocument?.removeEventListener('click', handleClick);
     };
     
     iframe.contentDocument.addEventListener('mouseover', handleMouseOver);
     iframe.contentDocument.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
     
     return () => {
       if (iframe.contentDocument) {
         iframe.contentDocument.removeEventListener('mouseover', handleMouseOver);
         iframe.contentDocument.removeEventListener('click', handleClick);
       }
+      document.removeEventListener('keydown', handleKeyDown);
       if (iframe.style) {
         iframe.style.cursor = '';
       }
@@ -292,6 +323,8 @@ export function useElementTargeting({
     }
     setIsSelectingElement(false);
     highlightElement(null);
+    setTargetedElement(null);
+    setElementTarget(null);
   }, [getIframe, highlightElement]);
   
   // Find an element using stored target information
@@ -304,8 +337,12 @@ export function useElementTargeting({
       
       // Try CSS selector first
       if (elementTarget.selector) {
-        element = iframe.contentDocument.querySelector(elementTarget.selector);
-        if (element) return element;
+        try {
+          element = iframe.contentDocument.querySelector(elementTarget.selector);
+          if (element) return element;
+        } catch (e) {
+          console.warn('Selector evaluation failed:', e);
+        }
       }
       
       // Try XPath as fallback
@@ -326,12 +363,85 @@ export function useElementTargeting({
         }
       }
       
+      // Try metadata as a last resort
+      if (elementTarget.metadata) {
+        const { tagName, attributes } = elementTarget.metadata;
+        
+        if (tagName && attributes && attributes.id) {
+          element = iframe.contentDocument.getElementById(attributes.id);
+          if (element && element.tagName.toLowerCase() === tagName.toLowerCase()) {
+            return element;
+          }
+        }
+        
+        // Try to find by a combination of tag, class, and text content
+        if (tagName && attributes && attributes.class) {
+          const potentialElements = Array.from(
+            iframe.contentDocument.querySelectorAll(`${tagName}.${attributes.class.split(' ')[0]}`)
+          );
+          
+          if (potentialElements.length === 1) {
+            return potentialElements[0];
+          }
+          
+          // Filter by text content if available
+          if (elementTarget.metadata.text && potentialElements.length > 0) {
+            const element = potentialElements.find(el => 
+              el.textContent?.trim().includes(elementTarget.metadata!.text!.trim())
+            );
+            if (element) return element;
+          }
+        }
+      }
+      
       return null;
     } catch (error) {
       console.error('Error finding element by target:', error);
       return null;
     }
   }, [getIframe]);
+  
+  // Setup event listener for window resize to update highlights
+  useEffect(() => {
+    if (!enabled) return;
+    
+    const handleResize = () => {
+      if (targetedElement) {
+        highlightElement(targetedElement);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [enabled, targetedElement, highlightElement]);
+  
+  // Add mutation observer to handle DOM changes in the iframe
+  useEffect(() => {
+    if (!enabled || !targetedElement) return;
+    
+    const iframe = getIframe();
+    if (!iframe || !iframe.contentDocument) return;
+    
+    const observer = new MutationObserver(() => {
+      // Re-highlight the element after DOM changes
+      if (targetedElement) {
+        highlightElement(targetedElement);
+      }
+    });
+    
+    observer.observe(iframe.contentDocument, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [enabled, targetedElement, getIframe, highlightElement]);
   
   // Clean up highlight on unmount
   useEffect(() => {
