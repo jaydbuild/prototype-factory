@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
@@ -24,6 +23,48 @@ interface FeedbackOverlayProps {
   deviceType?: 'desktop' | 'tablet' | 'mobile' | 'custom';
   orientation?: 'portrait' | 'landscape';
   scale?: number;
+}
+
+// Helper function to safely convert attributes to Record<string, string>
+function safelyConvertAttributes(attributes: any): Record<string, string> | undefined {
+  if (!attributes || typeof attributes !== 'object') {
+    return undefined;
+  }
+  
+  // If it's an array, we can't convert it to Record<string, string>
+  if (Array.isArray(attributes)) {
+    return undefined;
+  }
+  
+  // Convert all values to strings
+  const result: Record<string, string> = {};
+  for (const key in attributes) {
+    if (Object.prototype.hasOwnProperty.call(attributes, key)) {
+      const value = attributes[key];
+      // Skip null or undefined values
+      if (value != null) {
+        // Convert any value to string
+        result[key] = String(value);
+      }
+    }
+  }
+  
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+// Helper function to safely convert element metadata
+function safelyConvertElementMetadata(metadata: any): ElementTarget['metadata'] {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return null;
+  }
+  
+  return {
+    tagName: typeof metadata.tagName === 'string' ? metadata.tagName : undefined,
+    text: typeof metadata.text === 'string' ? metadata.text : undefined,
+    attributes: safelyConvertAttributes(metadata.attributes),
+    elementType: typeof metadata.elementType === 'string' ? metadata.elementType : undefined,
+    displayName: typeof metadata.displayName === 'string' ? metadata.displayName : undefined
+  };
 }
 
 export function FeedbackOverlay({
@@ -328,15 +369,7 @@ export function FeedbackOverlay({
             ? {
                 selector: data.element_selector,
                 xpath: data.element_xpath,
-                metadata: data.element_metadata && typeof data.element_metadata === 'object' && !Array.isArray(data.element_metadata)
-                  ? {
-                      tagName: typeof data.element_metadata.tagName === 'string' ? data.element_metadata.tagName : undefined,
-                      text: typeof data.element_metadata.text === 'string' ? data.element_metadata.text : undefined,
-                      attributes: typeof data.element_metadata.attributes === 'object' ? data.element_metadata.attributes : undefined,
-                      elementType: typeof data.element_metadata.elementType === 'string' ? data.element_metadata.elementType : undefined,
-                      displayName: typeof data.element_metadata.displayName === 'string' ? data.element_metadata.displayName : undefined
-                    }
-                  : null
+                metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined
         };
@@ -413,15 +446,7 @@ export function FeedbackOverlay({
             ? {
                 selector: data.element_selector,
                 xpath: data.element_xpath,
-                metadata: data.element_metadata && typeof data.element_metadata === 'object' && !Array.isArray(data.element_metadata)
-                  ? {
-                      tagName: typeof data.element_metadata.tagName === 'string' ? data.element_metadata.tagName : undefined,
-                      text: typeof data.element_metadata.text === 'string' ? data.element_metadata.text : undefined,
-                      attributes: typeof data.element_metadata.attributes === 'object' ? data.element_metadata.attributes : undefined,
-                      elementType: typeof data.element_metadata.elementType === 'string' ? data.element_metadata.elementType : undefined,
-                      displayName: typeof data.element_metadata.displayName === 'string' ? data.element_metadata.displayName : undefined
-                    }
-                  : null
+                metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined
         };

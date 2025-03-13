@@ -4,6 +4,48 @@ import { FeedbackPoint, FeedbackUser, ElementTarget } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 
+// Helper function to safely convert attributes to Record<string, string>
+function safelyConvertAttributes(attributes: any): Record<string, string> | undefined {
+  if (!attributes || typeof attributes !== 'object') {
+    return undefined;
+  }
+  
+  // If it's an array, we can't convert it to Record<string, string>
+  if (Array.isArray(attributes)) {
+    return undefined;
+  }
+  
+  // Convert all values to strings
+  const result: Record<string, string> = {};
+  for (const key in attributes) {
+    if (Object.prototype.hasOwnProperty.call(attributes, key)) {
+      const value = attributes[key];
+      // Skip null or undefined values
+      if (value != null) {
+        // Convert any value to string
+        result[key] = String(value);
+      }
+    }
+  }
+  
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+// Helper function to safely convert element metadata
+function safelyConvertElementMetadata(metadata: any): ElementTarget['metadata'] {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return null;
+  }
+  
+  return {
+    tagName: typeof metadata.tagName === 'string' ? metadata.tagName : undefined,
+    text: typeof metadata.text === 'string' ? metadata.text : undefined,
+    attributes: safelyConvertAttributes(metadata.attributes),
+    elementType: typeof metadata.elementType === 'string' ? metadata.elementType : undefined,
+    displayName: typeof metadata.displayName === 'string' ? metadata.displayName : undefined
+  };
+}
+
 export function usePrototypeFeedback(prototypeId: string) {
   const [feedbackPoints, setFeedbackPoints] = useState<FeedbackPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +78,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               element_target = {
                 selector: feedback.element_selector || null,
                 xpath: feedback.element_xpath || null,
-                metadata: feedback.element_metadata || null
+                metadata: safelyConvertElementMetadata(feedback.element_metadata)
               };
             }
             
@@ -118,7 +160,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               element_target = {
                 selector: newData.element_selector || null,
                 xpath: newData.element_xpath || null,
-                metadata: newData.element_metadata || null
+                metadata: safelyConvertElementMetadata(newData.element_metadata)
               };
             }
             
@@ -160,7 +202,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               element_target = {
                 selector: updatedData.element_selector || null,
                 xpath: updatedData.element_xpath || null,
-                metadata: updatedData.element_metadata || null
+                metadata: safelyConvertElementMetadata(updatedData.element_metadata)
               };
             }
             
