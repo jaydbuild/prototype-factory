@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
@@ -13,6 +14,7 @@ interface PreviewWindowProps {
 export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps) {
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [figmaUrl, setFigmaUrl] = useState<string | null>(null);
+  const [filesUrl, setFilesUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [useSandpack, setUseSandpack] = useState(false);
@@ -56,6 +58,16 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         }
         
         setFigmaUrl(figmaUrlValue);
+
+        // If the prototype has a file_path, get the file URL
+        if (prototype && prototype.file_path) {
+          const { data: { publicUrl } } = await supabase
+            .storage
+            .from('prototype-uploads')
+            .getPublicUrl(prototype.file_path);
+          
+          setFilesUrl(publicUrl);
+        }
 
         // If the prototype is deployed and has a URL, use it
         if (prototype && prototype.deployment_status === 'deployed' && prototype.deployment_url) {
@@ -113,6 +125,7 @@ export function PreviewWindow({ prototypeId, url, onShare }: PreviewWindowProps)
         prototypeId={prototypeId} 
         url={previewUrl || undefined}
         figmaUrl={figmaUrl}
+        filesUrl={filesUrl}
         onShare={onShare}
       />
     );

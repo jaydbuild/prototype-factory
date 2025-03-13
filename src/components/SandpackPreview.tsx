@@ -6,7 +6,6 @@ import {
   SandpackPreview as SandpackPreviewComponent,
   useSandpack,
   SandpackFiles,
-  SandpackPredefinedTemplate,
 } from '@codesandbox/sandpack-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -54,6 +53,7 @@ interface SandpackPreviewProps {
   url?: string;
   deploymentUrl?: string;
   figmaUrl?: string | null;
+  filesUrl?: string | null;
   onShare?: () => void;
 }
 
@@ -158,7 +158,7 @@ const FileChangeListener = memo(({ onFileChange }: { onFileChange: (file: string
 
 FileChangeListener.displayName = 'FileChangeListener';
 
-export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, onShare }: SandpackPreviewProps) {
+export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, filesUrl, onShare }: SandpackPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -563,6 +563,56 @@ if (typeof window.menuitemfn === 'undefined') {
     );
   }, [figmaUrlState]);
 
+  const handleDownload = useCallback(() => {
+    try {
+      if (!filesUrl) {
+        toast({
+          title: 'Download Error',
+          description: 'No files available for download.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      window.open(filesUrl, '_blank');
+      
+      toast({
+        title: 'Download Started',
+        description: 'Your files will download in a new tab.',
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: 'Download Error',
+        description: 'Failed to download files. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [filesUrl, toast]);
+
+  const handleShare = useCallback(() => {
+    try {
+      const shareUrl = window.location.href;
+      navigator.clipboard.writeText(shareUrl);
+      
+      toast({
+        title: 'Link Copied!',
+        description: 'Prototype link has been copied to clipboard.',
+      });
+      
+      if (onShare) {
+        onShare();
+      }
+    } catch (error) {
+      console.error("Share error:", error);
+      toast({
+        title: 'Share Error',
+        description: 'Failed to copy link. Please try manually copying the URL.',
+        variant: 'destructive',
+      });
+    }
+  }, [onShare, toast]);
+
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">
       <div className={`flex justify-between items-center p-2 ${showUI ? '' : 'hidden'}`}>
@@ -614,8 +664,10 @@ if (typeof window.menuitemfn === 'undefined') {
               }, 500);
             }
           }}
-          onShare={onShare}
-          hasFigmaDesign={!!figmaUrlState} 
+          onShare={handleShare}
+          hasFigmaDesign={!!figmaUrlState}
+          filesUrl={filesUrl}
+          onDownload={handleDownload}
         />
         
         <div className="flex items-center gap-2">
