@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { FeedbackPoint, FeedbackUser } from '@/types/feedback';
+import { FeedbackPoint, FeedbackUser, ElementTarget } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 
@@ -26,7 +26,35 @@ export function usePrototypeFeedback(prototypeId: string) {
         }
 
         if (data) {
-          setFeedbackPoints(data as FeedbackPoint[]);
+          // Convert the DB structure to our FeedbackPoint type with element_target
+          const feedbackWithElementTargets = data.map(item => {
+            const feedback = item as any;
+            
+            // Create element_target if any of the fields exist
+            let element_target: ElementTarget | undefined = undefined;
+            if (feedback.element_selector || feedback.element_xpath || feedback.element_metadata) {
+              element_target = {
+                selector: feedback.element_selector || null,
+                xpath: feedback.element_xpath || null,
+                metadata: feedback.element_metadata || null
+              };
+            }
+            
+            // Return the feedback point with our structure
+            return {
+              id: feedback.id,
+              prototype_id: feedback.prototype_id,
+              created_by: feedback.created_by,
+              content: feedback.content,
+              position: feedback.position,
+              created_at: feedback.created_at,
+              updated_at: feedback.updated_at,
+              status: feedback.status,
+              element_target
+            } as FeedbackPoint;
+          });
+          
+          setFeedbackPoints(feedbackWithElementTargets);
           
           // Extract unique user IDs
           const userIds = [...new Set(data.map(item => item.created_by))];
@@ -82,7 +110,30 @@ export function usePrototypeFeedback(prototypeId: string) {
         },
         async (payload) => {
           if (payload.eventType === 'INSERT') {
-            const newFeedback = payload.new as FeedbackPoint;
+            const newData = payload.new as any;
+            
+            // Create element_target from database fields
+            let element_target: ElementTarget | undefined = undefined;
+            if (newData.element_selector || newData.element_xpath || newData.element_metadata) {
+              element_target = {
+                selector: newData.element_selector || null,
+                xpath: newData.element_xpath || null,
+                metadata: newData.element_metadata || null
+              };
+            }
+            
+            const newFeedback: FeedbackPoint = {
+              id: newData.id,
+              prototype_id: newData.prototype_id,
+              created_by: newData.created_by,
+              content: newData.content,
+              position: newData.position,
+              created_at: newData.created_at,
+              updated_at: newData.updated_at,
+              status: newData.status,
+              element_target
+            };
+            
             setFeedbackPoints(prev => [...prev, newFeedback]);
             
             // Fetch user if not already in cache
@@ -101,7 +152,30 @@ export function usePrototypeFeedback(prototypeId: string) {
               }
             }
           } else if (payload.eventType === 'UPDATE') {
-            const updatedFeedback = payload.new as FeedbackPoint;
+            const updatedData = payload.new as any;
+            
+            // Create element_target from database fields
+            let element_target: ElementTarget | undefined = undefined;
+            if (updatedData.element_selector || updatedData.element_xpath || updatedData.element_metadata) {
+              element_target = {
+                selector: updatedData.element_selector || null,
+                xpath: updatedData.element_xpath || null,
+                metadata: updatedData.element_metadata || null
+              };
+            }
+            
+            const updatedFeedback: FeedbackPoint = {
+              id: updatedData.id,
+              prototype_id: updatedData.prototype_id,
+              created_by: updatedData.created_by,
+              content: updatedData.content,
+              position: updatedData.position,
+              created_at: updatedData.created_at,
+              updated_at: updatedData.updated_at,
+              status: updatedData.status,
+              element_target
+            };
+            
             setFeedbackPoints(prev => 
               prev.map(item => item.id === updatedFeedback.id ? updatedFeedback : item)
             );

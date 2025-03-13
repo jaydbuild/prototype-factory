@@ -1,6 +1,18 @@
 
 export type FeedbackStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
+export interface ElementTarget {
+  selector: string | null;
+  xpath: string | null;
+  metadata: {
+    tagName?: string;
+    text?: string;
+    attributes?: Record<string, string>;
+    elementType?: string;
+    displayName?: string;
+  } | null;
+}
+
 export interface FeedbackPoint {
   id: string;
   prototype_id: string;
@@ -15,6 +27,7 @@ export interface FeedbackPoint {
   created_at: string;
   updated_at: string;
   status: FeedbackStatus;
+  element_target?: ElementTarget;
 }
 
 export interface FeedbackReaction {

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackStatus } from '@/types/feedback';
 import { Badge } from '@/components/ui/badge';
 import { 
-  AlertCircle, CheckCircle, Clock, XCircle 
+  AlertCircle, CheckCircle, Clock, XCircle, Target
 } from 'lucide-react';
 
 interface FeedbackPointProps {
@@ -10,15 +11,19 @@ interface FeedbackPointProps {
   onClick: (feedback: FeedbackPointType) => void;
   isSelected: boolean;
   commentCount: number;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export function FeedbackPoint({ 
   feedback, 
   onClick, 
   isSelected,
-  commentCount = 0
+  commentCount = 0,
+  onMouseEnter,
+  onMouseLeave
 }: FeedbackPointProps) {
-  const { position, status } = feedback;
+  const { position, status, element_target } = feedback;
   
   const getStatusIcon = (status: FeedbackStatus) => {
     switch (status) {
@@ -50,6 +55,8 @@ export function FeedbackPoint({
         top: `${position.y}%`,
       }}
       onClick={handleClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <button
         onClick={handleClick}
@@ -63,6 +70,13 @@ export function FeedbackPoint({
         title="View feedback"
       >
         {getStatusIcon(status)}
+        
+        {/* Element targeting indicator */}
+        {element_target && (
+          <span className="absolute -left-1.5 -bottom-1.5 bg-blue-500 text-white rounded-full p-0.5 w-3 h-3 flex items-center justify-center">
+            <Target className="h-2 w-2" />
+          </span>
+        )}
         
         {commentCount > 0 && (
           <Badge 
