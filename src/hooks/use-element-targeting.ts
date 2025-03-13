@@ -1,110 +1,184 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { ElementTarget } from '@/types/feedback';
-import { safelyConvertAttributes, safelyConvertElementMetadata } from '@/utils/feedback-utils';
 
-type ElementTargetingOptions = {
+interface UseElementTargetingOptions {
+  iframeSelector?: string;
   enabled?: boolean;
-};
+}
 
-type ElementPosition = {
-  x: number;
-  y: number;
-  width?: number;
-  height?: number;
-};
-
-export const useElementTargeting = (options: ElementTargetingOptions = {}) => {
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [iframe, setIframe] = useState<HTMLIFrameElement | null>(null);
+export function useElementTargeting({
+  iframeSelector = '.sp-preview iframe',
+  enabled = false,
+}: UseElementTargetingOptions = {}) {
   const [targetedElement, setTargetedElement] = useState<Element | null>(null);
   const [elementTarget, setElementTarget] = useState<ElementTarget | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const [isSelectingElement, setIsSelectingElement] = useState(false);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   
-  // Function to start element selection
-  const start = useCallback((iframeElement: HTMLIFrameElement | null) => {
-    setIframe(iframeElement);
-    setIsSelecting(true);
+  // Get the iframe element
+  const getIframe = useCallback(() => {
+    if (iframeRef.current) return iframeRef.current;
     
-    if (iframeElement) {
-      const cleanup = startElementSelection(iframeElement, (element) => {
-        setTargetedElement(element);
-        
-        if (element) {
-          const target = generateElementTarget(element);
-          setElementTarget(target);
-        } else {
-          setElementTarget(null);
+    const iframe = document.querySelector(iframeSelector) as HTMLIFrameElement;
+    if (iframe) {
+      iframeRef.current = iframe;
+      return iframe;
+    }
+    
+    return null;
+  }, [iframeSelector]);
+  
+  // Generate a unique CSS selector for an element
+  const generateSelector = useCallback((element: Element): string => {
+    if (!element || !element.tagName) return '';
+    
+    // Try using ID first
+    if (element.id) {
+      return `#${element.id}`;
+    }
+    
+    // Try using unique classes
+    if (element.classList && element.classList.length > 0) {
+      const classSelector = Array.from(element.classList).map(c => `.${c}`).join('');
+      // Check if this class combo is unique
+      try {
+        const iframe = getIframe();
+        if (iframe && iframe.contentDocument) {
+          const matches = iframe.contentDocument.querySelectorAll(classSelector);
+          if (matches.length === 1) {
+            return classSelector;
+          }
         }
-      });
+      } catch (e) {
+        console.error('Error checking selector uniqueness:', e);
+      }
+    }
+    
+    // Use tag name with parent context
+    let currentElem = element;
+    let selector = element.tagName.toLowerCase();
+    let iterations = 0;
+    const maxIterations = 4; // Limit to prevent very long selectors
+    
+    while (currentElem.parentElement && iterations < maxIterations) {
+      const parent = currentElem.parentElement;
+      const siblings = Array.from(parent.children).filter(
+        child => child.tagName === currentElem.tagName
+      );
       
-      cleanupRef.current = cleanup;
+      if (siblings.length > 1) {
+        const index = siblings.indexOf(currentElem as Element);
+        selector = `${currentElem.tagName.toLowerCase()}:nth-child(${index + 1})`;
+      }
+      
+      // Add parent tag
+      if (parent.tagName !== 'BODY' && parent.tagName !== 'HTML') {
+        selector = `${parent.tagName.toLowerCase()} > ${selector}`;
+        currentElem = parent;
+      } else {
+        break;
+      }
+      
+      iterations++;
     }
+    
+    return selector;
+  }, [getIframe]);
+  
+  // Generate an XPath for an element
+  const generateXPath = useCallback((element: Element): string => {
+    if (!element) return '';
+    
+    let xpath = '';
+    let currentElem: Element | null = element;
+    
+    while (currentElem && currentElem.nodeType === Node.ELEMENT_NODE) {
+      let index = 1;
+      let sibling: Element | null = currentElem.previousElementSibling;
+      
+      while (sibling) {
+        if (sibling.tagName === currentElem.tagName) {
+          index++;
+        }
+        sibling = sibling.previousElementSibling;
+      }
+      
+      const tagName = currentElem.tagName.toLowerCase();
+      const indexSuffix = index > 1 ? `[${index}]` : '';
+      const idPrefix = currentElem.id ? `[@id='${currentElem.id}']` : '';
+      
+      const step = `/${tagName}${idPrefix}${indexSuffix}`;
+      xpath = step + xpath;
+      
+      currentElem = currentElem.parentElement;
+    }
+    
+    return xpath || '/';
   }, []);
   
-  // Function to cancel element selection
-  const cancel = useCallback(() => {
-    setIsSelecting(false);
-    setIframe(null);
-    setTargetedElement(null);
-    setElementTarget(null);
+  // Extract metadata from an element
+  const extractElementMetadata = useCallback((element: Element) => {
+    if (!element) return null;
     
-    if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
-    }
-  }, []);
-  
-  // Function to highlight an element
-  const highlightElement = useCallback((element: Element | null) => {
-    if (!iframe || !iframe.contentDocument) return;
+    const metadata: ElementTarget['metadata'] = {
+      tagName: element.tagName.toLowerCase(),
+      text: element.textContent?.trim().substring(0, 100) || '',
+      elementType: element.getAttribute('type') || 'element',
+      attributes: {},
+    };
     
-    // Remove existing highlights
-    const existingHighlights = iframe.contentDocument.querySelectorAll('.element-highlight');
-    existingHighlights.forEach(highlight => {
-      highlight.remove();
+    // Get important attributes
+    const attributesToCapture = ['class', 'href', 'src', 'alt', 'title', 'role', 'aria-label', 'name', 'placeholder'];
+    attributesToCapture.forEach(attr => {
+      const value = element.getAttribute(attr);
+      if (value) {
+        metadata.attributes = metadata.attributes || {};
+        metadata.attributes[attr] = value;
+      }
     });
     
-    if (!element) return;
-    
-    try {
-      // Get element's position
-      const position = getElementPosition(element);
-      if (!position) return;
-      
-      // Create highlight element
-      const highlight = iframe.contentDocument.createElement('div');
-      highlight.className = 'element-highlight';
-      highlight.style.position = 'absolute';
-      highlight.style.left = `${position.x}%`;
-      highlight.style.top = `${position.y}%`;
-      highlight.style.width = position.width ? `${position.width}%` : '10px';
-      highlight.style.height = position.height ? `${position.height}%` : '10px';
-      highlight.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
-      highlight.style.border = '2px solid rgb(59, 130, 246)';
-      highlight.style.borderRadius = '4px';
-      highlight.style.pointerEvents = 'none';
-      highlight.style.zIndex = '9999';
-      highlight.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.5)';
-      
-      // Add to the document
-      iframe.contentDocument.body.appendChild(highlight);
-    } catch (error) {
-      console.error('Error highlighting element:', error);
+    // Try to generate a display name
+    if (element.tagName === 'BUTTON' || element.tagName === 'A' || element.tagName === 'INPUT') {
+      const label = element.getAttribute('aria-label') || 
+                   element.getAttribute('title') || 
+                   element.getAttribute('alt') ||
+                   element.getAttribute('placeholder') ||
+                   element.textContent?.trim();
+      if (label) {
+        metadata.displayName = label.substring(0, 30);
+      }
+    } else if (element.tagName === 'IMG') {
+      metadata.displayName = element.getAttribute('alt') || 'Image';
+    } else if (metadata.text) {
+      metadata.displayName = metadata.text.substring(0, 30);
     }
-  }, [iframe]);
-  
-  // Function to calculate element position relative to iframe
-  const getElementPosition = useCallback((element: Element): ElementPosition | null => {
-    if (!iframe || !iframe.contentDocument || !element) return null;
     
+    return metadata;
+  }, []);
+  
+  // Generate complete element target information
+  const generateElementTarget = useCallback((element: Element): ElementTarget => {
+    return {
+      selector: generateSelector(element),
+      xpath: generateXPath(element),
+      metadata: extractElementMetadata(element)
+    };
+  }, [generateSelector, generateXPath, extractElementMetadata]);
+  
+  // Find element position relative to the iframe
+  const getElementPosition = useCallback((element: Element) => {
     try {
-      const rect = (element as HTMLElement).getBoundingClientRect();
+      const iframe = getIframe();
+      if (!iframe || !iframe.contentDocument) return null;
+      
+      const rect = element.getBoundingClientRect();
       const iframeRect = iframe.getBoundingClientRect();
       
-      // Calculate element position as percentage of iframe dimensions
-      const x = (rect.left / iframeRect.width) * 100;
-      const y = (rect.top / iframeRect.height) * 100;
+      // Calculate the position as percentage of iframe dimensions
+      const x = ((rect.left + (rect.width / 2) - iframeRect.left + iframe.contentWindow!.scrollX) / iframeRect.width) * 100;
+      const y = ((rect.top + (rect.height / 2) - iframeRect.top + iframe.contentWindow!.scrollY) / iframeRect.height) * 100;
       const width = (rect.width / iframeRect.width) * 100;
       const height = (rect.height / iframeRect.height) * 100;
       
@@ -113,52 +187,254 @@ export const useElementTargeting = (options: ElementTargetingOptions = {}) => {
       console.error('Error getting element position:', error);
       return null;
     }
-  }, [iframe]);
+  }, [getIframe]);
   
-  // Function to find an element by target data
-  const findElementByTarget = useCallback((target: ElementTarget): Element | null => {
-    if (!iframe || !iframe.contentDocument) return null;
-    
+  // Highlight an element in the iframe
+  const highlightElement = useCallback((element: Element | null) => {
     try {
-      // Try to find by selector first
-      if (target.selector) {
-        const element = iframe.contentDocument.querySelector(target.selector);
-        if (element) return element;
+      const iframe = getIframe();
+      if (!iframe) {
+        console.log("No iframe found for highlighting");
+        return;
+      }
+
+      // Remove existing highlight
+      if (!element) {
+        if (highlightRef.current && highlightRef.current.parentElement) {
+          highlightRef.current.style.display = 'none';
+        }
+        return;
       }
       
-      // Try to find by XPath
-      if (target.xpath) {
-        const result = iframe.contentDocument.evaluate(
-          target.xpath,
-          iframe.contentDocument,
-          null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
-          null
-        );
-        if (result.singleNodeValue) return result.singleNodeValue as Element;
+      console.log("Highlighting element:", element.tagName);
+      
+      const position = getElementPosition(element);
+      if (!position) {
+        console.log("Could not get element position");
+        return;
       }
       
-      // Fallback to more complex search by metadata if available
-      if (target.metadata) {
-        // Implementation for finding by metadata would go here
-        // This is a simplified version
-        const elements = iframe.contentDocument.querySelectorAll(target.metadata.tagName || '*');
-        for (const element of elements) {
-          // Check for matching text content
-          if (target.metadata.text && element.textContent?.includes(target.metadata.text)) {
+      // Create highlight element if it doesn't exist
+      if (!highlightRef.current) {
+        highlightRef.current = document.createElement('div');
+        highlightRef.current.className = 'element-highlight';
+        highlightRef.current.style.position = 'absolute';
+        highlightRef.current.style.pointerEvents = 'none';
+        highlightRef.current.style.border = '3px solid #3b82f6';
+        highlightRef.current.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+        highlightRef.current.style.zIndex = '99999';
+        highlightRef.current.style.transition = 'all 0.15s ease-out';
+        highlightRef.current.style.borderRadius = '3px';
+        highlightRef.current.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.5)';
+        
+        // Add to appropriate container (preview container)
+        const previewContainer = iframe.closest('.sp-preview');
+        if (previewContainer) {
+          previewContainer.style.position = 'relative';
+          previewContainer.appendChild(highlightRef.current);
+        } else {
+          iframe.parentElement?.appendChild(highlightRef.current);
+        }
+      }
+      
+      const highlight = highlightRef.current;
+      highlight.style.display = 'block';
+      
+      // Position based on the iframe's position
+      const iframeRect = iframe.getBoundingClientRect();
+      highlight.style.left = `${iframeRect.left + window.scrollX + (position.x - position.width/2) * iframeRect.width / 100}px`;
+      highlight.style.top = `${iframeRect.top + window.scrollY + (position.y - position.height/2) * iframeRect.height / 100}px`;
+      highlight.style.width = `${position.width * iframeRect.width / 100}px`;
+      highlight.style.height = `${position.height * iframeRect.height / 100}px`;
+      
+      // Add tag indicator as a pseudo-element via a data attribute
+      const tagName = element.tagName.toLowerCase();
+      highlight.setAttribute('data-element', tagName);
+      
+      // Add attention-getting animation
+      highlight.animate([
+        { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 0 rgba(59, 130, 246, 0.3)' },
+        { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 10px rgba(59, 130, 246, 0.6)' },
+        { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 0 rgba(59, 130, 246, 0.3)' }
+      ], {
+        duration: 1200,
+        iterations: 2
+      });
+    } catch (error) {
+      console.error('Error highlighting element:', error);
+    }
+  }, [getIframe, getElementPosition]);
+  
+  // Start element selection mode
+  const startElementSelection = useCallback(() => {
+    console.log("Starting element selection mode");
+    setIsSelectingElement(true);
+    
+    const iframe = getIframe();
+    if (!iframe || !iframe.contentDocument) {
+      console.log("No iframe found for element selection");
+      return () => {};
+    }
+    
+    // Set cursor to indicate element selection mode
+    // Fix: Check if iframe is HTMLIFrameElement before accessing style
+    if (iframe instanceof HTMLIFrameElement && iframe.style) {
+      iframe.style.cursor = 'crosshair';
+    }
+    
+    // Add mouseover event to highlight elements
+    const handleMouseOver = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
+      
+      console.log("Mouse over element:", target.tagName);
+      highlightElement(target);
+    };
+    
+    // Add click event to select an element
+    const handleClick = (event: MouseEvent) => {
+      if (!isSelectingElement) return;
+      
+      event.preventDefault();
+      event.stopPropagation();
+      
+      const target = event.target as Element;
+      if (target && target.nodeType === Node.ELEMENT_NODE) {
+        console.log("Selected element:", target.tagName);
+        setTargetedElement(target);
+        const target_info = generateElementTarget(target);
+        setElementTarget(target_info);
+        
+        // Keep highlighting the selected element
+        highlightElement(target);
+      }
+    };
+    
+    // Handle mouse movement to track hovered elements
+    const handleMouseMove = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
+      
+      // Only update if different from current highlight to avoid flickering
+      if (targetedElement !== target) {
+        highlightElement(target);
+      }
+    };
+    
+    // Setup keyboard navigation for element selection
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isSelectingElement) return;
+      
+      if (event.key === 'Escape') {
+        // Cancel element selection on Escape
+        event.preventDefault();
+        setIsSelectingElement(false);
+        // Fix: Check if iframe is HTMLIFrameElement before accessing style
+        if (iframe instanceof HTMLIFrameElement && iframe.style) {
+          iframe.style.cursor = '';
+        }
+        highlightElement(null);
+        setTargetedElement(null);
+        setElementTarget(null);
+      }
+    };
+    
+    // Attach all event listeners
+    iframe.contentDocument.addEventListener('mouseover', handleMouseOver);
+    iframe.contentDocument.addEventListener('mousemove', handleMouseMove);
+    iframe.contentDocument.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      if (iframe.contentDocument) {
+        iframe.contentDocument.removeEventListener('mouseover', handleMouseOver);
+        iframe.contentDocument.removeEventListener('mousemove', handleMouseMove);
+        iframe.contentDocument.removeEventListener('click', handleClick);
+      }
+      document.removeEventListener('keydown', handleKeyDown);
+      // Fix: Check if iframe is HTMLIFrameElement before accessing style
+      if (iframe instanceof HTMLIFrameElement && iframe.style) {
+        iframe.style.cursor = '';
+      }
+    };
+  }, [isSelectingElement, highlightElement, generateElementTarget, getIframe, targetedElement]);
+  
+  // Cancel element selection mode
+  const cancelElementSelection = useCallback(() => {
+    const iframe = getIframe();
+    // Fix: Check if iframe is HTMLIFrameElement before accessing style
+    if (iframe instanceof HTMLIFrameElement && iframe.style) {
+      iframe.style.cursor = '';
+    }
+    setIsSelectingElement(false);
+    highlightElement(null);
+    setTargetedElement(null);
+    setElementTarget(null);
+  }, [getIframe, highlightElement]);
+  
+  // Find an element using stored target information
+  const findElementByTarget = useCallback((elementTarget: ElementTarget) => {
+    try {
+      const iframe = getIframe();
+      if (!iframe || !iframe.contentDocument) return null;
+      
+      let element: Element | null = null;
+      
+      // Try CSS selector first
+      if (elementTarget.selector) {
+        try {
+          element = iframe.contentDocument.querySelector(elementTarget.selector);
+          if (element) return element;
+        } catch (e) {
+          console.warn('Selector evaluation failed:', e);
+        }
+      }
+      
+      // Try XPath as fallback
+      if (elementTarget.xpath) {
+        try {
+          const xpathResult = iframe.contentDocument.evaluate(
+            elementTarget.xpath,
+            iframe.contentDocument,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          );
+          
+          element = xpathResult.singleNodeValue as Element;
+          if (element) return element;
+        } catch (e) {
+          console.warn('XPath evaluation failed:', e);
+        }
+      }
+      
+      // Try metadata as a last resort
+      if (elementTarget.metadata) {
+        const { tagName, attributes } = elementTarget.metadata;
+        
+        if (tagName && attributes && attributes.id) {
+          element = iframe.contentDocument.getElementById(attributes.id);
+          if (element && element.tagName.toLowerCase() === tagName.toLowerCase()) {
             return element;
           }
+        }
+        
+        // Try to find by a combination of tag, class, and text content
+        if (tagName && attributes && attributes.class) {
+          const potentialElements = Array.from(
+            iframe.contentDocument.querySelectorAll(`${tagName}.${attributes.class.split(' ')[0]}`)
+          );
           
-          // Check for matching attributes
-          if (target.metadata.attributes) {
-            let match = true;
-            for (const [key, value] of Object.entries(target.metadata.attributes)) {
-              if (element.getAttribute(key) !== value) {
-                match = false;
-                break;
-              }
-            }
-            if (match) return element;
+          if (potentialElements.length === 1) {
+            return potentialElements[0];
+          }
+          
+          // Filter by text content if available
+          if (elementTarget.metadata.text && potentialElements.length > 0) {
+            const element = potentialElements.find(el => 
+              el.textContent?.trim().includes(elementTarget.metadata!.text!.trim())
+            );
+            if (element) return element;
           }
         }
       }
@@ -168,259 +444,82 @@ export const useElementTargeting = (options: ElementTargetingOptions = {}) => {
       console.error('Error finding element by target:', error);
       return null;
     }
-  }, [iframe]);
+  }, [getIframe]);
   
-  // Function to generate element target data
-  const generateElementTarget = useCallback((element: Element): ElementTarget => {
-    let selector = '';
-    let xpath = '';
+  // Setup event listener for window resize to update highlights
+  useEffect(() => {
+    if (!enabled) return;
     
-    try {
-      // Generate CSS selector
-      selector = generateSelector(element);
-      
-      // Generate XPath
-      xpath = generateXPath(element);
-    } catch (error) {
-      console.error('Error generating element target:', error);
-    }
-    
-    // Extract element metadata
-    const metadata = {
-      tagName: element.tagName,
-      text: element.textContent?.trim().substring(0, 100) || '',
-      attributes: getElementAttributes(element),
-      elementType: getElementType(element)
+    const handleResize = () => {
+      if (targetedElement) {
+        highlightElement(targetedElement);
+      }
     };
     
-    return {
-      selector,
-      xpath,
-      metadata: safelyConvertElementMetadata(metadata)
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [enabled, targetedElement, highlightElement]);
+  
+  // Add mutation observer to handle DOM changes in the iframe
+  useEffect(() => {
+    if (!enabled || !targetedElement) return;
+    
+    const iframe = getIframe();
+    if (!iframe || !iframe.contentDocument) return;
+    
+    const observer = new MutationObserver(() => {
+      // Re-highlight the element after DOM changes
+      if (targetedElement) {
+        highlightElement(targetedElement);
+      }
+    });
+    
+    observer.observe(iframe.contentDocument, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [enabled, targetedElement, getIframe, highlightElement]);
+  
+  // Start element selection when enabled
+  useEffect(() => {
+    if (enabled) {
+      console.log("Element targeting enabled, starting selection mode");
+      const cleanup = startElementSelection();
+      return cleanup;
+    } else {
+      console.log("Element targeting disabled");
+      cancelElementSelection();
+    }
+  }, [enabled, startElementSelection, cancelElementSelection]);
+  
+  // Clean up highlight on unmount
+  useEffect(() => {
+    return () => {
+      console.log("Cleaning up element targeting");
+      if (highlightRef.current && highlightRef.current.parentElement) {
+        highlightRef.current.parentElement.removeChild(highlightRef.current);
+        highlightRef.current = null;
+      }
     };
   }, []);
   
-  // Effect to auto-start if enabled
-  useEffect(() => {
-    if (options.enabled && iframe) {
-      start(iframe);
-    }
-    
-    return () => {
-      if (cleanupRef.current) {
-        cleanupRef.current();
-        cleanupRef.current = null;
-      }
-    };
-  }, [options.enabled, iframe, start]);
-  
   return {
-    isSelecting,
-    start,
-    cancel,
-    iframe,
     targetedElement,
     elementTarget,
-    isSelectingElement: isSelecting,
-    cancelElementSelection: cancel,
+    isSelectingElement,
+    startElementSelection,
+    cancelElementSelection,
+    generateElementTarget,
     getElementPosition,
     highlightElement,
-    findElementByTarget,
-    generateElementTarget
+    findElementByTarget
   };
-};
-
-// Helper function to generate a CSS selector for an element
-function generateSelector(element: Element): string {
-  try {
-    if (element.id) {
-      return `#${element.id}`;
-    }
-    
-    if (element.classList && element.classList.length) {
-      return `.${Array.from(element.classList).join('.')}`;
-    }
-    
-    // Fallback to tag name with nth-child
-    let path = element.tagName.toLowerCase();
-    let parent = element.parentElement;
-    let nthChild = 1;
-    
-    if (parent) {
-      const siblings = Array.from(parent.children);
-      const sameTagSiblings = siblings.filter(el => el.tagName === element.tagName);
-      
-      if (sameTagSiblings.length > 1) {
-        nthChild = siblings.indexOf(element) + 1;
-        path += `:nth-child(${nthChild})`;
-      }
-    }
-    
-    return path;
-  } catch (error) {
-    console.error('Error generating selector:', error);
-    return '';
-  }
 }
-
-// Helper function to generate an XPath for an element
-function generateXPath(element: Element): string {
-  try {
-    let path = '';
-    let current = element;
-    
-    while (current && current.nodeType === Node.ELEMENT_NODE) {
-      let index = 1;
-      let sibling = current.previousElementSibling;
-      
-      while (sibling) {
-        if (sibling.tagName === current.tagName) {
-          index++;
-        }
-        sibling = sibling.previousElementSibling;
-      }
-      
-      const tagName = current.tagName.toLowerCase();
-      const pathSegment = index > 1 ? `${tagName}[${index}]` : tagName;
-      
-      path = path.length > 0 ? `/${pathSegment}${path}` : pathSegment;
-      current = current.parentElement as Element;
-    }
-    
-    return `//${path}`;
-  } catch (error) {
-    console.error('Error generating XPath:', error);
-    return '';
-  }
-}
-
-// Helper function to get element attributes
-function getElementAttributes(element: Element): Record<string, string> {
-  const attributes: Record<string, string> = {};
-  
-  try {
-    Array.from(element.attributes).forEach(attr => {
-      attributes[attr.name] = attr.value;
-    });
-  } catch (error) {
-    console.error('Error getting element attributes:', error);
-  }
-  
-  return attributes;
-}
-
-// Helper function to determine element type
-function getElementType(element: Element): string {
-  const tagName = element.tagName.toLowerCase();
-  
-  // Common element types
-  switch (tagName) {
-    case 'a': return 'link';
-    case 'button': return 'button';
-    case 'input': {
-      const type = element.getAttribute('type');
-      if (type) return `input-${type}`;
-      return 'input';
-    }
-    case 'select': return 'select';
-    case 'textarea': return 'textarea';
-    case 'img': return 'image';
-    case 'video': return 'video';
-    case 'audio': return 'audio';
-    case 'form': return 'form';
-    case 'table': return 'table';
-    case 'div': {
-      // Try to infer semantic meaning from class or role
-      const role = element.getAttribute('role');
-      if (role) return role;
-      
-      // Check for common UI component patterns
-      const className = element.className;
-      if (typeof className === 'string') {
-        if (className.includes('card')) return 'card';
-        if (className.includes('button')) return 'button';
-        if (className.includes('container')) return 'container';
-      }
-      
-      return 'div';
-    }
-    default: return tagName;
-  }
-}
-
-// Element selection functionality
-export const startElementSelection = (iframe: HTMLIFrameElement | null, callback: (element: Element | null) => void) => {
-  if (!iframe) {
-    console.warn('No iframe provided for element selection');
-    return () => {};
-  }
-
-  const document = iframe.contentDocument;
-
-  if (!document) {
-    console.warn('Iframe content document is not available');
-    return () => {};
-  }
-
-  // Change the iframe pointer events to allow selection inside it
-  if (iframe && iframe instanceof HTMLElement) {
-    iframe.style.pointerEvents = 'none';
-  }
-
-  // Add a style for highlighting elements on hover
-  const styleElement = document.createElement('style');
-  styleElement.innerHTML = `
-    .element-hover-highlight {
-      outline: 2px dashed rgba(59, 130, 246, 0.5) !important;
-      outline-offset: 2px !important;
-      background-color: rgba(59, 130, 246, 0.1) !important;
-    }
-  `;
-  document.head.appendChild(styleElement);
-
-  let currentHighlighted: Element | null = null;
-
-  const handleMouseOver = (e: Event) => {
-    if (currentHighlighted) {
-      currentHighlighted.classList.remove('element-hover-highlight');
-    }
-    const target = e.target as Element;
-    currentHighlighted = target;
-    target.classList.add('element-hover-highlight');
-    callback(target);
-  };
-
-  const handleMouseOut = (e: Event) => {
-    const target = e.target as Element;
-    target.classList.remove('element-hover-highlight');
-  };
-
-  const handleClick = (e: Event) => {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
-    const target = e.target as Element;
-    callback(target);
-  };
-
-  document.addEventListener('mouseover', handleMouseOver, { capture: true });
-  document.addEventListener('mouseout', handleMouseOut, { capture: true });
-  document.addEventListener('click', handleClick, { capture: true });
-
-  return () => {
-    document.removeEventListener('mouseover', handleMouseOver, { capture: true });
-    document.removeEventListener('mouseout', handleMouseOut, { capture: true });
-    document.removeEventListener('click', handleClick, { capture: true });
-    document.head.removeChild(styleElement);
-    if (iframe && iframe instanceof HTMLElement) {
-      iframe.style.pointerEvents = 'auto';
-    }
-  };
-};
-
-export const cancelElementSelection = (iframe: HTMLIFrameElement | null) => {
-  // Reset the iframe pointer events
-  if (iframe && iframe instanceof HTMLElement) {
-    iframe.style.pointerEvents = 'auto';
-  }
-};
