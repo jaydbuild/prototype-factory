@@ -176,8 +176,8 @@ export function useElementTargeting({
       const iframeRect = iframe.getBoundingClientRect();
       
       // Calculate the position as percentage of iframe dimensions
-      const x = ((rect.left - iframeRect.left + iframe.contentWindow!.scrollX) / iframeRect.width) * 100;
-      const y = ((rect.top - iframeRect.top + iframe.contentWindow!.scrollY) / iframeRect.height) * 100;
+      const x = ((rect.left + (rect.width / 2) - iframeRect.left + iframe.contentWindow!.scrollX) / iframeRect.width) * 100;
+      const y = ((rect.top + (rect.height / 2) - iframeRect.top + iframe.contentWindow!.scrollY) / iframeRect.height) * 100;
       const width = (rect.width / iframeRect.width) * 100;
       const height = (rect.height / iframeRect.height) * 100;
       
@@ -219,8 +219,8 @@ export function useElementTargeting({
       
       const highlight = highlightRef.current;
       highlight.style.display = 'block';
-      highlight.style.left = `${position.x}%`;
-      highlight.style.top = `${position.y}%`;
+      highlight.style.left = `${position.x - (position.width / 2)}%`;
+      highlight.style.top = `${position.y - (position.height / 2)}%`;
       highlight.style.width = `${position.width}%`;
       highlight.style.height = `${position.height}%`;
       
@@ -260,7 +260,9 @@ export function useElementTargeting({
       
       event.stopPropagation();
       const target = event.target as Element;
-      highlightElement(target);
+      if (target && target.nodeType === Node.ELEMENT_NODE) {
+        highlightElement(target);
+      }
     };
     
     // Add click event to select an element
@@ -271,15 +273,14 @@ export function useElementTargeting({
       event.stopPropagation();
       
       const target = event.target as Element;
-      setTargetedElement(target);
-      const target_info = generateElementTarget(target);
-      setElementTarget(target_info);
-      
-      // Keep highlighting the selected element
-      highlightElement(target);
-      
-      // Don't exit selection mode automatically
-      // We now use a toggle button for this
+      if (target && target.nodeType === Node.ELEMENT_NODE) {
+        setTargetedElement(target);
+        const target_info = generateElementTarget(target);
+        setElementTarget(target_info);
+        
+        // Keep highlighting the selected element
+        highlightElement(target);
+      }
     };
     
     // Setup keyboard navigation for element selection
@@ -313,7 +314,7 @@ export function useElementTargeting({
         iframe.style.cursor = '';
       }
     };
-  }, [getIframe, isSelectingElement, highlightElement, generateElementTarget]);
+  }, [isSelectingElement, highlightElement, generateElementTarget, getIframe]);
   
   // Cancel element selection mode
   const cancelElementSelection = useCallback(() => {

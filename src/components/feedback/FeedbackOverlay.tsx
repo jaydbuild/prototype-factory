@@ -328,7 +328,7 @@ export function FeedbackOverlay({
             ? {
                 selector: data.element_selector,
                 xpath: data.element_xpath,
-                metadata: data.element_metadata && typeof data.element_metadata === 'object'
+                metadata: data.element_metadata && typeof data.element_metadata === 'object' && !Array.isArray(data.element_metadata)
                   ? {
                       tagName: typeof data.element_metadata.tagName === 'string' ? data.element_metadata.tagName : undefined,
                       text: typeof data.element_metadata.text === 'string' ? data.element_metadata.text : undefined,
@@ -413,7 +413,7 @@ export function FeedbackOverlay({
             ? {
                 selector: data.element_selector,
                 xpath: data.element_xpath,
-                metadata: data.element_metadata && typeof data.element_metadata === 'object'
+                metadata: data.element_metadata && typeof data.element_metadata === 'object' && !Array.isArray(data.element_metadata)
                   ? {
                       tagName: typeof data.element_metadata.tagName === 'string' ? data.element_metadata.tagName : undefined,
                       text: typeof data.element_metadata.text === 'string' ? data.element_metadata.text : undefined,
