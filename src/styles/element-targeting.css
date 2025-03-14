@@ -11,6 +11,26 @@
   box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
 }
 
+.element-highlight:before {
+  content: "Click to comment";
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #3b82f6;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.element-highlight:hover:before {
+  opacity: 1;
+}
+
 .sp-preview {
   position: relative !important;
 }
@@ -33,4 +53,8 @@
 
 .animate-pulse-once {
   animation: pulse-once 2s;
+}
+
+.sp-preview[data-feedback-mode="true"] iframe {
+  cursor: crosshair !important;
 }

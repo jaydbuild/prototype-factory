@@ -321,7 +321,7 @@ export function useElementTargeting({
     // Fix TypeScript error by checking if iframe is an HTMLIFrameElement before accessing style
     if (iframe instanceof HTMLIFrameElement) {
       console.log("Setting cursor to crosshair");
-      iframe.style.cursor = 'crosshair';
+      iframe.style.cursor = 'pointer';
     }
     
     const handleMouseOver = (event: MouseEvent) => {
@@ -346,6 +346,9 @@ export function useElementTargeting({
         setElementTarget(target_info);
         
         highlightElement(target);
+        
+        // We're now just selecting the element, not immediately creating a comment
+        // The FeedbackOverlay component will handle showing the comment form
       }
     };
     
