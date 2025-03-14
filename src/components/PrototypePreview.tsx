@@ -65,7 +65,7 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
       
       // Try a few times with increasing delays
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 10; // Increased from 5 to 10
       
       const attemptAccess = () => {
         if (attempts >= maxAttempts) {
@@ -80,7 +80,22 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
       };
       
       // Start checking after a short delay
-      setTimeout(attemptAccess, 500);
+      setTimeout(attemptAccess, 300);
+      
+      // Listen for iframe load event
+      const handleIframeLoad = () => {
+        console.log('PrototypePreview: iframe has loaded, checking content access');
+        checkAccess();
+      };
+      
+      if (iframeRef.current) {
+        iframeRef.current.addEventListener('load', handleIframeLoad);
+        return () => {
+          if (iframeRef.current) {
+            iframeRef.current.removeEventListener('load', handleIframeLoad);
+          }
+        };
+      }
     }
   }, [isFeedbackMode]);
 
@@ -93,6 +108,9 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   }
 
   // Construct sandbox permissions with proper navigation permissions
+  // Critical permissions for element targeting:
+  // - allow-same-origin: Required to access iframe contentDocument
+  // - allow-scripts: Required for JS execution in the iframe
   const defaultPermissions = [
     'allow-scripts', 
     'allow-same-origin', 
@@ -101,20 +119,29 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     'allow-top-navigation-by-user-activation'
   ];
   
+  // Ensure we always include critical permissions
   const sandboxPermissions = sandboxConfig?.permissions?.length 
-    ? [...sandboxConfig.permissions, 'allow-top-navigation-by-user-activation'].join(' ')
-    : defaultPermissions.join(' ');
+    ? [...new Set([...sandboxConfig.permissions, 'allow-same-origin', 'allow-scripts'])]
+    : defaultPermissions;
+  
+  const sandboxAttr = sandboxPermissions.join(' ');
 
-  console.log('PrototypePreview: Rendering with sandbox permissions:', sandboxPermissions);
+  console.log('PrototypePreview: Rendering with sandbox permissions:', sandboxAttr);
   console.log('PrototypePreview: Feedback mode:', isFeedbackMode);
+  
+  // Create a custom URL if needed to address cross-origin issues
+  const iframeSrc = deploymentUrl;
 
   return (
-    <div className={`relative w-full h-full ${className} ${isFeedbackMode ? 'sp-preview' : ''}`}>
+    <div 
+      className={`relative w-full h-full ${className} ${isFeedbackMode ? 'sp-preview' : ''}`}
+      id="prototype-preview-container"
+    >
       <iframe
         ref={iframeRef}
-        src={deploymentUrl}
+        src={iframeSrc}
         className="w-full h-full border-0"
-        sandbox={sandboxPermissions}
+        sandbox={sandboxAttr}
         allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"
         loading="lazy"
         data-feedback-mode={isFeedbackMode ? 'true' : 'false'}

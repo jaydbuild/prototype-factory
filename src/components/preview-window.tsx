@@ -37,21 +37,56 @@ export function PreviewWindow({ deploymentId, isFeedbackMode = false }: PreviewW
     };
   }, [deploymentId, isFeedbackMode]);
 
-  // Debug logging
+  // Enhanced debug logging
   useEffect(() => {
     if (isFeedbackMode) {
       console.log('PreviewWindow: Feedback mode enabled, checking iframe access');
-      setTimeout(() => {
+      
+      const checkIframeAccess = () => {
         try {
           if (iframeRef.current && iframeRef.current.contentDocument) {
             console.log('PreviewWindow: Successfully accessed iframe contentDocument');
+            return true;
           } else {
-            console.warn('PreviewWindow: Cannot access iframe contentDocument - possible security restriction');
+            console.warn('PreviewWindow: Cannot access iframe contentDocument yet');
+            return false;
           }
         } catch (e) {
           console.error('PreviewWindow: Error accessing iframe contentDocument:', e);
+          return false;
         }
-      }, 1000);
+      };
+      
+      // Try multiple times with increasing delays
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      const attemptAccess = () => {
+        if (attempts >= maxAttempts) {
+          console.error('PreviewWindow: Max attempts reached, cannot access iframe content');
+          return;
+        }
+        
+        if (!checkIframeAccess()) {
+          attempts++;
+          setTimeout(attemptAccess, 500 * attempts);
+        }
+      };
+      
+      // Wait for iframe to load before checking
+      const handleIframeLoad = () => {
+        console.log('PreviewWindow: iframe loaded, checking content access');
+        setTimeout(attemptAccess, 100);
+      };
+      
+      if (iframeRef.current) {
+        iframeRef.current.addEventListener('load', handleIframeLoad);
+        return () => {
+          if (iframeRef.current) {
+            iframeRef.current.removeEventListener('load', handleIframeLoad);
+          }
+        };
+      }
     }
   }, [isFeedbackMode]);
 

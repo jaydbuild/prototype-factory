@@ -1,3 +1,4 @@
+
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { ElementTarget } from '@/types/feedback';
 import { useIframeStability } from './use-iframe-stability';
@@ -317,7 +318,8 @@ export function useElementTargeting({
     
     iframeContentRef.current = contentDocument;
     
-    if (iframe instanceof HTMLIFrameElement && iframe.style) {
+    // Fix TypeScript error by checking if iframe is an HTMLIFrameElement before accessing style
+    if (iframe instanceof HTMLIFrameElement) {
       console.log("Setting cursor to crosshair");
       iframe.style.cursor = 'crosshair';
     }
@@ -362,7 +364,7 @@ export function useElementTargeting({
       if (event.key === 'Escape') {
         event.preventDefault();
         setIsSelectingElement(false);
-        if (iframe instanceof HTMLIFrameElement && iframe.style) {
+        if (iframe instanceof HTMLIFrameElement) {
           iframe.style.cursor = '';
         }
         highlightElement(null);
@@ -386,7 +388,7 @@ export function useElementTargeting({
         contentDocument.removeEventListener('click', handleClick);
       }
       document.removeEventListener('keydown', handleKeyDown);
-      if (iframe instanceof HTMLIFrameElement && iframe.style) {
+      if (iframe instanceof HTMLIFrameElement) {
         iframe.style.cursor = '';
       }
     };
@@ -395,7 +397,7 @@ export function useElementTargeting({
   const cancelElementSelection = useCallback(() => {
     console.log("Canceling element selection mode");
     const iframe = getIframeElement();
-    if (iframe instanceof HTMLIFrameElement && iframe.style) {
+    if (iframe instanceof HTMLIFrameElement) {
       iframe.style.cursor = '';
     }
     setIsSelectingElement(false);
