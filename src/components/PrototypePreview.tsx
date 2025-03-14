@@ -7,9 +7,6 @@ interface PrototypePreviewProps {
     permissions: string[];
   };
   className?: string;
-  filesUrl?: string;
-  onDownload?: () => void;
-  onShare?: () => void;
   isFeedbackMode?: boolean;
 }
 
@@ -17,13 +14,10 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   deploymentUrl,
   sandboxConfig,
   className = '',
-  filesUrl,
-  onDownload,
-  onShare,
   isFeedbackMode = false
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  
+
   useEffect(() => {
     console.log('PrototypePreview: Component mounted with feedback mode:', isFeedbackMode);
     
@@ -65,7 +59,7 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
       
       // Try a few times with increasing delays
       let attempts = 0;
-      const maxAttempts = 10; // Increased from 5 to 10
+      const maxAttempts = 15; // Increased for more attempts
       
       const attemptAccess = () => {
         if (attempts >= maxAttempts) {
@@ -107,7 +101,6 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     );
   }
 
-  // Construct sandbox permissions with proper navigation permissions
   // Critical permissions for element targeting:
   // - allow-same-origin: Required to access iframe contentDocument
   // - allow-scripts: Required for JS execution in the iframe
@@ -128,18 +121,16 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
 
   console.log('PrototypePreview: Rendering with sandbox permissions:', sandboxAttr);
   console.log('PrototypePreview: Feedback mode:', isFeedbackMode);
-  
-  // Create a custom URL if needed to address cross-origin issues
-  const iframeSrc = deploymentUrl;
 
   return (
     <div 
       className={`relative w-full h-full ${className} ${isFeedbackMode ? 'sp-preview' : ''}`}
+      data-feedback-mode={isFeedbackMode ? 'true' : 'false'}
       id="prototype-preview-container"
     >
       <iframe
         ref={iframeRef}
-        src={iframeSrc}
+        src={deploymentUrl}
         className="w-full h-full border-0"
         sandbox={sandboxAttr}
         allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"

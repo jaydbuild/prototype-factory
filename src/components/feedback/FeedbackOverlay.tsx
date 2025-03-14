@@ -97,7 +97,8 @@ export function FeedbackOverlay({
     getElementPosition,
     highlightElement,
     findElementByTarget,
-    generateElementTarget
+    generateElementTarget,
+    setTargetedElement
   } = useElementTargeting({
     enabled: isFeedbackMode && isIframeReady
   });

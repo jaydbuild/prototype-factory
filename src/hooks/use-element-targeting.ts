@@ -318,10 +318,10 @@ export function useElementTargeting({
     
     iframeContentRef.current = contentDocument;
     
-    // Fix TypeScript error by checking if iframe is an HTMLIFrameElement before accessing style
+    // Fix: Check if iframe is HTMLIFrameElement before accessing style
     if (iframe instanceof HTMLIFrameElement) {
       console.log("Setting cursor to crosshair");
-      iframe.style.cursor = 'pointer';
+      iframe.style.cursor = 'crosshair';
     }
     
     const handleMouseOver = (event: MouseEvent) => {
@@ -346,9 +346,6 @@ export function useElementTargeting({
         setElementTarget(target_info);
         
         highlightElement(target);
-        
-        // We're now just selecting the element, not immediately creating a comment
-        // The FeedbackOverlay component will handle showing the comment form
       }
     };
     
@@ -367,9 +364,12 @@ export function useElementTargeting({
       if (event.key === 'Escape') {
         event.preventDefault();
         setIsSelectingElement(false);
+        
+        // Fix: Check if iframe is HTMLIFrameElement before accessing style
         if (iframe instanceof HTMLIFrameElement) {
           iframe.style.cursor = '';
         }
+        
         highlightElement(null);
         setTargetedElement(null);
         setElementTarget(null);
@@ -391,6 +391,8 @@ export function useElementTargeting({
         contentDocument.removeEventListener('click', handleClick);
       }
       document.removeEventListener('keydown', handleKeyDown);
+      
+      // Fix: Check if iframe is HTMLIFrameElement before accessing style
       if (iframe instanceof HTMLIFrameElement) {
         iframe.style.cursor = '';
       }
@@ -400,9 +402,12 @@ export function useElementTargeting({
   const cancelElementSelection = useCallback(() => {
     console.log("Canceling element selection mode");
     const iframe = getIframeElement();
+    
+    // Fix: Check if iframe is HTMLIFrameElement before accessing style
     if (iframe instanceof HTMLIFrameElement) {
       iframe.style.cursor = '';
     }
+    
     setIsSelectingElement(false);
     highlightElement(null);
     setTargetedElement(null);
@@ -573,6 +578,7 @@ export function useElementTargeting({
     getElementPosition,
     highlightElement,
     findElementByTarget,
-    isIframeReady
+    isIframeReady,
+    setTargetedElement
   };
 }

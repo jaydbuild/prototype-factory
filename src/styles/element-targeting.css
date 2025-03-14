@@ -23,12 +23,7 @@
   border-radius: 3px;
   font-size: 10px;
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s ease-out;
-}
-
-.element-highlight:hover:before {
-  opacity: 1;
+  opacity: 1; /* Always show the tooltip */
 }
 
 .sp-preview {
