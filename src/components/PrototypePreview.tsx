@@ -42,6 +42,48 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     };
   }, [deploymentUrl]);
 
+  // Debug iframe access
+  useEffect(() => {
+    if (isFeedbackMode) {
+      console.log('PrototypePreview: Feedback mode enabled, checking iframe access');
+      
+      // Check iframe access after the iframe has had time to load
+      const checkAccess = () => {
+        try {
+          if (iframeRef.current && iframeRef.current.contentDocument) {
+            console.log('PrototypePreview: Successfully accessed iframe contentDocument');
+            return true;
+          } else {
+            console.warn('PrototypePreview: Cannot access iframe contentDocument yet');
+            return false;
+          }
+        } catch (e) {
+          console.error('PrototypePreview: Error accessing iframe contentDocument:', e);
+          return false;
+        }
+      };
+      
+      // Try a few times with increasing delays
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const attemptAccess = () => {
+        if (attempts >= maxAttempts) {
+          console.error('PrototypePreview: Max attempts reached, cannot access iframe content');
+          return;
+        }
+        
+        if (!checkAccess()) {
+          attempts++;
+          setTimeout(attemptAccess, 500 * attempts);
+        }
+      };
+      
+      // Start checking after a short delay
+      setTimeout(attemptAccess, 500);
+    }
+  }, [isFeedbackMode]);
+
   if (!deploymentUrl) {
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>

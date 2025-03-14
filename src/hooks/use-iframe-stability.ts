@@ -21,6 +21,7 @@ export function useIframeStability({
   const retryCountRef = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const onReadyCalledRef = useRef(false);
 
   // Get iframe element - memoized to avoid recreating
   const getIframeElement = useCallback(() => {
@@ -58,7 +59,7 @@ export function useIframeStability({
     return null;
   }, [containerSelector]);
 
-  // Check if iframe is ready with dimensions
+  // Check if iframe is ready with dimensions and accessible content
   const checkIframeReady = useCallback(() => {
     // Clear any existing timer
     if (timerRef.current) {
@@ -87,11 +88,16 @@ export function useIframeStability({
             console.warn('useIframeStability: contentDocument not accessible', e);
           }
           
+          // Even if we can't access the contentDocument (due to cross-origin),
+          // we'll still consider the iframe ready if it has dimensions
           setIsIframeReady(true);
-          if (onReady) {
+          
+          if (onReady && !onReadyCalledRef.current) {
             console.log('useIframeStability: calling onReady callback');
             onReady();
+            onReadyCalledRef.current = true;
           }
+          
           retryCountRef.current = 0;
           return;
         } else {
@@ -125,6 +131,7 @@ export function useIframeStability({
     console.log('useIframeStability: manual refresh triggered');
     retryCountRef.current = 0;
     iframeRef.current = null; // Force re-query of iframe
+    onReadyCalledRef.current = false; // Reset onReady called state
     setIsIframeReady(false);
     checkIframeReady();
   }, [checkIframeReady]);
@@ -188,9 +195,10 @@ export function useIframeStability({
       console.log('useIframeStability: iframe load event fired');
       if (isMountedRef.current) {
         setIsIframeReady(true);
-        if (onReady) {
+        if (onReady && !onReadyCalledRef.current) {
           console.log('useIframeStability: calling onReady from load event');
           onReady();
+          onReadyCalledRef.current = true;
         }
       }
     };

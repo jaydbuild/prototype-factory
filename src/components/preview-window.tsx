@@ -37,6 +37,24 @@ export function PreviewWindow({ deploymentId, isFeedbackMode = false }: PreviewW
     };
   }, [deploymentId, isFeedbackMode]);
 
+  // Debug logging
+  useEffect(() => {
+    if (isFeedbackMode) {
+      console.log('PreviewWindow: Feedback mode enabled, checking iframe access');
+      setTimeout(() => {
+        try {
+          if (iframeRef.current && iframeRef.current.contentDocument) {
+            console.log('PreviewWindow: Successfully accessed iframe contentDocument');
+          } else {
+            console.warn('PreviewWindow: Cannot access iframe contentDocument - possible security restriction');
+          }
+        } catch (e) {
+          console.error('PreviewWindow: Error accessing iframe contentDocument:', e);
+        }
+      }, 1000);
+    }
+  }, [isFeedbackMode]);
+
   return (
     <div className={`relative h-[calc(100vh-4rem)] w-full overflow-hidden rounded-lg border ${isFeedbackMode ? 'sp-preview' : ''}`}>
       {isLoading && (

@@ -34,6 +34,24 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     };
   }, [deploymentUrl]);
 
+  // Debug logging
+  useEffect(() => {
+    if (isFeedbackMode) {
+      console.log('PrototypePreview (components): Feedback mode enabled, checking iframe access');
+      setTimeout(() => {
+        try {
+          if (iframeRef.current && iframeRef.current.contentDocument) {
+            console.log('PrototypePreview: Successfully accessed iframe contentDocument');
+          } else {
+            console.warn('PrototypePreview: Cannot access iframe contentDocument - possible security restriction');
+          }
+        } catch (e) {
+          console.error('PrototypePreview: Error accessing iframe contentDocument:', e);
+        }
+      }, 1000);
+    }
+  }, [isFeedbackMode]);
+
   if (!deploymentUrl) {
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>
@@ -45,7 +63,7 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   // Construct sandbox permissions with proper navigation permissions
   const defaultPermissions = [
     'allow-scripts',
-    'allow-same-origin',
+    'allow-same-origin', 
     'allow-forms',
     'allow-popups',
     'allow-top-navigation-by-user-activation'
