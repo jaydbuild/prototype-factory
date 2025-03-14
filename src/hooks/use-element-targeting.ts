@@ -1,6 +1,6 @@
-
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { ElementTarget } from '@/types/feedback';
+import { useIframeStability } from './use-iframe-stability';
 
 interface UseElementTargetingOptions {
   iframeSelector?: string;
@@ -15,36 +15,34 @@ export function useElementTargeting({
   const [elementTarget, setElementTarget] = useState<ElementTarget | null>(null);
   const [isSelectingElement, setIsSelectingElement] = useState(false);
   const highlightRef = useRef<HTMLDivElement | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const eventAttachedRef = useRef(false);
+  const iframeContentRef = useRef<Document | null>(null);
   
-  // Get the iframe element
-  const getIframe = useCallback(() => {
-    if (iframeRef.current) return iframeRef.current;
-    
-    const iframe = document.querySelector(iframeSelector) as HTMLIFrameElement;
-    if (iframe) {
-      iframeRef.current = iframe;
-      return iframe;
+  const { 
+    isIframeReady, 
+    getIframeElement, 
+    refreshCheck 
+  } = useIframeStability({
+    containerSelector: iframeSelector.split(' ')[0],
+    readyCheckInterval: 300,
+    maxRetries: 40,
+    onReady: () => {
+      console.log('useElementTargeting: iframe is ready via stability hook');
+      setupEventListeners();
     }
-    
-    return null;
-  }, [iframeSelector]);
+  });
   
-  // Generate a unique CSS selector for an element
   const generateSelector = useCallback((element: Element): string => {
     if (!element || !element.tagName) return '';
     
-    // Try using ID first
     if (element.id) {
       return `#${element.id}`;
     }
     
-    // Try using unique classes
     if (element.classList && element.classList.length > 0) {
       const classSelector = Array.from(element.classList).map(c => `.${c}`).join('');
-      // Check if this class combo is unique
       try {
-        const iframe = getIframe();
+        const iframe = getIframeElement();
         if (iframe && iframe.contentDocument) {
           const matches = iframe.contentDocument.querySelectorAll(classSelector);
           if (matches.length === 1) {
@@ -56,11 +54,10 @@ export function useElementTargeting({
       }
     }
     
-    // Use tag name with parent context
     let currentElem = element;
     let selector = element.tagName.toLowerCase();
     let iterations = 0;
-    const maxIterations = 4; // Limit to prevent very long selectors
+    const maxIterations = 4;
     
     while (currentElem.parentElement && iterations < maxIterations) {
       const parent = currentElem.parentElement;
@@ -73,7 +70,6 @@ export function useElementTargeting({
         selector = `${currentElem.tagName.toLowerCase()}:nth-child(${index + 1})`;
       }
       
-      // Add parent tag
       if (parent.tagName !== 'BODY' && parent.tagName !== 'HTML') {
         selector = `${parent.tagName.toLowerCase()} > ${selector}`;
         currentElem = parent;
@@ -85,9 +81,8 @@ export function useElementTargeting({
     }
     
     return selector;
-  }, [getIframe]);
+  }, [getIframeElement]);
   
-  // Generate an XPath for an element
   const generateXPath = useCallback((element: Element): string => {
     if (!element) return '';
     
@@ -118,7 +113,6 @@ export function useElementTargeting({
     return xpath || '/';
   }, []);
   
-  // Extract metadata from an element
   const extractElementMetadata = useCallback((element: Element) => {
     if (!element) return null;
     
@@ -129,7 +123,6 @@ export function useElementTargeting({
       attributes: {},
     };
     
-    // Get important attributes
     const attributesToCapture = ['class', 'href', 'src', 'alt', 'title', 'role', 'aria-label', 'name', 'placeholder'];
     attributesToCapture.forEach(attr => {
       const value = element.getAttribute(attr);
@@ -139,7 +132,6 @@ export function useElementTargeting({
       }
     });
     
-    // Try to generate a display name
     if (element.tagName === 'BUTTON' || element.tagName === 'A' || element.tagName === 'INPUT') {
       const label = element.getAttribute('aria-label') || 
                    element.getAttribute('title') || 
@@ -158,7 +150,6 @@ export function useElementTargeting({
     return metadata;
   }, []);
   
-  // Generate complete element target information
   const generateElementTarget = useCallback((element: Element): ElementTarget => {
     return {
       selector: generateSelector(element),
@@ -167,16 +158,14 @@ export function useElementTargeting({
     };
   }, [generateSelector, generateXPath, extractElementMetadata]);
   
-  // Find element position relative to the iframe
   const getElementPosition = useCallback((element: Element) => {
     try {
-      const iframe = getIframe();
+      const iframe = getIframeElement();
       if (!iframe || !iframe.contentDocument) return null;
       
       const rect = element.getBoundingClientRect();
       const iframeRect = iframe.getBoundingClientRect();
       
-      // Calculate the position as percentage of iframe dimensions
       const x = ((rect.left + (rect.width / 2) - iframeRect.left + iframe.contentWindow!.scrollX) / iframeRect.width) * 100;
       const y = ((rect.top + (rect.height / 2) - iframeRect.top + iframe.contentWindow!.scrollY) / iframeRect.height) * 100;
       const width = (rect.width / iframeRect.width) * 100;
@@ -187,18 +176,16 @@ export function useElementTargeting({
       console.error('Error getting element position:', error);
       return null;
     }
-  }, [getIframe]);
+  }, [getIframeElement]);
   
-  // Highlight an element in the iframe
   const highlightElement = useCallback((element: Element | null) => {
     try {
-      const iframe = getIframe();
+      const iframe = getIframeElement();
       if (!iframe) {
         console.log("No iframe found for highlighting");
         return;
       }
 
-      // Remove existing highlight
       if (!element) {
         if (highlightRef.current && highlightRef.current.parentElement) {
           highlightRef.current.style.display = 'none';
@@ -214,7 +201,6 @@ export function useElementTargeting({
         return;
       }
       
-      // Create highlight element if it doesn't exist
       if (!highlightRef.current) {
         highlightRef.current = document.createElement('div');
         highlightRef.current.className = 'element-highlight';
@@ -227,31 +213,33 @@ export function useElementTargeting({
         highlightRef.current.style.borderRadius = '3px';
         highlightRef.current.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.5)';
         
-        // Add to appropriate container (preview container)
         const previewContainer = iframe.closest('.sp-preview');
         if (previewContainer) {
+          console.log("Adding highlight element to preview container");
           previewContainer.style.position = 'relative';
           previewContainer.appendChild(highlightRef.current);
         } else {
-          iframe.parentElement?.appendChild(highlightRef.current);
+          console.log("No preview container found, adding to iframe parent");
+          const parent = iframe.parentElement;
+          if (parent) {
+            parent.style.position = 'relative';
+            parent.appendChild(highlightRef.current);
+          }
         }
       }
       
       const highlight = highlightRef.current;
       highlight.style.display = 'block';
       
-      // Position based on the iframe's position
       const iframeRect = iframe.getBoundingClientRect();
       highlight.style.left = `${iframeRect.left + window.scrollX + (position.x - position.width/2) * iframeRect.width / 100}px`;
       highlight.style.top = `${iframeRect.top + window.scrollY + (position.y - position.height/2) * iframeRect.height / 100}px`;
       highlight.style.width = `${position.width * iframeRect.width / 100}px`;
       highlight.style.height = `${position.height * iframeRect.height / 100}px`;
       
-      // Add tag indicator as a pseudo-element via a data attribute
       const tagName = element.tagName.toLowerCase();
       highlight.setAttribute('data-element', tagName);
       
-      // Add attention-getting animation
       highlight.animate([
         { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 0 rgba(59, 130, 246, 0.3)' },
         { boxShadow: '0 0 0 2px rgba(255,255,255,0.5), 0 0 10px rgba(59, 130, 246, 0.6)' },
@@ -263,26 +251,77 @@ export function useElementTargeting({
     } catch (error) {
       console.error('Error highlighting element:', error);
     }
-  }, [getIframe, getElementPosition]);
+  }, [getIframeElement, getElementPosition]);
   
-  // Start element selection mode
+  const setupEventListeners = useCallback(() => {
+    if (eventAttachedRef.current) {
+      console.log("Event listeners already attached");
+      return;
+    }
+    
+    try {
+      const iframe = getIframeElement();
+      if (!iframe) {
+        console.log("No iframe found for element targeting");
+        return;
+      }
+      
+      let contentDocument: Document | null = null;
+      
+      try {
+        contentDocument = iframe.contentDocument;
+        if (!contentDocument) {
+          console.log("No contentDocument in iframe");
+          return;
+        }
+      } catch (e) {
+        console.error("Error accessing iframe contentDocument", e);
+        return;
+      }
+      
+      iframeContentRef.current = contentDocument;
+      console.log("Successfully accessed iframe contentDocument", !!contentDocument);
+      
+      eventAttachedRef.current = true;
+      
+      console.log("Setting up element targeting event listeners");
+    } catch (error) {
+      console.error("Error in setupEventListeners:", error);
+    }
+  }, [getIframeElement]);
+  
   const startElementSelection = useCallback(() => {
     console.log("Starting element selection mode");
     setIsSelectingElement(true);
     
-    const iframe = getIframe();
-    if (!iframe || !iframe.contentDocument) {
+    const iframe = getIframeElement();
+    if (!iframe) {
       console.log("No iframe found for element selection");
+      refreshCheck();
       return () => {};
     }
     
-    // Set cursor to indicate element selection mode
-    // Fix: Check if iframe is HTMLIFrameElement before accessing style
+    let contentDocument: Document | null = null;
+    
+    try {
+      contentDocument = iframe.contentDocument;
+      if (!contentDocument) {
+        console.log("No contentDocument in iframe for element selection");
+        refreshCheck();
+        return () => {};
+      }
+    } catch (e) {
+      console.error("Error accessing iframe contentDocument for element selection", e);
+      return () => {};
+    }
+    
+    iframeContentRef.current = contentDocument;
+    
     if (iframe instanceof HTMLIFrameElement && iframe.style) {
+      console.log("Setting cursor to crosshair");
       iframe.style.cursor = 'crosshair';
     }
     
-    // Add mouseover event to highlight elements
     const handleMouseOver = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
@@ -291,7 +330,6 @@ export function useElementTargeting({
       highlightElement(target);
     };
     
-    // Add click event to select an element
     const handleClick = (event: MouseEvent) => {
       if (!isSelectingElement) return;
       
@@ -305,31 +343,25 @@ export function useElementTargeting({
         const target_info = generateElementTarget(target);
         setElementTarget(target_info);
         
-        // Keep highlighting the selected element
         highlightElement(target);
       }
     };
     
-    // Handle mouse movement to track hovered elements
     const handleMouseMove = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target || target.nodeType !== Node.ELEMENT_NODE) return;
       
-      // Only update if different from current highlight to avoid flickering
       if (targetedElement !== target) {
         highlightElement(target);
       }
     };
     
-    // Setup keyboard navigation for element selection
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isSelectingElement) return;
       
       if (event.key === 'Escape') {
-        // Cancel element selection on Escape
         event.preventDefault();
         setIsSelectingElement(false);
-        // Fix: Check if iframe is HTMLIFrameElement before accessing style
         if (iframe instanceof HTMLIFrameElement && iframe.style) {
           iframe.style.cursor = '';
         }
@@ -339,30 +371,30 @@ export function useElementTargeting({
       }
     };
     
-    // Attach all event listeners
-    iframe.contentDocument.addEventListener('mouseover', handleMouseOver);
-    iframe.contentDocument.addEventListener('mousemove', handleMouseMove);
-    iframe.contentDocument.addEventListener('click', handleClick);
+    console.log("Attaching element selection event listeners to contentDocument");
+    
+    contentDocument.addEventListener('mouseover', handleMouseOver);
+    contentDocument.addEventListener('mousemove', handleMouseMove);
+    contentDocument.addEventListener('click', handleClick);
     document.addEventListener('keydown', handleKeyDown);
     
     return () => {
-      if (iframe.contentDocument) {
-        iframe.contentDocument.removeEventListener('mouseover', handleMouseOver);
-        iframe.contentDocument.removeEventListener('mousemove', handleMouseMove);
-        iframe.contentDocument.removeEventListener('click', handleClick);
+      console.log("Cleaning up element selection event listeners");
+      if (contentDocument) {
+        contentDocument.removeEventListener('mouseover', handleMouseOver);
+        contentDocument.removeEventListener('mousemove', handleMouseMove);
+        contentDocument.removeEventListener('click', handleClick);
       }
       document.removeEventListener('keydown', handleKeyDown);
-      // Fix: Check if iframe is HTMLIFrameElement before accessing style
       if (iframe instanceof HTMLIFrameElement && iframe.style) {
         iframe.style.cursor = '';
       }
     };
-  }, [isSelectingElement, highlightElement, generateElementTarget, getIframe, targetedElement]);
+  }, [isSelectingElement, highlightElement, generateElementTarget, getIframeElement, targetedElement, refreshCheck]);
   
-  // Cancel element selection mode
   const cancelElementSelection = useCallback(() => {
-    const iframe = getIframe();
-    // Fix: Check if iframe is HTMLIFrameElement before accessing style
+    console.log("Canceling element selection mode");
+    const iframe = getIframeElement();
     if (iframe instanceof HTMLIFrameElement && iframe.style) {
       iframe.style.cursor = '';
     }
@@ -370,17 +402,15 @@ export function useElementTargeting({
     highlightElement(null);
     setTargetedElement(null);
     setElementTarget(null);
-  }, [getIframe, highlightElement]);
+  }, [getIframeElement, highlightElement]);
   
-  // Find an element using stored target information
   const findElementByTarget = useCallback((elementTarget: ElementTarget) => {
     try {
-      const iframe = getIframe();
+      const iframe = getIframeElement();
       if (!iframe || !iframe.contentDocument) return null;
       
       let element: Element | null = null;
       
-      // Try CSS selector first
       if (elementTarget.selector) {
         try {
           element = iframe.contentDocument.querySelector(elementTarget.selector);
@@ -390,7 +420,6 @@ export function useElementTargeting({
         }
       }
       
-      // Try XPath as fallback
       if (elementTarget.xpath) {
         try {
           const xpathResult = iframe.contentDocument.evaluate(
@@ -408,7 +437,6 @@ export function useElementTargeting({
         }
       }
       
-      // Try metadata as a last resort
       if (elementTarget.metadata) {
         const { tagName, attributes } = elementTarget.metadata;
         
@@ -419,7 +447,6 @@ export function useElementTargeting({
           }
         }
         
-        // Try to find by a combination of tag, class, and text content
         if (tagName && attributes && attributes.class) {
           const potentialElements = Array.from(
             iframe.contentDocument.querySelectorAll(`${tagName}.${attributes.class.split(' ')[0]}`)
@@ -429,7 +456,6 @@ export function useElementTargeting({
             return potentialElements[0];
           }
           
-          // Filter by text content if available
           if (elementTarget.metadata.text && potentialElements.length > 0) {
             const element = potentialElements.find(el => 
               el.textContent?.trim().includes(elementTarget.metadata!.text!.trim())
@@ -444,14 +470,16 @@ export function useElementTargeting({
       console.error('Error finding element by target:', error);
       return null;
     }
-  }, [getIframe]);
+  }, [getIframeElement]);
   
-  // Setup event listener for window resize to update highlights
   useEffect(() => {
     if (!enabled) return;
     
+    console.log("useElementTargeting: Setting up resize listener");
+    
     const handleResize = () => {
       if (targetedElement) {
+        console.log("Window resized, updating highlight");
         highlightElement(targetedElement);
       }
     };
@@ -459,55 +487,74 @@ export function useElementTargeting({
     window.addEventListener('resize', handleResize);
     
     return () => {
+      console.log("useElementTargeting: Removing resize listener");
       window.removeEventListener('resize', handleResize);
     };
   }, [enabled, targetedElement, highlightElement]);
   
-  // Add mutation observer to handle DOM changes in the iframe
   useEffect(() => {
     if (!enabled || !targetedElement) return;
     
-    const iframe = getIframe();
+    console.log("useElementTargeting: Setting up mutation observer");
+    
+    const iframe = getIframeElement();
     if (!iframe || !iframe.contentDocument) return;
     
     const observer = new MutationObserver(() => {
-      // Re-highlight the element after DOM changes
       if (targetedElement) {
+        console.log("DOM mutation detected, updating highlight");
         highlightElement(targetedElement);
       }
     });
     
-    observer.observe(iframe.contentDocument, {
-      childList: true,
-      subtree: true,
-      attributes: true
-    });
+    try {
+      observer.observe(iframe.contentDocument, {
+        childList: true,
+        subtree: true,
+        attributes: true
+      });
+      console.log("Mutation observer attached successfully");
+    } catch (e) {
+      console.error("Error attaching mutation observer:", e);
+    }
     
     return () => {
+      console.log("useElementTargeting: Disconnecting mutation observer");
       observer.disconnect();
     };
-  }, [enabled, targetedElement, getIframe, highlightElement]);
+  }, [enabled, targetedElement, getIframeElement, highlightElement]);
   
-  // Start element selection when enabled
   useEffect(() => {
+    console.log("useElementTargeting: enabled changed to", enabled);
+    
     if (enabled) {
-      console.log("Element targeting enabled, starting selection mode");
+      if (isIframeReady) {
+        console.log("Iframe is already ready, setting up event listeners");
+        setupEventListeners();
+      } else {
+        console.log("Iframe not ready yet, will set up listeners when ready");
+        refreshCheck();
+      }
+      
       const cleanup = startElementSelection();
       return cleanup;
     } else {
-      console.log("Element targeting disabled");
+      console.log("Element targeting disabled, canceling selection");
       cancelElementSelection();
+      
+      eventAttachedRef.current = false;
     }
-  }, [enabled, startElementSelection, cancelElementSelection]);
+  }, [enabled, isIframeReady, setupEventListeners, startElementSelection, cancelElementSelection, refreshCheck]);
   
-  // Clean up highlight on unmount
   useEffect(() => {
     return () => {
-      console.log("Cleaning up element targeting");
+      console.log("useElementTargeting: Cleaning up on unmount");
       if (highlightRef.current && highlightRef.current.parentElement) {
         highlightRef.current.parentElement.removeChild(highlightRef.current);
         highlightRef.current = null;
       }
+      
+      eventAttachedRef.current = false;
     };
   }, []);
   
@@ -520,6 +567,7 @@ export function useElementTargeting({
     generateElementTarget,
     getElementPosition,
     highlightElement,
-    findElementByTarget
+    findElementByTarget,
+    isIframeReady
   };
 }
