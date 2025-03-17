@@ -53,3 +53,12 @@
 .sp-preview[data-feedback-mode="true"] iframe {
   cursor: crosshair !important;
 }
+
+/* Additional styles for new overlay inspector */
+.inspector-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair !important;
+  z-index: 99998;
+}
+

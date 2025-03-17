@@ -1,9 +1,6 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ElementTarget, FeedbackPoint, FeedbackUser } from '@/types/feedback';
 import { useElementTargeting } from '@/hooks/use-element-targeting';
-import { FeedbackPoint as FeedbackPointComponent } from './FeedbackPoint';
-import { CommentThread } from './CommentThread';
 import { cn } from '@/lib/utils';
 
 interface ElementInfoProps {
@@ -64,6 +61,124 @@ const ElementInfo: React.FC<ElementInfoProps> = ({ element, elementTarget }) => 
   );
 };
 
+interface OverlayElementInspectorProps {
+  iframeRef: React.RefObject<HTMLIFrameElement>;
+}
+
+const OverlayElementInspector: React.FC<OverlayElementInspectorProps> = ({ iframeRef }) => {
+  const [highlightPosition, setHighlightPosition] = useState({ 
+    left: 0, 
+    top: 0, 
+    width: 100, 
+    height: 50 
+  });
+  const [isHovering, setIsHovering] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const mousePositionRef = useRef({ x: 0, y: 0 });
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!iframeRef.current) return;
+    
+    const rect = iframeRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    mousePositionRef.current = { x, y };
+    
+    // Calculate highlight position - make it centered around the cursor
+    const width = 150;
+    const height = 50;
+    
+    setHighlightPosition({
+      left: Math.max(0, Math.min(x - width / 2, rect.width - width)),
+      top: Math.max(0, Math.min(y - height / 2, rect.height - height)),
+      width,
+      height
+    });
+    
+    setIsHovering(true);
+  }, [iframeRef]);
+  
+  const handleMouseLeave = useCallback(() => {
+    setIsHovering(false);
+  }, []);
+  
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setSelectedPosition(highlightPosition);
+  }, [highlightPosition]);
+  
+  return (
+    <>
+      <div 
+        className="absolute inset-0 cursor-crosshair"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+      />
+      
+      {isHovering && (
+        <div 
+          className="element-highlight absolute pointer-events-none"
+          style={{
+            left: `${highlightPosition.left}px`,
+            top: `${highlightPosition.top}px`,
+            width: `${highlightPosition.width}px`,
+            height: `${highlightPosition.height}px`,
+          }}
+        />
+      )}
+      
+      {selectedPosition && (
+        <div 
+          className="element-highlight absolute pointer-events-none animate-pulse-once"
+          style={{
+            left: `${selectedPosition.left}px`,
+            top: `${selectedPosition.top}px`,
+            width: `${selectedPosition.width}px`,
+            height: `${selectedPosition.height}px`,
+            border: '3px solid #22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.2)',
+          }}
+        />
+      )}
+      
+      {selectedPosition && (
+        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-md z-[100] border border-border">
+          <h3 className="text-lg font-medium mb-2">Element Inspector</h3>
+          
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-semibold">Position:</span> 
+              <span className="font-mono text-xs ml-1">
+                x: {Math.round(selectedPosition.left + selectedPosition.width/2)}, 
+                y: {Math.round(selectedPosition.top + selectedPosition.height/2)}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold">Size:</span> 
+              <span className="font-mono text-xs ml-1">
+                {Math.round(selectedPosition.width)} × {Math.round(selectedPosition.height)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Note: This is an approximate visual inspection. To inspect actual DOM elements, 
+              try using browser DevTools.
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 interface FeedbackOverlayProps {
   prototypeId: string;
   isFeedbackMode: boolean;
@@ -93,12 +208,9 @@ export function FeedbackOverlay({
 }: FeedbackOverlayProps) {
   const [isIframeReady, setIsIframeReady] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   
-  const [showPointForm, setShowPointForm] = useState(false);
-  const [pointFormPosition, setPointFormPosition] = useState({ x: 0, y: 0 });
   const [loadedPoints, setLoadedPoints] = useState<FeedbackPoint[]>([]);
-  const [activePointId, setActivePointId] = useState<string | null>(null);
-  const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
   
   const {
     targetedElement,
@@ -124,10 +236,20 @@ export function FeedbackOverlay({
   useEffect(() => {
     if (!previewContainerRef.current || !isFeedbackMode) return;
     
-    const visiblePoints = feedbackPoints.filter(point => !point.isResolved);
+    const visiblePoints = feedbackPoints;
     setLoadedPoints(visiblePoints);
     
   }, [feedbackPoints, isFeedbackMode, previewContainerRef]);
+
+  // Find and cache the iframe element
+  useEffect(() => {
+    if (!previewContainerRef.current) return;
+    
+    const iframe = previewContainerRef.current.querySelector('iframe');
+    if (iframe) {
+      iframeRef.current = iframe;
+    }
+  }, [previewContainerRef]);
 
   // Handle resizing and scaling for the overlay
   useEffect(() => {
@@ -153,8 +275,6 @@ export function FeedbackOverlay({
   useEffect(() => {
     if (!isFeedbackMode) {
       setTargetedElement(null);
-      setActivePointId(null);
-      setHoveredPointId(null);
     }
   }, [isFeedbackMode, setTargetedElement]);
 
@@ -173,12 +293,17 @@ export function FeedbackOverlay({
         <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-2 z-[100] border border-border">
           <div className="text-sm font-medium">Element Inspector Mode</div>
           <div className="text-xs text-muted-foreground">
-            Hover over elements to inspect them
+            Hover over the content to inspect elements
           </div>
         </div>
       )}
       
-      {/* Display element information when an element is selected */}
+      {/* New visual element inspector overlay */}
+      {isFeedbackMode && iframeRef.current && (
+        <OverlayElementInspector iframeRef={iframeRef} />
+      )}
+      
+      {/* Original element inspector - keep for now but it won't work cross-origin */}
       {isFeedbackMode && targetedElement && elementTarget && (
         <ElementInfo element={targetedElement} elementTarget={elementTarget} />
       )}
