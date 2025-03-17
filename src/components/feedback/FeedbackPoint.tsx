@@ -2,7 +2,9 @@
 import React from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackStatus } from '@/types/feedback';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle } from 'lucide-react';
+import { 
+  AlertCircle, CheckCircle, Clock, XCircle, Target, MessageCircle
+} from 'lucide-react';
 
 interface FeedbackPointProps {
   feedback: FeedbackPointType;
@@ -21,20 +23,18 @@ export function FeedbackPoint({
   onMouseEnter,
   onMouseLeave
 }: FeedbackPointProps) {
-  const { position, status } = feedback;
+  const { position, status, element_target } = feedback;
   
-  const getStatusColor = (status: FeedbackStatus) => {
+  const getStatusIcon = (status: FeedbackStatus) => {
     switch (status) {
       case 'open':
-        return 'bg-orange-500';
+        return <AlertCircle className="h-3 w-3 text-orange-500" />;
       case 'in_progress':
-        return 'bg-blue-500';
+        return <Clock className="h-3 w-3 text-blue-500" />;
       case 'resolved':
-        return 'bg-green-500';
+        return <CheckCircle className="h-3 w-3 text-green-500" />;
       case 'closed':
-        return 'bg-gray-500';
-      default:
-        return 'bg-primary';
+        return <XCircle className="h-3 w-3 text-gray-500" />;
     }
   };
 
@@ -58,26 +58,37 @@ export function FeedbackPoint({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <button
-        onClick={handleClick}
-        className={`group relative flex items-center justify-center w-6 h-6 rounded-full transition-all duration-200 ${
-          isSelected
-            ? 'bg-primary text-primary-foreground scale-125'
-            : `${getStatusColor(status)} text-white hover:scale-110`
-        } shadow-md border-2 border-white`}
-        title="View feedback"
-      >
-        <MessageCircle className="h-3 w-3" />
-        
-        {commentCount > 0 && (
-          <Badge 
-            variant="secondary" 
-            className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center text-[10px] px-1 py-0"
-          >
-            {commentCount}
-          </Badge>
-        )}
-      </button>
+      <div className={element_target ? "animate-pulse-once" : ""}>
+        <button
+          onClick={handleClick}
+          className={`group relative flex items-center justify-center w-6 h-6 rounded-full transition-all duration-200 ${
+            isSelected
+              ? 'bg-primary text-primary-foreground scale-125'
+              : 'bg-background text-foreground hover:bg-primary/20 hover:scale-110'
+          } shadow-md border-2 ${
+            isSelected ? 'border-primary' : 'border-border'
+          }`}
+          title={element_target?.metadata?.displayName || "View feedback"}
+        >
+          {getStatusIcon(status)}
+          
+          {/* Element targeting indicator */}
+          {element_target && (
+            <span className="absolute -left-1.5 -bottom-1.5 bg-blue-500 text-white rounded-full p-0.5 w-3 h-3 flex items-center justify-center">
+              <Target className="h-2 w-2" />
+            </span>
+          )}
+          
+          {commentCount > 0 && (
+            <Badge 
+              variant="secondary" 
+              className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center text-[10px] px-1 py-0"
+            >
+              {commentCount}
+            </Badge>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
