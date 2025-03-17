@@ -230,7 +230,10 @@ export function useElementTargeting({
         // Add to appropriate container (preview container)
         const previewContainer = iframe.closest('.sp-preview');
         if (previewContainer) {
-          previewContainer.style.position = 'relative';
+          // Fix: Check if previewContainer is HTMLElement before accessing style
+          if (previewContainer instanceof HTMLElement) {
+            previewContainer.style.position = 'relative';
+          }
           previewContainer.appendChild(highlightRef.current);
         } else {
           iframe.parentElement?.appendChild(highlightRef.current);
