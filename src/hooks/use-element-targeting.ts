@@ -217,13 +217,17 @@ export function useElementTargeting({
         const previewContainer = iframe.closest('.sp-preview');
         if (previewContainer) {
           console.log("Adding highlight element to preview container");
-          previewContainer.style.position = 'relative';
+          if (previewContainer instanceof HTMLElement) {
+            previewContainer.style.position = 'relative';
+          }
           previewContainer.appendChild(highlightRef.current);
         } else {
           console.log("No preview container found, adding to iframe parent");
           const parent = iframe.parentElement;
           if (parent) {
-            parent.style.position = 'relative';
+            if (parent instanceof HTMLElement) {
+              parent.style.position = 'relative';
+            }
             parent.appendChild(highlightRef.current);
           }
         }
@@ -320,7 +324,7 @@ export function useElementTargeting({
     
     // Fix: Check if iframe is HTMLIFrameElement before accessing style
     if (iframe instanceof HTMLIFrameElement) {
-      console.log("Setting cursor to crosshair");
+      console.log("Setting cursor to inspect mode");
       iframe.style.cursor = 'crosshair';
     }
     
@@ -346,6 +350,7 @@ export function useElementTargeting({
         setElementTarget(target_info);
         
         highlightElement(target);
+        // Note: We're not triggering comment UI anymore
       }
     };
     

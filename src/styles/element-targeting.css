@@ -12,7 +12,7 @@
 }
 
 .element-highlight:before {
-  content: "Click to comment";
+  content: "Element Inspector";
   position: absolute;
   top: -25px;
   left: 50%;
