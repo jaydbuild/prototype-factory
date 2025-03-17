@@ -36,32 +36,6 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     };
   }, [deploymentUrl]);
 
-  // Make the iframe ready for inspection with feedback mode
-  useEffect(() => {
-    if (!iframeRef.current) return;
-    
-    if (isFeedbackMode) {
-      // Apply crosshair cursor style to the iframe
-      iframeRef.current.style.cursor = 'crosshair';
-      
-      // Add a class to the iframe container
-      const container = iframeRef.current.parentElement;
-      if (container) {
-        container.classList.add('inspector-active');
-      }
-      
-    } else {
-      // Reset cursor style
-      iframeRef.current.style.cursor = '';
-      
-      // Remove the class from the iframe container
-      const container = iframeRef.current.parentElement;
-      if (container) {
-        container.classList.remove('inspector-active');
-      }
-    }
-  }, [isFeedbackMode]);
-
   if (!deploymentUrl) {
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>
@@ -93,8 +67,8 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
         sandbox={sandboxPermissions}
         allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"
         loading="lazy"
-        data-feedback-mode={isFeedbackMode ? 'true' : 'false'}
       />
+      {/* No overlay needed directly on the iframe - we'll handle that in FeedbackOverlay */}
     </div>
   );
-};
+}
