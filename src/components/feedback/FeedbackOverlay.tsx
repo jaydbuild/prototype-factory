@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIframeStability } from '@/hooks/use-iframe-stability';
 import { useElementTargeting } from '@/hooks/use-element-targeting';
 import { Crosshair, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { safelyConvertElementMetadata } from '@/utils/feedback-utils';
 
 interface FeedbackOverlayProps {
   prototypeId: string;
@@ -23,47 +24,9 @@ interface FeedbackOverlayProps {
   deviceType?: 'desktop' | 'tablet' | 'mobile' | 'custom';
   orientation?: 'portrait' | 'landscape';
   scale?: number;
-}
-
-// Helper function to safely convert attributes to Record<string, string>
-function safelyConvertAttributes(attributes: any): Record<string, string> | undefined {
-  if (!attributes || typeof attributes !== 'object') {
-    return undefined;
-  }
-  
-  // If it's an array, we can't convert it to Record<string, string>
-  if (Array.isArray(attributes)) {
-    return undefined;
-  }
-  
-  // Convert all values to strings
-  const result: Record<string, string> = {};
-  for (const key in attributes) {
-    if (Object.prototype.hasOwnProperty.call(attributes, key)) {
-      const value = attributes[key];
-      // Skip null or undefined values
-      if (value != null) {
-        // Convert any value to string
-        result[key] = String(value);
-      }
-    }
-  }
-  
-  return Object.keys(result).length > 0 ? result : undefined;
-}
-
-// Helper function to safely convert element metadata
-function safelyConvertElementMetadata(metadata: any): ElementTarget['metadata'] {
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-    return null;
-  }
-  
-  return {
-    tagName: typeof metadata.tagName === 'string' ? metadata.tagName : undefined,
-    text: typeof metadata.text === 'string' ? metadata.text : undefined,
-    attributes: safelyConvertAttributes(metadata.attributes),
-    elementType: typeof metadata.elementType === 'string' ? metadata.elementType : undefined,
-    displayName: typeof metadata.displayName === 'string' ? metadata.displayName : undefined
+  originalDimensions?: {
+    width: number;
+    height: number;
   };
 }
 
@@ -78,7 +41,8 @@ export function FeedbackOverlay({
   previewContainerRef,
   deviceType = 'desktop',
   orientation = 'portrait',
-  scale = 1
+  scale = 1,
+  originalDimensions = { width: 1920, height: 1080 }
 }: FeedbackOverlayProps) {
   const { toast } = useToast();
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -124,6 +88,55 @@ export function FeedbackOverlay({
     }
   }, [currentHoveredElements, currentElementIndex]);
   
+  // Use memoized handler for overlay clicks to prevent unnecessary recreations
+  const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isFeedbackMode || !overlayRef.current || !isIframeReady) return;
+    
+    // If we're already interacting with a comment, don't add a new one
+    if (isInteractingWithComment) {
+      e.stopPropagation();
+      return;
+    }
+    
+    // Check if we clicked on an existing feedback point or form
+    if ((e.target as HTMLElement).closest('.feedback-point') || 
+        (e.target as HTMLElement).closest('.feedback-form') ||
+        (e.target as HTMLElement).closest('.comment-thread')) {
+      e.stopPropagation();
+      return;
+    }
+    
+    try {
+      // If we have hovered elements, use the position of the selected element
+      if (currentHoveredElements.length > 0 && currentElementIndex < currentHoveredElements.length) {
+        const selectedElement = currentHoveredElements[currentElementIndex];
+        const position = getElementPosition(selectedElement);
+        if (position) {
+          setNewFeedbackPosition({ x: position.x, y: position.y });
+          setSelectedFeedback(null);
+          e.stopPropagation();
+          return;
+        }
+      }
+      
+      // Fallback to click position if no element is hovered
+      const rect = overlayRef.current.getBoundingClientRect();
+      
+      // Calculate position as percentages relative to original dimensions
+      // taking into account the current scale
+      const x = ((e.clientX - rect.left) / (rect.width)) * 100;
+      const y = ((e.clientY - rect.top) / (rect.height)) * 100;
+      
+      if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
+        setNewFeedbackPosition({ x, y });
+        setSelectedFeedback(null);
+        e.stopPropagation();
+      }
+    } catch (error) {
+      console.error('Error handling overlay click:', error);
+    }
+  }, [isFeedbackMode, isIframeReady, isInteractingWithComment, currentHoveredElements, currentElementIndex, getElementPosition]);
+
   // Handle key presses for element navigation
   useEffect(() => {
     if (!isFeedbackMode || !isIframeReady) return;
@@ -166,50 +179,7 @@ export function FeedbackOverlay({
   ]);
   
   // Use memoized handler for overlay clicks to prevent unnecessary recreations
-  const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isFeedbackMode || !overlayRef.current || !isIframeReady) return;
-    
-    // If we're already interacting with a comment, don't add a new one
-    if (isInteractingWithComment) {
-      e.stopPropagation();
-      return;
-    }
-    
-    // Check if we clicked on an existing feedback point or form
-    if ((e.target as HTMLElement).closest('.feedback-point') || 
-        (e.target as HTMLElement).closest('.feedback-form') ||
-        (e.target as HTMLElement).closest('.comment-thread')) {
-      e.stopPropagation();
-      return;
-    }
-    
-    try {
-      // If we have hovered elements, use the position of the selected element
-      if (currentHoveredElements.length > 0 && currentElementIndex < currentHoveredElements.length) {
-        const selectedElement = currentHoveredElements[currentElementIndex];
-        const position = getElementPosition(selectedElement);
-        if (position) {
-          setNewFeedbackPosition({ x: position.x, y: position.y });
-          setSelectedFeedback(null);
-          e.stopPropagation();
-          return;
-        }
-      }
-      
-      // Fallback to click position if no element is hovered
-      const rect = overlayRef.current.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const y = ((e.clientY - rect.top) / rect.height) * 100;
-      
-      if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
-        setNewFeedbackPosition({ x, y });
-        setSelectedFeedback(null);
-        e.stopPropagation();
-      }
-    } catch (error) {
-      console.error('Error handling overlay click:', error);
-    }
-  }, [isFeedbackMode, isIframeReady, isInteractingWithComment, currentHoveredElements, currentElementIndex, getElementPosition]);
+  
 
   // Memoized handlers for feedback interactions
   const handleFeedbackPointClick = useCallback((feedback: FeedbackPointType) => {
@@ -499,6 +469,11 @@ export function FeedbackOverlay({
       ref={overlayRef}
       className={`absolute inset-0 ${isIframeReady ? 'cursor-crosshair' : 'cursor-wait'} ${isFeedbackMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
       onClick={handleOverlayClick}
+      style={{
+        // Apply the same scale as the iframe to ensure alignment
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+      }}
     >
       {!isIframeReady && isFeedbackMode && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/30 z-10">

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface PrototypePreviewProps {
   deploymentUrl?: string;
@@ -10,6 +10,10 @@ interface PrototypePreviewProps {
   filesUrl?: string;
   onDownload?: () => void;
   onShare?: () => void;
+  originalDimensions?: {
+    width: number;
+    height: number;
+  };
 }
 
 export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
@@ -18,9 +22,13 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   className = '',
   filesUrl,
   onDownload,
-  onShare
+  onShare,
+  originalDimensions = { width: 1920, height: 1080 } // Default dimensions
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [aspectRatio, setAspectRatio] = useState(originalDimensions.width / originalDimensions.height);
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Reset iframe when URL changes
@@ -35,6 +43,28 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
       }
     };
   }, [deploymentUrl]);
+
+  // Calculate scale factor when container is resized
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const calculateScale = () => {
+      const containerWidth = containerRef.current?.clientWidth || 0;
+      const idealWidth = originalDimensions.width;
+      const newScale = containerWidth / idealWidth;
+      setScale(newScale);
+    };
+
+    calculateScale();
+    const resizeObserver = new ResizeObserver(calculateScale);
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+    };
+  }, [originalDimensions.width]);
 
   if (!deploymentUrl) {
     return (
@@ -58,7 +88,11 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     : defaultPermissions.join(' ');
 
   return (
-    <div className={`relative w-full h-full ${className}`}>
+    <div 
+      ref={containerRef}
+      className={`relative w-full overflow-hidden ${className}`} 
+      style={{ aspectRatio: aspectRatio }}
+    >
       <iframe
         ref={iframeRef}
         src={deploymentUrl}
@@ -66,6 +100,10 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
         sandbox={sandboxPermissions}
         allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"
         loading="lazy"
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+        }}
       />
     </div>
   );
