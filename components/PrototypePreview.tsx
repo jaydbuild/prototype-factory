@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 
 interface PrototypePreviewProps {
@@ -7,50 +6,21 @@ interface PrototypePreviewProps {
     permissions: string[];
   };
   className?: string;
-  isFeedbackMode?: boolean;
 }
 
 export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   deploymentUrl,
   sandboxConfig,
-  className = '',
-  isFeedbackMode = false
+  className = ''
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    console.log('PrototypePreview (components): Component mounted with feedback mode:', isFeedbackMode);
-    
     // Reset iframe when URL changes
     if (iframeRef.current) {
       iframeRef.current.src = deploymentUrl || 'about:blank';
     }
-
-    // Clean up on unmount
-    return () => {
-      if (iframeRef.current) {
-        iframeRef.current.src = 'about:blank';
-      }
-    };
   }, [deploymentUrl]);
-
-  // Debug logging
-  useEffect(() => {
-    if (isFeedbackMode) {
-      console.log('PrototypePreview (components): Feedback mode enabled, checking iframe access');
-      setTimeout(() => {
-        try {
-          if (iframeRef.current && iframeRef.current.contentDocument) {
-            console.log('PrototypePreview: Successfully accessed iframe contentDocument');
-          } else {
-            console.warn('PrototypePreview: Cannot access iframe contentDocument - possible security restriction');
-          }
-        } catch (e) {
-          console.error('PrototypePreview: Error accessing iframe contentDocument:', e);
-        }
-      }, 1000);
-    }
-  }, [isFeedbackMode]);
 
   if (!deploymentUrl) {
     return (
@@ -60,19 +30,11 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     );
   }
 
-  // Construct sandbox permissions with proper navigation permissions
-  const defaultPermissions = [
-    'allow-scripts',
-    'allow-same-origin', 
-    'allow-forms',
-    'allow-popups',
-    'allow-top-navigation-by-user-activation'
-  ];
-  
-  const sandboxPermissions = sandboxConfig?.permissions?.join(' ') || defaultPermissions.join(' ');
+  // Construct sandbox permissions
+  const sandboxPermissions = sandboxConfig?.permissions?.join(' ') || 'allow-scripts';
 
   return (
-    <div className={`relative w-full h-full ${className} ${isFeedbackMode ? 'sp-preview' : ''}`}>
+    <div className={`relative w-full h-full ${className}`}>
       <iframe
         ref={iframeRef}
         src={deploymentUrl}
@@ -80,7 +42,6 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
         sandbox={sandboxPermissions}
         allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"
         loading="lazy"
-        data-feedback-mode={isFeedbackMode ? 'true' : 'false'}
       />
     </div>
   );
