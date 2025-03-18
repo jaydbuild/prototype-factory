@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget } from '@/types/feedback';
+import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget, DeviceType } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
 import { CommentThread } from './CommentThread';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -266,7 +266,7 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_type: data.device_type as DeviceType || deviceType
+          device_type: (data.device_type || deviceType) as DeviceType
         };
         
         onFeedbackAdded(feedback);
@@ -605,3 +605,4 @@ export function FeedbackOverlay({
     </div>
   );
 }
+
