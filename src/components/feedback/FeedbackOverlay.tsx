@@ -129,7 +129,7 @@ export function FeedbackOverlay({
       console.error('Error handling overlay click:', error);
     }
   }, [isFeedbackMode, isIframeReady, isInteractingWithComment, currentHoveredElements, currentElementIndex, getElementPosition, scale, originalDimensions]);
-
+  
   const handleKeyDown = (e: KeyboardEvent) => {
     if (!isFeedbackMode || currentHoveredElements.length === 0) return;
     
@@ -229,7 +229,8 @@ export function FeedbackOverlay({
         created_by: currentUser.id,
         content: newFeedbackContent,
         position: feedbackPosition,
-        status: 'open'
+        status: 'open',
+        device_type: deviceType
       };
       
       if (targetData) {
@@ -264,7 +265,8 @@ export function FeedbackOverlay({
                 xpath: data.element_xpath,
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
-            : undefined
+            : undefined,
+          device_type: data.device_type as DeviceType || deviceType
         };
         
         onFeedbackAdded(feedback);
@@ -301,7 +303,8 @@ export function FeedbackOverlay({
     generateElementTarget,
     getElementPosition,
     highlightElement,
-    elementTarget
+    elementTarget,
+    deviceType
   ]);
 
   const handleUpdateFeedbackStatus = useCallback(async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {

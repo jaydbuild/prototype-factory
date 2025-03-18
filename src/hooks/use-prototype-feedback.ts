@@ -92,7 +92,8 @@ export function usePrototypeFeedback(prototypeId: string) {
               created_at: feedback.created_at,
               updated_at: feedback.updated_at,
               status: feedback.status,
-              element_target
+              element_target,
+              device_type: feedback.device_type
             } as FeedbackPoint;
           });
           
@@ -173,7 +174,8 @@ export function usePrototypeFeedback(prototypeId: string) {
               created_at: newData.created_at,
               updated_at: newData.updated_at,
               status: newData.status,
-              element_target
+              element_target,
+              device_type: newData.device_type
             };
             
             setFeedbackPoints(prev => [...prev, newFeedback]);
@@ -215,7 +217,8 @@ export function usePrototypeFeedback(prototypeId: string) {
               created_at: updatedData.created_at,
               updated_at: updatedData.updated_at,
               status: updatedData.status,
-              element_target
+              element_target,
+              device_type: updatedData.device_type
             };
             
             setFeedbackPoints(prev => 

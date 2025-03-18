@@ -1,25 +1,18 @@
-import React, { useState } from 'react';
-import { FeedbackPoint as FeedbackPointType, FeedbackUser } from '@/types/feedback';
+
+import React from 'react';
+import { FeedbackPoint, FeedbackStatus, FeedbackUser } from '@/types/feedback';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  MessageSquare, 
-  AlertCircle, 
-  Clock, 
-  CheckCircle, 
-  XCircle,
-  ThumbsUp,
-  ThumbsDown
-} from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { formatDistanceToNow } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { X, Check, Clock, AlertCircle, Smartphone, Tablet, Monitor } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface CommentThreadProps {
-  feedback: FeedbackPointType;
+  feedback: FeedbackPoint;
   onClose: (e: React.MouseEvent) => void;
-  onUpdateStatus: (status: FeedbackPointType['status'], e?: React.MouseEvent) => void;
+  onUpdateStatus: (status: FeedbackStatus, e?: React.MouseEvent) => void;
   onAddReply: (content: string, e?: React.MouseEvent) => void;
   currentUser?: FeedbackUser;
   creator?: FeedbackUser;
@@ -33,170 +26,127 @@ export function CommentThread({
   currentUser,
   creator
 }: CommentThreadProps) {
-  const [replyContent, setReplyContent] = useState('');
+  const [replyContent, setReplyContent] = React.useState('');
   
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+  const statusColors = {
+    open: 'bg-blue-100 text-blue-800 border-blue-200',
+    in_progress: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    resolved: 'bg-green-100 text-green-800 border-green-200',
+    closed: 'bg-gray-100 text-gray-800 border-gray-200'
+  };
+  
+  const statusTexts = {
+    open: 'Open',
+    in_progress: 'In Progress',
+    resolved: 'Resolved',
+    closed: 'Closed'
+  };
+  
+  const statusIcons = {
+    open: <AlertCircle className="h-3.5 w-3.5 mr-1" />,
+    in_progress: <Clock className="h-3.5 w-3.5 mr-1" />,
+    resolved: <Check className="h-3.5 w-3.5 mr-1" />,
+    closed: <X className="h-3.5 w-3.5 mr-1" />
   };
 
-  const getStatusLabel = (status: FeedbackPointType['status']) => {
-    switch (status) {
-      case 'open': return { label: 'Open', icon: <AlertCircle className="h-4 w-4" />, color: 'bg-orange-100 text-orange-800' };
-      case 'in_progress': return { label: 'In Progress', icon: <Clock className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' };
-      case 'resolved': return { label: 'Resolved', icon: <CheckCircle className="h-4 w-4" />, color: 'bg-green-100 text-green-800' };
-      case 'closed': return { label: 'Closed', icon: <XCircle className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' };
+  const getDeviceIcon = (deviceType?: string) => {
+    switch(deviceType) {
+      case 'mobile':
+        return <Smartphone className="h-3.5 w-3.5 mr-1" />;
+      case 'tablet':
+        return <Tablet className="h-3.5 w-3.5 mr-1" />;
+      case 'desktop':
+      default:
+        return <Monitor className="h-3.5 w-3.5 mr-1" />;
     }
-  };
-
-  const statusInfo = getStatusLabel(feedback.status);
-
-  // Handle status update with explicit event stopping
-  const handleStatusUpdate = (status: FeedbackPointType['status'], e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onUpdateStatus(status, e);
-  };
-
-  // Handle reply submission with explicit event stopping
-  const handleSubmitReply = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    if (replyContent.trim()) {
-      onAddReply(replyContent, e);
-      setReplyContent('');
-    }
-  };
-
-  // Handle close with explicit event stopping
-  const handleClose = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onClose(e);
-  };
-
-  // Handle textarea change with explicit event stopping
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    e.stopPropagation();
-    setReplyContent(e.target.value);
   };
 
   return (
-    <Card className="w-80 shadow-lg" onClick={(e) => e.stopPropagation()}>
-      <CardHeader className="p-3 flex flex-row items-start justify-between space-y-0">
-        <div className="flex items-center space-x-2">
+    <Card className="w-80 max-w-md shadow-lg z-50">
+      <CardHeader className="px-3 py-2 flex flex-row items-center justify-between bg-muted/30">
+        <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
-            <AvatarImage src={creator?.avatar_url || undefined} />
-            <AvatarFallback>{getInitials(creator?.name)}</AvatarFallback>
+            <AvatarImage src={creator?.avatar_url || ''} />
+            <AvatarFallback>{creator?.name?.charAt(0) || '?'}</AvatarFallback>
           </Avatar>
-          <div>
-            <p className="text-sm font-medium leading-none">{creator?.name || 'Anonymous'}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(feedback.created_at), { addSuffix: true })}
-            </p>
-          </div>
+          <span className="text-sm font-medium">{creator?.name || 'Anonymous'}</span>
         </div>
-        <Badge 
-          variant="outline" 
-          className={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${statusInfo.color}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {statusInfo.icon}
-          <span>{statusInfo.label}</span>
-        </Badge>
+        <div className="flex items-center gap-1">
+          <Badge 
+            className={`text-xs px-1.5 py-0 h-5 ${statusColors[feedback.status]} flex items-center`}
+            variant="outline"
+          >
+            {statusIcons[feedback.status]}
+            {statusTexts[feedback.status]}
+          </Badge>
+          {feedback.device_type && (
+            <Badge
+              className="text-xs px-1.5 py-0 h-5 bg-gray-100 text-gray-800 border-gray-200 ml-1 flex items-center"
+              variant="outline"
+            >
+              {getDeviceIcon(feedback.device_type)}
+              {feedback.device_type.charAt(0).toUpperCase() + feedback.device_type.slice(1)}
+            </Badge>
+          )}
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-6 w-6 ml-1 rounded-full"
+            onClick={onClose}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="p-3 pt-0">
-        <p className="text-sm">{feedback.content}</p>
-        
-        <div className="flex flex-wrap gap-1 mt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-7 text-xs gap-1" 
-            onClick={(e) => handleStatusUpdate('open', e)}
-          >
-            <AlertCircle className="h-3 w-3" />
-            Open
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-7 text-xs gap-1" 
-            onClick={(e) => handleStatusUpdate('in_progress', e)}
-          >
-            <Clock className="h-3 w-3" />
-            In Progress
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-7 text-xs gap-1" 
-            onClick={(e) => handleStatusUpdate('resolved', e)}
-          >
-            <CheckCircle className="h-3 w-3" />
-            Resolved
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-7 text-xs gap-1" 
-            onClick={(e) => handleStatusUpdate('closed', e)}
-          >
-            <XCircle className="h-3 w-3" />
-            Closed
-          </Button>
+      <CardContent className="p-3">
+        <div className="text-sm mb-3 whitespace-pre-wrap">
+          {feedback.content}
         </div>
+        <div className="text-xs text-muted-foreground">
+          {format(new Date(feedback.created_at), 'MMM d, yyyy h:mm a')}
+        </div>
+        {/* Additional replies would go here */}
       </CardContent>
-      <CardFooter className="p-3 pt-0 flex flex-col items-stretch gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
+      <CardFooter className="px-3 pt-0 pb-3 flex-col gap-2">
+        <Textarea
+          placeholder="Add a reply..."
+          value={replyContent}
+          onChange={(e) => setReplyContent(e.target.value)}
+          className="min-h-[60px] text-sm"
+        />
+        <div className="flex justify-between w-full">
+          <div className="flex gap-1">
             <Button 
-              variant="ghost" 
               size="sm" 
-              className="h-8 w-8 p-0"
-              onClick={(e) => e.stopPropagation()}
+              variant={feedback.status === 'in_progress' ? 'default' : 'outline'} 
+              className="h-7 px-2 text-xs"
+              onClick={(e) => onUpdateStatus('in_progress', e)}
             >
-              <ThumbsUp className="h-4 w-4" />
+              <Clock className="h-3 w-3 mr-1" />
+              In Progress
             </Button>
             <Button 
-              variant="ghost" 
               size="sm" 
-              className="h-8 w-8 p-0"
-              onClick={(e) => e.stopPropagation()}
+              variant={feedback.status === 'resolved' ? 'default' : 'outline'} 
+              className="h-7 px-2 text-xs"
+              onClick={(e) => onUpdateStatus('resolved', e)}
             >
-              <ThumbsDown className="h-4 w-4" />
+              <Check className="h-3 w-3 mr-1" />
+              Resolve
             </Button>
           </div>
           <Button 
-            variant="outline" 
             size="sm" 
-            className="h-8" 
-            onClick={handleClose}
-          >
-            Close
-          </Button>
-        </div>
-        
-        <div className="flex flex-col gap-2">
-          <Textarea 
-            placeholder="Add a reply..." 
-            className="min-h-[60px] text-sm" 
-            value={replyContent}
-            onChange={handleTextareaChange}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <Button 
-            size="sm" 
-            onClick={handleSubmitReply}
+            className="h-7 px-2 text-xs"
             disabled={!replyContent.trim()}
+            onClick={(e) => {
+              if (replyContent.trim()) {
+                onAddReply(replyContent, e);
+                setReplyContent('');
+              }
+            }}
           >
-            Submit
+            Reply
           </Button>
         </div>
       </CardFooter>

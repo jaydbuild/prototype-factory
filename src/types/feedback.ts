@@ -1,5 +1,6 @@
 
 export type FeedbackStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export type DeviceType = 'desktop' | 'tablet' | 'mobile' | 'custom';
 
 export interface ElementTarget {
   selector: string | null;
@@ -28,6 +29,7 @@ export interface FeedbackPoint {
   updated_at: string | null;
   status: FeedbackStatus;
   element_target?: ElementTarget;
+  device_type?: DeviceType;
 }
 
 export interface FeedbackReaction {

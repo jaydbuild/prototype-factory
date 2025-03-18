@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useDeviceType } from '@/hooks/use-device-type';
 
 interface PrototypePreviewProps {
   deploymentUrl?: string;
@@ -29,6 +30,7 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   const [aspectRatio, setAspectRatio] = useState(originalDimensions.width / originalDimensions.height);
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const deviceType = useDeviceType();
 
   useEffect(() => {
     // Reset iframe when URL changes
@@ -116,6 +118,7 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
             width: '100%',
             height: '100%',
           }}
+          data-device-type={deviceType}
         />
       </div>
     </div>
