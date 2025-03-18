@@ -7,6 +7,9 @@ interface PrototypePreviewProps {
     permissions: string[];
   };
   className?: string;
+  filesUrl?: string;
+  onDownload?: () => void;
+  onShare?: () => void;
   originalDimensions?: {
     width: number;
     height: number;
@@ -17,6 +20,9 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
   deploymentUrl,
   sandboxConfig,
   className = '',
+  filesUrl,
+  onDownload,
+  onShare,
   originalDimensions = { width: 1920, height: 1080 } // Default dimensions
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -29,6 +35,13 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     if (iframeRef.current) {
       iframeRef.current.src = deploymentUrl || 'about:blank';
     }
+
+    // Clean up on unmount
+    return () => {
+      if (iframeRef.current) {
+        iframeRef.current.src = 'about:blank';
+      }
+    };
   }, [deploymentUrl]);
 
   // Calculate scale factor when container is resized
@@ -61,27 +74,50 @@ export const PrototypePreview: React.FC<PrototypePreviewProps> = ({
     );
   }
 
-  // Construct sandbox permissions
-  const sandboxPermissions = sandboxConfig?.permissions?.join(' ') || 'allow-scripts';
+  // Construct sandbox permissions with proper navigation permissions
+  const defaultPermissions = [
+    'allow-scripts', 
+    'allow-same-origin', 
+    'allow-forms', 
+    'allow-popups', 
+    'allow-top-navigation-by-user-activation'
+  ];
+  
+  const sandboxPermissions = sandboxConfig?.permissions?.length 
+    ? [...sandboxConfig.permissions, 'allow-top-navigation-by-user-activation'].join(' ')
+    : defaultPermissions.join(' ');
 
   return (
     <div 
       ref={containerRef}
       className={`relative w-full overflow-hidden ${className}`} 
-      style={{ aspectRatio: aspectRatio }}
+      style={{ 
+        aspectRatio: aspectRatio,
+        height: 'auto', // Let height be determined by aspect ratio
+      }}
     >
-      <iframe
-        ref={iframeRef}
-        src={deploymentUrl}
-        className="w-full h-full border-0"
-        sandbox={sandboxPermissions}
-        allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"
-        loading="lazy"
+      <div
         style={{
+          width: originalDimensions.width,
+          height: originalDimensions.height,
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
         }}
-      />
+        className="relative"
+      >
+        <iframe
+          ref={iframeRef}
+          src={deploymentUrl}
+          className="w-full h-full border-0"
+          sandbox={sandboxPermissions}
+          allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; web-share"
+          loading="lazy"
+          style={{
+            width: '100%',
+            height: '100%',
+          }}
+        />
+      </div>
     </div>
   );
-};
+}

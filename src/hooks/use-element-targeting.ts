@@ -1,15 +1,19 @@
-
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { ElementTarget } from '@/types/feedback';
 
 interface UseElementTargetingOptions {
   iframeSelector?: string;
   enabled?: boolean;
+  originalDimensions?: {
+    width: number;
+    height: number;
+  };
 }
 
 export function useElementTargeting({
   iframeSelector = '.sp-preview iframe',
   enabled = false,
+  originalDimensions = { width: 1920, height: 1080 },
 }: UseElementTargetingOptions = {}) {
   const [targetedElement, setTargetedElement] = useState<Element | null>(null);
   const [elementTarget, setElementTarget] = useState<ElementTarget | null>(null);
@@ -176,18 +180,35 @@ export function useElementTargeting({
       const rect = element.getBoundingClientRect();
       const iframeRect = iframe.getBoundingClientRect();
       
-      // Calculate the position as percentage of iframe dimensions
-      const x = ((rect.left + (rect.width / 2) - iframeRect.left + iframe.contentWindow!.scrollX) / iframeRect.width) * 100;
-      const y = ((rect.top + (rect.height / 2) - iframeRect.top + iframe.contentWindow!.scrollY) / iframeRect.height) * 100;
-      const width = (rect.width / iframeRect.width) * 100;
-      const height = (rect.height / iframeRect.height) * 100;
+      // Get the current scale of the iframe
+      let scale = 1;
+      if (iframe.style.transform) {
+        const match = iframe.style.transform.match(/scale\(([^)]+)\)/);
+        if (match && match[1]) {
+          scale = parseFloat(match[1]);
+        }
+      }
+      
+      // Calculate the position relative to the original dimensions
+      const contentX = rect.left + (rect.width / 2) - iframeRect.left + (iframe.contentWindow?.scrollX || 0);
+      const contentY = rect.top + (rect.height / 2) - iframeRect.top + (iframe.contentWindow?.scrollY || 0);
+      
+      // Adjust for scale to get the position in unscaled coordinates
+      const unscaledX = contentX / scale;
+      const unscaledY = contentY / scale;
+      
+      // Calculate percentage based on original dimensions
+      const x = (unscaledX / originalDimensions.width) * 100;
+      const y = (unscaledY / originalDimensions.height) * 100;
+      const width = (rect.width / originalDimensions.width) * 100;
+      const height = (rect.height / originalDimensions.height) * 100;
       
       return { x, y, width, height };
     } catch (error) {
       console.error('Error getting element position:', error);
       return null;
     }
-  }, [getIframe]);
+  }, [getIframe, originalDimensions]);
   
   // Highlight an element in the iframe
   const highlightElement = useCallback((element: Element | null) => {
