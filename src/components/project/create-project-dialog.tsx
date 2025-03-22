@@ -33,6 +33,11 @@ export function CreateProjectDialog({
   const { supabase } = useSupabase();
   const { toast } = useToast();
 
+  const resetForm = () => {
+    setName("");
+    setDescription("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -91,8 +96,7 @@ export function CreateProjectDialog({
         
         onProjectCreated(data as Project);
         onOpenChange(false);
-        setName("");
-        setDescription("");
+        resetForm();
       }
     } catch (error) {
       console.error("Error creating project:", error);
@@ -106,8 +110,16 @@ export function CreateProjectDialog({
     }
   };
 
+  // Reset form when dialog is closed
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      resetForm();
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -147,7 +159,7 @@ export function CreateProjectDialog({
           </div>
           
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

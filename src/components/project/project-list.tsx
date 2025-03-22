@@ -29,18 +29,24 @@ export function ProjectList({
 
   return (
     <>
-      <SidebarMenuSub>
-        {projects.map((project) => (
-          <SidebarMenuSubItem key={project.id}>
-            <SidebarMenuSubButton
-              onClick={() => onSelectProject(project.id)}
-              isActive={currentProjectId === project.id}
-            >
-              <Folder className="h-4 w-4" />
-              <span>{project.name}</span>
-            </SidebarMenuSubButton>
-          </SidebarMenuSubItem>
-        ))}
+      <SidebarMenuSub className="pl-4">
+        {isLoading ? (
+          <div className="py-2 text-sm text-muted-foreground">Loading projects...</div>
+        ) : projects.length === 0 ? (
+          <div className="py-2 text-sm text-muted-foreground">No projects found</div>
+        ) : (
+          projects.map((project) => (
+            <SidebarMenuSubItem key={project.id}>
+              <SidebarMenuSubButton
+                onClick={() => onSelectProject(project.id)}
+                isActive={currentProjectId === project.id}
+              >
+                <Folder className="h-4 w-4" />
+                <span>{project.name}</span>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          ))
+        )}
         
         <SidebarMenuSubItem>
           <Button
@@ -60,7 +66,6 @@ export function ProjectList({
         onOpenChange={setIsCreateDialogOpen}
         onProjectCreated={(project) => {
           onSelectProject(project.id);
-          navigate(`/projects/${project.id}`);
         }}
       />
     </>

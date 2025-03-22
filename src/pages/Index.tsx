@@ -7,11 +7,12 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { ProjectList } from "@/components/project/project-list";
 import { useProjects } from "@/hooks/use-projects";
-import { Collapsible } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronRight } from "lucide-react";
 
 const Index = () => {
   const { session } = useSupabase();
-  const { projects, currentProject, setCurrentProject, isLoading: projectsLoading } = useProjects();
+  const { projects, currentProject, setCurrentProject, isLoading: projectsLoading, createDefaultProjectIfNeeded } = useProjects();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,6 +20,13 @@ const Index = () => {
       setCurrentProjectId(currentProject.id);
     }
   }, [currentProject]);
+
+  // Create default project if needed
+  useEffect(() => {
+    if (!projectsLoading && projects.length === 0) {
+      createDefaultProjectIfNeeded();
+    }
+  }, [projectsLoading, projects, createDefaultProjectIfNeeded]);
 
   if (!session) {
     return (
@@ -42,13 +50,19 @@ const Index = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <AppSidebar>
-          <Collapsible defaultOpen>
-            <ProjectList 
-              projects={projects} 
-              currentProjectId={currentProjectId}
-              onSelectProject={handleSelectProject}
-              isLoading={projectsLoading}
-            />
+          <Collapsible defaultOpen className="group/collapsible">
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent">
+              <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+              <span>Projects</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ProjectList 
+                projects={projects} 
+                currentProjectId={currentProjectId}
+                onSelectProject={handleSelectProject}
+                isLoading={projectsLoading}
+              />
+            </CollapsibleContent>
           </Collapsible>
         </AppSidebar>
         <SidebarInset className="bg-background">
