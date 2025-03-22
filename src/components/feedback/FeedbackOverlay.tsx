@@ -266,7 +266,7 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_type: (data.device_type || deviceType) as DeviceType
+          device_type: ((data as any).device_type || deviceType) as DeviceType
         };
         
         onFeedbackAdded(feedback);
@@ -605,4 +605,3 @@ export function FeedbackOverlay({
     </div>
   );
 }
-
