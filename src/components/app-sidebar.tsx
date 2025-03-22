@@ -8,7 +8,8 @@ import {
   LogOut,
   UserCog,
   Blocks,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ChevronRight
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -23,6 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,18 +78,26 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={location.pathname === "/" || location.pathname.includes("/dashboard")}
-                  tooltip="Projects"
-                >
-                  <Link to="/">
-                    <LayoutDashboard />
-                    <span>Projects</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      isActive={location.pathname === "/" || location.pathname.includes("/projects")}
+                      tooltip="Projects"
+                      className="justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>Projects</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    {/* This will be filled with projects later */}
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               
               <SidebarMenuItem>
                 <SidebarMenuButton

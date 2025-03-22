@@ -1,12 +1,24 @@
 
+import { useEffect, useState } from "react";
 import { PrototypeGrid } from "@/components/prototype-grid";
 import { useSupabase } from "@/lib/supabase-provider";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { ProjectList } from "@/components/project/project-list";
+import { useProjects } from "@/hooks/use-projects";
+import { CollapsibleContent } from "@/components/ui/collapsible";
 
 const Index = () => {
   const { session } = useSupabase();
+  const { projects, currentProject, setCurrentProject, isLoading: projectsLoading } = useProjects();
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentProject) {
+      setCurrentProjectId(currentProject.id);
+    }
+  }, [currentProject]);
 
   if (!session) {
     return (
@@ -19,13 +31,29 @@ const Index = () => {
     );
   }
 
+  const handleSelectProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setCurrentProject(project);
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <AppSidebar />
+        <AppSidebar>
+          <CollapsibleContent>
+            <ProjectList 
+              projects={projects} 
+              currentProjectId={currentProjectId}
+              onSelectProject={handleSelectProject}
+              isLoading={projectsLoading}
+            />
+          </CollapsibleContent>
+        </AppSidebar>
         <SidebarInset className="bg-background">
           <div className="container mx-auto p-6">
-            <PrototypeGrid />
+            <PrototypeGrid projectId={currentProjectId} />
           </div>
         </SidebarInset>
       </div>
