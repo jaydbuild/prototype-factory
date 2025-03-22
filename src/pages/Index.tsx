@@ -7,7 +7,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { ProjectList } from "@/components/project/project-list";
 import { useProjects } from "@/hooks/use-projects";
-import { CollapsibleContent } from "@/components/ui/collapsible";
+import { Collapsible } from "@/components/ui/collapsible";
 
 const Index = () => {
   const { session } = useSupabase();
@@ -42,14 +42,14 @@ const Index = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <AppSidebar>
-          <CollapsibleContent>
+          <Collapsible defaultOpen>
             <ProjectList 
               projects={projects} 
               currentProjectId={currentProjectId}
               onSelectProject={handleSelectProject}
               isLoading={projectsLoading}
             />
-          </CollapsibleContent>
+          </Collapsible>
         </AppSidebar>
         <SidebarInset className="bg-background">
           <div className="container mx-auto p-6">
