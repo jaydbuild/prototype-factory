@@ -1,7 +1,9 @@
 
 import { PrototypeGrid } from "@/components/prototype-grid";
 import { useSupabase } from "@/lib/supabase-provider";
-import { CustomSidebar } from "@/components/ui/custom-sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset } from "@/components/ui/sidebar";
 
 const Index = () => {
   const { session } = useSupabase();
@@ -18,14 +20,16 @@ const Index = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <CustomSidebar />
-      <main className="flex-1 pl-[3.05rem] transition-all">
-        <div className="container mx-auto p-6">
-          <PrototypeGrid />
-        </div>
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar />
+        <SidebarInset className="bg-background">
+          <div className="container mx-auto p-6">
+            <PrototypeGrid />
+          </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 };
 

@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { FeedbackPoint, FeedbackUser, ElementTarget } from '@/types/feedback';
+import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceType } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 
@@ -175,7 +175,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               updated_at: newData.updated_at,
               status: newData.status,
               element_target,
-              device_type: newData.device_type
+              device_type: (newData.device_type as DeviceType) || 'desktop'
             };
             
             setFeedbackPoints(prev => [...prev, newFeedback]);
@@ -218,7 +218,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               updated_at: updatedData.updated_at,
               status: updatedData.status,
               element_target,
-              device_type: updatedData.device_type
+              device_type: (updatedData.device_type as DeviceType) || 'desktop'
             };
             
             setFeedbackPoints(prev => 
