@@ -21,28 +21,51 @@ export const useProjects = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      // First, get the user's project memberships
+      const { data: memberships, error: membershipError } = await supabase
+        .from('project_members')
+        .select('project_id, role')
+        .eq('user_id', userData.user.id);
+
+      if (membershipError) {
+        console.error('Error fetching project memberships:', membershipError);
+        throw membershipError;
+      }
+
+      if (!memberships || memberships.length === 0) {
+        setProjects([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Then, fetch the projects using the project_ids
+      const projectIds = memberships.map(m => m.project_id);
+      
+      const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select(`
           *,
-          project_members!inner(user_id),
           project_members_count:project_members(count),
           prototype_count:prototypes(count)
         `)
-        .eq('project_members.user_id', userData.user.id)
+        .in('id', projectIds)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching projects:', error);
-        throw error;
+      if (projectsError) {
+        console.error('Error fetching projects:', projectsError);
+        throw projectsError;
       }
 
-      // Transform the data to include the member count and prototype count
-      const projectsWithCounts = data.map(project => ({
-        ...project,
-        member_count: project.project_members_count?.[0]?.count || 0,
-        prototype_count: project.prototype_count?.[0]?.count || 0
-      }));
+      // Transform the data to include the member count, prototype count, and role
+      const projectsWithCounts = projectsData.map(project => {
+        const membership = memberships.find(m => m.project_id === project.id);
+        return {
+          ...project,
+          member_count: project.project_members_count?.[0]?.count || 0,
+          prototype_count: project.prototype_count?.[0]?.count || 0,
+          role: membership?.role
+        };
+      });
 
       setProjects(projectsWithCounts);
       
@@ -86,7 +109,7 @@ export const useProjects = () => {
         throw projectError;
       }
 
-      // Add the user as an owner of the project
+      // Add the user as an owner of the project, using a separate query
       const { error: memberError } = await supabase
         .from('project_members')
         .insert({
@@ -125,12 +148,14 @@ export const useProjects = () => {
       }
 
       // Add the newly created project to the state
-      setProjects(prev => [{
+      const newProjectWithCounts: ProjectWithMemberCount = {
         ...newProject,
         member_count: 1,
         prototype_count: prototypes?.length || 0,
         role: 'owner'
-      }, ...prev]);
+      };
+      
+      setProjects(prev => [newProjectWithCounts, ...prev]);
       
       // Set as current project
       setCurrentProject(newProject);

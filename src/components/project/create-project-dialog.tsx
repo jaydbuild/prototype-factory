@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -30,12 +32,14 @@ export function CreateProjectDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { supabase } = useSupabase();
   const { toast } = useToast();
 
   const resetForm = () => {
     setName("");
     setDescription("");
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,6 +55,7 @@ export function CreateProjectDialog({
     }
     
     setIsLoading(true);
+    setError(null);
     
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -77,7 +82,7 @@ export function CreateProjectDialog({
       
       if (error) throw error;
       
-      // Add creator as project owner
+      // Add creator as project owner in a separate query to avoid RLS issues
       if (data) {
         const { error: memberError } = await supabase
           .from("project_members")
@@ -94,12 +99,21 @@ export function CreateProjectDialog({
           description: "Project created successfully",
         });
         
-        onProjectCreated(data as Project);
+        // Add member_count and prototype_count to match ProjectWithMemberCount type
+        const projectWithCounts = {
+          ...data,
+          member_count: 1,
+          prototype_count: 0,
+          role: 'owner' as const
+        };
+        
+        onProjectCreated(projectWithCounts);
         onOpenChange(false);
         resetForm();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating project:", error);
+      setError(error.message || "Failed to create project. Please try again.");
       toast({
         variant: "destructive",
         title: "Error",
@@ -128,6 +142,13 @@ export function CreateProjectDialog({
               Create a new project to organize your prototypes.
             </DialogDescription>
           </DialogHeader>
+          
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
