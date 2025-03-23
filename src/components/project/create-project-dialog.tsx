@@ -74,7 +74,7 @@ export function CreateProjectDialog({
         p_name: name.trim(),
         p_description: description.trim() || null,
         p_user_id: userData.user.id 
-      });
+      } as any); // Using type assertion to bypass TypeScript checking for RPC params
       
       if (error) {
         // Check for specific Supabase errors and provide more helpful messages
@@ -88,12 +88,20 @@ export function CreateProjectDialog({
         throw new Error("Failed to create project. Please try again.");
       }
       
+      // Add the member and prototype counts to match ProjectWithMemberCount
+      const projectWithCounts = {
+        ...data,
+        member_count: 1, // New project has 1 member (the creator)
+        prototype_count: 0, // New project has 0 prototypes initially
+        role: 'owner' as const // Creator is the owner
+      };
+      
       toast({
         title: "Success",
         description: "Project created successfully",
       });
       
-      onProjectCreated(data);
+      onProjectCreated(projectWithCounts);
       onOpenChange(false);
       resetForm();
       
