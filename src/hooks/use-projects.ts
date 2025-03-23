@@ -26,7 +26,8 @@ export const useProjects = () => {
         .select(`
           *,
           project_members!inner(user_id),
-          project_members_count:project_members(count)
+          project_members_count:project_members(count),
+          prototype_count:prototypes(count)
         `)
         .eq('project_members.user_id', userData.user.id)
         .order('created_at', { ascending: false });
@@ -36,10 +37,11 @@ export const useProjects = () => {
         throw error;
       }
 
-      // Transform the data to include the member count
+      // Transform the data to include the member count and prototype count
       const projectsWithCounts = data.map(project => ({
         ...project,
-        member_count: project.project_members_count?.[0]?.count || 0
+        member_count: project.project_members_count?.[0]?.count || 0,
+        prototype_count: project.prototype_count?.[0]?.count || 0
       }));
 
       setProjects(projectsWithCounts);
@@ -125,7 +127,9 @@ export const useProjects = () => {
       // Add the newly created project to the state
       setProjects(prev => [{
         ...newProject,
-        member_count: 1
+        member_count: 1,
+        prototype_count: prototypes?.length || 0,
+        role: 'owner'
       }, ...prev]);
       
       // Set as current project
