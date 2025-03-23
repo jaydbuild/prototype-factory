@@ -50,6 +50,7 @@ const Index = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <AppSidebar>
+          {/* The issue was here - Radix UI's Collapsible component has specific TypeScript types */}
           <Collapsible defaultOpen className="group/collapsible">
             <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent">
               <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
