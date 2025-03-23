@@ -7,7 +7,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { ProjectList } from "@/components/project/project-list";
 import { useProjects } from "@/hooks/use-projects";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 
 const Index = () => {
@@ -50,21 +49,12 @@ const Index = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <AppSidebar>
-          {/* The issue was here - Radix UI's Collapsible component has specific TypeScript types */}
-          <Collapsible defaultOpen className="group/collapsible">
-            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent">
-              <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
-              <span>Projects</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <ProjectList 
-                projects={projects} 
-                currentProjectId={currentProjectId}
-                onSelectProject={handleSelectProject}
-                isLoading={projectsLoading}
-              />
-            </CollapsibleContent>
-          </Collapsible>
+          <ProjectList 
+            projects={projects} 
+            currentProjectId={currentProjectId}
+            onSelectProject={handleSelectProject}
+            isLoading={projectsLoading}
+          />
         </AppSidebar>
         <SidebarInset className="bg-background">
           <div className="container mx-auto p-6">

@@ -35,7 +35,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useSupabase } from "@/lib/supabase-provider";
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  children?: React.ReactNode;
+}
+
+export function AppSidebar({ children }: AppSidebarProps) {
   const location = useLocation();
   const { supabase } = useSupabase();
   
@@ -95,6 +99,7 @@ export function AppSidebar() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     {/* This will be filled with projects later */}
+                    {children}
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
