@@ -6,7 +6,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton
 } from '@/components/ui/sidebar';
-import { Folder, FolderPlus, Plus } from 'lucide-react';
+import { Folder, FolderPlus } from 'lucide-react';
 import { ProjectWithMemberCount } from '@/types/project';
 import { Button } from '@/components/ui/button';
 import { CreateProjectDialog } from './create-project-dialog';
@@ -16,16 +16,30 @@ interface ProjectListProps {
   currentProjectId: string | null;
   onSelectProject: (projectId: string) => void;
   isLoading?: boolean;
+  refetchProjects?: () => void;
 }
 
 export function ProjectList({ 
   projects, 
   currentProjectId, 
   onSelectProject,
-  isLoading = false 
+  isLoading = false,
+  refetchProjects
 }: ProjectListProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleProjectCreated = (project: ProjectWithMemberCount) => {
+    // Immediately select the newly created project
+    onSelectProject(project.id);
+    
+    // Refetch the projects list to ensure UI is up-to-date
+    if (refetchProjects) {
+      setTimeout(() => {
+        refetchProjects();
+      }, 100); // Short delay to ensure database has completed the transaction
+    }
+  };
 
   return (
     <>
@@ -64,9 +78,7 @@ export function ProjectList({
       <CreateProjectDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
-        onProjectCreated={(project) => {
-          onSelectProject(project.id);
-        }}
+        onProjectCreated={handleProjectCreated}
       />
     </>
   );

@@ -88,9 +88,14 @@ export function CreateProjectDialog({
         throw new Error("Failed to create project. Please try again.");
       }
       
+      console.log("Project creation response:", data); // Debug log
+      
+      // Parse data if it's a string, otherwise use as is
+      const projectData = typeof data === 'string' ? JSON.parse(data) : data;
+      
       // Add the member and prototype counts to match ProjectWithMemberCount
       const projectWithCounts = {
-        ...data,
+        ...(projectData || {}), // Use empty object as fallback if projectData is null/undefined
         member_count: 1, // New project has 1 member (the creator)
         prototype_count: 0, // New project has 0 prototypes initially
         role: 'owner' as const // Creator is the owner
@@ -101,6 +106,7 @@ export function CreateProjectDialog({
         description: "Project created successfully",
       });
       
+      // Refetch projects immediately after creating one
       onProjectCreated(projectWithCounts);
       onOpenChange(false);
       resetForm();

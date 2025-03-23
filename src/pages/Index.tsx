@@ -7,11 +7,17 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { ProjectList } from "@/components/project/project-list";
 import { useProjects } from "@/hooks/use-projects";
-import { ChevronRight } from "lucide-react";
 
 const Index = () => {
   const { session } = useSupabase();
-  const { projects, currentProject, setCurrentProject, isLoading: projectsLoading, createDefaultProjectIfNeeded } = useProjects();
+  const { 
+    projects, 
+    currentProject, 
+    setCurrentProject, 
+    isLoading: projectsLoading, 
+    createDefaultProjectIfNeeded,
+    refetchProjects
+  } = useProjects();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,6 +60,7 @@ const Index = () => {
             currentProjectId={currentProjectId}
             onSelectProject={handleSelectProject}
             isLoading={projectsLoading}
+            refetchProjects={refetchProjects}
           />
         </AppSidebar>
         <SidebarInset className="bg-background">

@@ -11,6 +11,14 @@ export const useProjects = () => {
   const { supabase } = useSupabase();
   const { toast } = useToast();
 
+  // Helper function to validate role is one of the expected values
+  const validateRole = (role: string | undefined): 'owner' | 'editor' | 'viewer' | undefined => {
+    if (!role) return undefined;
+    return (role === 'owner' || role === 'editor' || role === 'viewer') 
+      ? (role as 'owner' | 'editor' | 'viewer') 
+      : undefined;
+  };
+
   const fetchProjects = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -33,10 +41,13 @@ export const useProjects = () => {
       }
 
       if (!memberships || memberships.length === 0) {
+        console.log('No project memberships found for user:', userData.user.id);
         setProjects([]);
         setIsLoading(false);
         return;
       }
+
+      console.log('User project memberships:', memberships);
 
       // Then, fetch the projects using the project_ids
       const projectIds = memberships.map(m => m.project_id);
@@ -56,13 +67,7 @@ export const useProjects = () => {
         throw projectsError;
       }
 
-      // Helper function to validate role is one of the expected values
-      const validateRole = (role: string | undefined): 'owner' | 'editor' | 'viewer' | undefined => {
-        if (!role) return undefined;
-        return (role === 'owner' || role === 'editor' || role === 'viewer') 
-          ? (role as 'owner' | 'editor' | 'viewer') 
-          : undefined;
-      };
+      console.log('Projects data fetched:', projectsData);
 
       // Transform the data to include the member count, prototype count, and role
       const projectsWithCounts = projectsData.map(project => {
@@ -75,6 +80,7 @@ export const useProjects = () => {
         } as ProjectWithMemberCount; // Ensure the whole object matches the expected type
       });
 
+      console.log('Projects with counts:', projectsWithCounts);
       setProjects(projectsWithCounts);
       
       // Set first project as current if none is set
@@ -101,35 +107,28 @@ export const useProjects = () => {
         return;
       }
 
-      // Create a default "Test" project
-      const { data: newProject, error: projectError } = await supabase
-        .from('projects')
-        .insert({
-          name: 'Test',
-          description: 'Default project for your prototypes',
-          created_by: userData.user.id,
-        })
-        .select()
-        .single();
+      console.log('Creating default project for user:', userData.user.id);
+
+      // Create a default "Test" project using the RPC function
+      const { data, error: projectError } = await supabase.rpc('create_project_with_owner', {
+        p_name: 'Test',
+        p_description: 'Default project for your prototypes',
+        p_user_id: userData.user.id
+      } as any);
 
       if (projectError) {
         console.error('Error creating default project:', projectError);
         throw projectError;
       }
 
-      // Add the user as an owner of the project, using a separate query
-      const { error: memberError } = await supabase
-        .from('project_members')
-        .insert({
-          project_id: newProject.id,
-          user_id: userData.user.id,
-          role: 'owner',
-        });
-
-      if (memberError) {
-        console.error('Error adding member to project:', memberError);
-        throw memberError;
+      // Parse data if it's a string
+      const projectData = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (!projectData) {
+        throw new Error('Failed to create default project');
       }
+      
+      console.log('Default project created:', projectData);
       
       // Get existing prototypes without a project_id
       const { data: prototypes, error: prototypeError } = await supabase
@@ -146,7 +145,7 @@ export const useProjects = () => {
       if (prototypes && prototypes.length > 0) {
         const { error: updateError } = await supabase
           .from('prototypes')
-          .update({ project_id: newProject.id })
+          .update({ project_id: projectData.id })
           .in('id', prototypes.map(p => p.id));
           
         if (updateError) {
@@ -157,7 +156,7 @@ export const useProjects = () => {
 
       // Add the newly created project to the state
       const newProjectWithCounts: ProjectWithMemberCount = {
-        ...newProject,
+        ...projectData,
         member_count: 1,
         prototype_count: prototypes?.length || 0,
         role: 'owner'
@@ -166,12 +165,15 @@ export const useProjects = () => {
       setProjects(prev => [newProjectWithCounts, ...prev]);
       
       // Set as current project
-      setCurrentProject(newProject);
+      setCurrentProject(newProjectWithCounts);
       
       toast({
         title: 'Default Project Created',
         description: 'A "Test" project has been created for your prototypes.'
       });
+      
+      // Refetch projects to ensure UI is up-to-date
+      fetchProjects();
       
     } catch (error) {
       console.error('Error creating default project:', error);
@@ -181,7 +183,7 @@ export const useProjects = () => {
         description: 'Failed to create default project. Please try again.'
       });
     }
-  }, [supabase, toast]);
+  }, [supabase, toast, fetchProjects]);
 
   useEffect(() => {
     if (supabase) {
