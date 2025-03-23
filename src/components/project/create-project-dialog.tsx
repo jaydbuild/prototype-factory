@@ -69,55 +69,41 @@ export function CreateProjectDialog({
         return;
       }
       
-      // Create the project
-      const { data, error } = await supabase
-        .from("projects")
-        .insert({
-          name: name.trim(),
-          description: description.trim() || null,
-          created_by: userData.user.id,
-        })
-        .select()
-        .single();
+      // Use a single transaction via RPC to avoid RLS policy recursion issues
+      const { data, error } = await supabase.rpc('create_project_with_owner', { 
+        p_name: name.trim(),
+        p_description: description.trim() || null,
+        p_user_id: userData.user.id 
+      });
       
-      if (error) throw error;
-      
-      // Add creator as project owner in a separate query to avoid RLS issues
-      if (data) {
-        const { error: memberError } = await supabase
-          .from("project_members")
-          .insert({
-            project_id: data.id,
-            user_id: userData.user.id,
-            role: "owner",
-          });
-        
-        if (memberError) throw memberError;
-        
-        toast({
-          title: "Success",
-          description: "Project created successfully",
-        });
-        
-        // Add member_count and prototype_count to match ProjectWithMemberCount type
-        const projectWithCounts = {
-          ...data,
-          member_count: 1,
-          prototype_count: 0,
-          role: 'owner' as const
-        };
-        
-        onProjectCreated(projectWithCounts);
-        onOpenChange(false);
-        resetForm();
+      if (error) {
+        // Check for specific Supabase errors and provide more helpful messages
+        if (error.message.includes('recursion')) {
+          throw new Error("Database permission error. Please contact support.");
+        }
+        throw error;
       }
+      
+      if (!data) {
+        throw new Error("Failed to create project. Please try again.");
+      }
+      
+      toast({
+        title: "Success",
+        description: "Project created successfully",
+      });
+      
+      onProjectCreated(data);
+      onOpenChange(false);
+      resetForm();
+      
     } catch (error: any) {
       console.error("Error creating project:", error);
       setError(error.message || "Failed to create project. Please try again.");
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create project. Please try again.",
+        description: error.message || "Failed to create project. Please try again.",
       });
     } finally {
       setIsLoading(false);

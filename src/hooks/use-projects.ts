@@ -57,7 +57,8 @@ export const useProjects = () => {
       }
 
       // Helper function to validate role is one of the expected values
-      const validateRole = (role: string): 'owner' | 'editor' | 'viewer' | undefined => {
+      const validateRole = (role: string | undefined): 'owner' | 'editor' | 'viewer' | undefined => {
+        if (!role) return undefined;
         return (role === 'owner' || role === 'editor' || role === 'viewer') 
           ? (role as 'owner' | 'editor' | 'viewer') 
           : undefined;
