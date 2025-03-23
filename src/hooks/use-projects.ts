@@ -56,6 +56,13 @@ export const useProjects = () => {
         throw projectsError;
       }
 
+      // Helper function to validate role is one of the expected values
+      const validateRole = (role: string): 'owner' | 'editor' | 'viewer' | undefined => {
+        return (role === 'owner' || role === 'editor' || role === 'viewer') 
+          ? (role as 'owner' | 'editor' | 'viewer') 
+          : undefined;
+      };
+
       // Transform the data to include the member count, prototype count, and role
       const projectsWithCounts = projectsData.map(project => {
         const membership = memberships.find(m => m.project_id === project.id);
@@ -63,8 +70,8 @@ export const useProjects = () => {
           ...project,
           member_count: project.project_members_count?.[0]?.count || 0,
           prototype_count: project.prototype_count?.[0]?.count || 0,
-          role: membership?.role
-        };
+          role: validateRole(membership?.role)
+        } as ProjectWithMemberCount; // Ensure the whole object matches the expected type
       });
 
       setProjects(projectsWithCounts);
