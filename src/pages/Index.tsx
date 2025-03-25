@@ -1,6 +1,7 @@
 
 import { PrototypeGrid } from "@/components/prototype-grid";
 import { useSupabase } from "@/lib/supabase-provider";
+import Dashboard from "@/components/dashboard";
 
 const Index = () => {
   const { session } = useSupabase();
@@ -18,7 +19,7 @@ const Index = () => {
 
   return (
     <main className="min-h-screen bg-background">
-      <PrototypeGrid />
+      <Dashboard />
     </main>
   );
 };
