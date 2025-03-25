@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -6,9 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CollectionWithCount } from "@/types/prototype";
-import { CollectionList } from "./collection/CollectionList";
-import { CreateCollectionDialog } from "./collection/CreateCollectionDialog";
-import { PrototypeCollectionTag } from "./collection/PrototypeCollectionTag";
+import { CollectionList } from "./CollectionList";
+import { CreateCollectionDialog } from "./CreateCollectionDialog";
+import { PrototypeCollectionTag } from "./PrototypeCollectionTag";
 
 interface PrototypeCollectionsProps {
   selectedCollection: string | null;

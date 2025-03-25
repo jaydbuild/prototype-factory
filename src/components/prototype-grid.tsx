@@ -9,7 +9,7 @@ import { PrototypeCardList } from "./prototype/PrototypeCardList";
 import { AddToCollectionDialog } from "./prototype/collection/AddToCollectionDialog";
 import { usePrototypeData } from "./prototype/hooks/usePrototypeData";
 import { usePrototypeSelection } from "./prototype/hooks/usePrototypeSelection";
-import { CollectionWithCount } from "@/types/prototype";
+import { Collection, CollectionWithCount } from "@/types/prototype";
 import { useToast } from "@/hooks/use-toast";
 
 export const PrototypeGrid = () => {

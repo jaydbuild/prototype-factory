@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,8 +18,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { CollectionWithCount } from "@/types/prototype";
-import { ExistingCollectionsTab } from "./collection/ExistingCollectionsTab";
-import { NewCollectionForm } from "./collection/NewCollectionForm";
+import { ExistingCollectionsTab } from "./ExistingCollectionsTab";
+import { NewCollectionForm } from "./NewCollectionForm";
 
 interface AddToCollectionDialogProps {
   open: boolean;
