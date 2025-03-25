@@ -14,7 +14,7 @@ import { Plus, Folder, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Collection } from "@/types/prototype";
+import { Collection, CollectionWithCount } from "@/types/prototype";
 
 export function PrototypeCollections({ 
   selectedCollection, 
@@ -30,7 +30,7 @@ export function PrototypeCollections({
   const queryClient = useQueryClient();
 
   // Fetch collections with prototype counts
-  const { data: collections = [], isLoading } = useQuery({
+  const { data: collections = [], isLoading } = useQuery<CollectionWithCount[]>({
     queryKey: ['collections-with-counts'],
     queryFn: async () => {
       try {
@@ -61,7 +61,7 @@ export function PrototypeCollections({
         return (collectionsData || []).map(collection => ({
           ...collection,
           prototypeCount: countMap[collection.id] || 0
-        }));
+        })) as CollectionWithCount[];
       } catch (error: any) {
         console.error('Error fetching collections with counts:', error);
         toast({

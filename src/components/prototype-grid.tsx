@@ -8,7 +8,7 @@ import { PrototypeCollections } from "./prototype-collections";
 import { PrototypeToolbar } from "./prototype/PrototypeToolbar";
 import { PrototypeCardList } from "./prototype/PrototypeCardList";
 import { AddToCollectionDialog } from "./prototype/AddToCollectionDialog";
-import type { Prototype, Collection } from "@/types/prototype";
+import type { Prototype, Collection, CollectionWithCount } from "@/types/prototype";
 
 interface PrototypeCollection {
   prototype_id: string;
@@ -56,7 +56,7 @@ export const PrototypeGrid = () => {
   });
 
   // Query for collections with counts
-  const { data: collections = [] } = useQuery({
+  const { data: collections = [] } = useQuery<CollectionWithCount[]>({
     queryKey: ['collections-with-counts'],
     queryFn: async () => {
       try {
@@ -84,9 +84,14 @@ export const PrototypeGrid = () => {
         return (collectionsData || []).map(collection => ({
           ...collection,
           prototypeCount: countMap[collection.id] || 0
-        }));
+        })) as CollectionWithCount[];
       } catch (error) {
         console.error('Error fetching collections with counts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch collections",
+          variant: "destructive",
+        });
         return [];
       }
     }

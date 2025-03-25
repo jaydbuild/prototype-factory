@@ -22,7 +22,7 @@ export interface Prototype {
 export interface Collection {
   id: string;
   name: string;
-  color?: string;
+  color: string;  // Making this required to match usage in components
   created_at: string;
   created_by: string;
   prototypeCount?: number;
