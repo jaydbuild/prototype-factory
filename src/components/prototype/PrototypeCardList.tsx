@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PrototypeCard } from "@/components/prototype-card";
-import { PrototypeCollectionTag } from "@/components/prototype-collections";
+import { PrototypeCollectionTag } from "@/components/prototype/collection/PrototypeCollectionTag";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";

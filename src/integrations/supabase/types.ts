@@ -215,6 +215,7 @@ export type Database = {
           content: string
           created_at: string | null
           created_by: string | null
+          device_type: string | null
           element_metadata: Json | null
           element_selector: string | null
           element_xpath: string | null
@@ -228,6 +229,7 @@ export type Database = {
           content: string
           created_at?: string | null
           created_by?: string | null
+          device_type?: string | null
           element_metadata?: Json | null
           element_selector?: string | null
           element_xpath?: string | null
@@ -241,6 +243,7 @@ export type Database = {
           content?: string
           created_at?: string | null
           created_by?: string | null
+          device_type?: string | null
           element_metadata?: Json | null
           element_selector?: string | null
           element_xpath?: string | null
