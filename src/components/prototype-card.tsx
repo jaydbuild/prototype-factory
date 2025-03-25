@@ -1,7 +1,7 @@
 
 import { format, parseISO } from "date-fns";
 import { MessageSquare, Edit, ArrowUpRight, Check } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { PrototypeStatusBadge } from "./prototype-status-badge";
 import { useState } from "react";
 import { EditPrototypeDialog } from "./edit-prototype-dialog";
@@ -9,7 +9,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Prototype } from "@/types/prototype";
 import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
 
 interface PrototypeCardProps {
   prototype: Prototype;
@@ -21,7 +20,6 @@ interface PrototypeCardProps {
 export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }: PrototypeCardProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
-  const navigate = useNavigate();
   
   const { data: feedbackCount = 0 } = useQuery({
     queryKey: ['prototype-feedback-count', prototype.id],
@@ -48,10 +46,6 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
     }
   };
 
-  const handleCardClick = () => {
-    navigate(`/prototype/${prototype.id}${collectionId ? `?fromCollection=${collectionId}` : ''}`);
-  };
-
   return (
     <>
       <div 
@@ -62,10 +56,11 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
         )}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
-        onClick={handleCardClick}
-        role="button"
       >
-        <div className="block relative p-5">
+        <Link 
+          to={`/prototype/${prototype.id}${collectionId ? `?fromCollection=${collectionId}` : ''}`}
+          className="block relative p-5"
+        >
           {/* Selection Check - Only visible when hovering or selected */}
           {onSelect && (isHovering || isSelected) && (
             <div 
@@ -131,24 +126,22 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
               {/* View Link */}
               {prototype.deployment_url && prototype.deployment_status === 'deployed' && (
                 <div className="flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-1 text-primary hover:underline transition-colors text-xs"
+                  <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       window.open(prototype.deployment_url, '_blank', 'noopener,noreferrer');
                     }}
+                    className="flex items-center gap-1 text-primary hover:underline transition-colors text-xs"
                   >
                     View
                     <ArrowUpRight className="w-3 h-3" />
-                  </Button>
+                  </button>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       <EditPrototypeDialog

@@ -118,65 +118,6 @@ export type Database = {
         }
         Relationships: []
       }
-      project_members: {
-        Row: {
-          created_at: string
-          id: string
-          project_id: string
-          role: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          project_id: string
-          role: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          project_id?: string
-          role?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_members_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      projects: {
-        Row: {
-          created_at: string
-          created_by: string
-          description: string | null
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       prototype_collections: {
         Row: {
           collection_id: string
@@ -350,7 +291,6 @@ export type Database = {
           preview_title: string | null
           preview_url: string | null
           processed_at: string | null
-          project_id: string | null
           sandbox_config: Json | null
           status: string | null
           updated_at: string
@@ -373,7 +313,6 @@ export type Database = {
           preview_title?: string | null
           preview_url?: string | null
           processed_at?: string | null
-          project_id?: string | null
           sandbox_config?: Json | null
           status?: string | null
           updated_at?: string
@@ -396,7 +335,6 @@ export type Database = {
           preview_title?: string | null
           preview_url?: string | null
           processed_at?: string | null
-          project_id?: string | null
           sandbox_config?: Json | null
           status?: string | null
           updated_at?: string
@@ -408,13 +346,6 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "prototypes_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -442,14 +373,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_project_with_owner: {
-        Args: {
-          p_name: string
-          p_description: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

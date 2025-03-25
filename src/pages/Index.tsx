@@ -1,37 +1,9 @@
 
-import { useEffect, useState } from "react";
 import { PrototypeGrid } from "@/components/prototype-grid";
 import { useSupabase } from "@/lib/supabase-provider";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset } from "@/components/ui/sidebar";
-import { ProjectList } from "@/components/project/project-list";
-import { useProjects } from "@/hooks/use-projects";
 
 const Index = () => {
   const { session } = useSupabase();
-  const { 
-    projects, 
-    currentProject, 
-    setCurrentProject, 
-    isLoading: projectsLoading, 
-    createDefaultProjectIfNeeded,
-    refetchProjects
-  } = useProjects();
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (currentProject) {
-      setCurrentProjectId(currentProject.id);
-    }
-  }, [currentProject]);
-
-  // Create default project if needed
-  useEffect(() => {
-    if (!projectsLoading && projects.length === 0) {
-      createDefaultProjectIfNeeded();
-    }
-  }, [projectsLoading, projects, createDefaultProjectIfNeeded]);
 
   if (!session) {
     return (
@@ -44,32 +16,10 @@ const Index = () => {
     );
   }
 
-  const handleSelectProject = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    if (project) {
-      setCurrentProject(project);
-    }
-  };
-
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar>
-          <ProjectList 
-            projects={projects} 
-            currentProjectId={currentProjectId}
-            onSelectProject={handleSelectProject}
-            isLoading={projectsLoading}
-            refetchProjects={refetchProjects}
-          />
-        </AppSidebar>
-        <SidebarInset className="bg-background">
-          <div className="container mx-auto p-6">
-            <PrototypeGrid projectId={currentProjectId} />
-          </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <main className="min-h-screen bg-background">
+      <PrototypeGrid />
+    </main>
   );
 };
 
