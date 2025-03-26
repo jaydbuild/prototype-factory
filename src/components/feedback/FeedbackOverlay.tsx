@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget, DeviceType } from '@/types/feedback';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget, DeviceType, DeviceInfo } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
+import { FeedbackDeviceFilter } from './FeedbackDeviceFilter';
 import { CommentThread } from './CommentThread';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useIframeStability } from '@/hooks/use-iframe-stability';
 import { useElementTargeting } from '@/hooks/use-element-targeting';
-import { Crosshair, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Crosshair, X, ChevronUp, ChevronDown, Smartphone, Tablet, Monitor } from 'lucide-react';
 import { safelyConvertElementMetadata } from '@/utils/feedback-utils';
 
 interface FeedbackOverlayProps {
@@ -21,7 +22,7 @@ interface FeedbackOverlayProps {
   feedbackUsers: Record<string, FeedbackUser>;
   currentUser?: FeedbackUser;
   previewContainerRef?: React.RefObject<HTMLDivElement>;
-  deviceType?: 'desktop' | 'tablet' | 'mobile' | 'custom';
+  deviceType?: DeviceType;
   orientation?: 'portrait' | 'landscape';
   scale?: number;
   originalDimensions?: {
@@ -52,6 +53,7 @@ export function FeedbackOverlay({
   const [isInteractingWithComment, setIsInteractingWithComment] = useState(false);
   const [currentHoveredElements, setCurrentHoveredElements] = useState<Element[]>([]);
   const [currentElementIndex, setCurrentElementIndex] = useState(0);
+  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | 'all'>('all');
   
   const { isIframeReady, refreshCheck } = useIframeStability({
     containerSelector: '.sp-preview',
@@ -72,19 +74,78 @@ export function FeedbackOverlay({
     enabled: isFeedbackMode && isIframeReady
   });
 
+  const currentDeviceInfo: DeviceInfo = {
+    type: deviceType,
+    width: originalDimensions.width,
+    height: originalDimensions.height,
+    orientation: orientation,
+    scale: scale
+  };
+
+  const deviceCounts = useMemo(() => {
+    const counts: Record<DeviceType | 'all', number> = {
+      all: feedbackPoints.length,
+      desktop: 0,
+      tablet: 0,
+      mobile: 0,
+      custom: 0
+    };
+    
+    feedbackPoints.forEach(feedback => {
+      if (feedback.device_info?.type) {
+        counts[feedback.device_info.type] = (counts[feedback.device_info.type] || 0) + 1;
+      } else {
+        counts.desktop += 1;
+      }
+    });
+    
+    return counts;
+  }, [feedbackPoints]);
+
+  const filteredFeedbackPoints = useMemo(() => {
+    if (selectedDeviceType === 'all') {
+      return feedbackPoints;
+    }
+    
+    return feedbackPoints.filter(feedback => {
+      if (!feedback.device_info) {
+        return selectedDeviceType === 'desktop';
+      }
+      
+      return feedback.device_info.type === selectedDeviceType;
+    });
+  }, [feedbackPoints, selectedDeviceType]);
+
+  const isMatchingCurrentDevice = useCallback((feedback: FeedbackPointType) => {
+    if (!feedback.device_info) {
+      return deviceType === 'desktop';
+    }
+    
+    if (feedback.device_info.type !== deviceType) {
+      return false;
+    }
+    
+    if (feedback.device_info.orientation !== orientation) {
+      return false;
+    }
+    
+    if (deviceType === 'custom' && feedback.device_info.type === 'custom') {
+      const widthDiff = Math.abs(feedback.device_info.width - originalDimensions.width) / originalDimensions.width;
+      const heightDiff = Math.abs(feedback.device_info.height - originalDimensions.height) / originalDimensions.height;
+      
+      return widthDiff <= 0.1 && heightDiff <= 0.1;
+    }
+    
+    return true;
+  }, [deviceType, orientation, originalDimensions]);
+
   useEffect(() => {
     console.log("Feedback mode:", isFeedbackMode, "Iframe ready:", isIframeReady);
     if (isFeedbackMode) {
       refreshCheck();
     }
   }, [isFeedbackMode, refreshCheck]);
-  
-  useEffect(() => {
-    if (currentHoveredElements.length > 0) {
-      console.log(`Currently hovering over ${currentHoveredElements.length} elements, showing index ${currentElementIndex}`);
-    }
-  }, [currentHoveredElements, currentElementIndex]);
-  
+
   const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isFeedbackMode || !overlayRef.current || !isIframeReady) return;
     
@@ -224,13 +285,21 @@ export function FeedbackOverlay({
         };
       }
       
+      const deviceMetadata = {
+        type: deviceType,
+        width: originalDimensions.width,
+        height: originalDimensions.height,
+        orientation: orientation,
+        scale: scale
+      };
+      
       const feedbackData: any = {
         prototype_id: prototypeId,
         created_by: currentUser.id,
         content: newFeedbackContent,
         position: feedbackPosition,
         status: 'open',
-        device_type: deviceType
+        device_metadata: deviceMetadata
       };
       
       if (targetData) {
@@ -266,7 +335,15 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_type: ((data as any).device_type || deviceType) as DeviceType
+          device_info: data.device_metadata
+            ? {
+                type: data.device_metadata.type,
+                width: data.device_metadata.width,
+                height: data.device_metadata.height,
+                orientation: data.device_metadata.orientation,
+                scale: data.device_metadata.scale
+              }
+            : undefined
         };
         
         onFeedbackAdded(feedback);
@@ -304,7 +381,10 @@ export function FeedbackOverlay({
     getElementPosition,
     highlightElement,
     elementTarget,
-    deviceType
+    deviceType,
+    originalDimensions,
+    orientation,
+    scale
   ]);
 
   const handleUpdateFeedbackStatus = useCallback(async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {
@@ -440,6 +520,28 @@ export function FeedbackOverlay({
         </div>
       )}
       
+      {isIframeReady && (
+        <div className="absolute top-4 right-4 z-50">
+          <FeedbackDeviceFilter
+            selectedDeviceType={selectedDeviceType}
+            onSelectDeviceType={setSelectedDeviceType}
+            deviceCounts={deviceCounts}
+            currentDevice={currentDeviceInfo}
+          />
+        </div>
+      )}
+      
+      {isIframeReady && (
+        <div className="absolute top-4 left-4 z-50 flex items-center gap-1 bg-background/80 py-1 px-2 rounded-md border text-xs text-muted-foreground">
+          {deviceType === 'mobile' && <Smartphone className="h-3 w-3" />}
+          {deviceType === 'tablet' && <Tablet className="h-3 w-3" />}
+          {deviceType === 'desktop' && <Monitor className="h-3 w-3" />}
+          <span>
+            {deviceType} ({originalDimensions.width}×{originalDimensions.height})
+          </span>
+        </div>
+      )}
+      
       {isIframeReady && currentHoveredElements.length > 0 && (
         <div className="absolute bottom-4 right-4 z-50 bg-background rounded-md shadow-md border p-2">
           <div className="text-xs text-muted-foreground mb-1">
@@ -476,7 +578,7 @@ export function FeedbackOverlay({
         </div>
       )}
       
-      {isIframeReady && feedbackPoints.map(feedback => (
+      {isIframeReady && filteredFeedbackPoints.map(feedback => (
         <div 
           key={feedback.id} 
           className="feedback-point"
@@ -487,6 +589,7 @@ export function FeedbackOverlay({
             onClick={handleFeedbackPointClick}
             isSelected={selectedFeedback?.id === feedback.id}
             commentCount={0}
+            isMatchingCurrentDevice={isMatchingCurrentDevice(feedback)}
             onMouseEnter={() => {
               if (feedback.element_target) {
                 const element = findElementByTarget(feedback.element_target);

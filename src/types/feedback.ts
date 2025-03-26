@@ -14,6 +14,14 @@ export interface ElementTarget {
   } | null;
 }
 
+export interface DeviceInfo {
+  type: DeviceType;
+  width: number;
+  height: number;
+  orientation: 'portrait' | 'landscape';
+  scale?: number;
+}
+
 export interface FeedbackPoint {
   id: string;
   prototype_id: string;
@@ -29,7 +37,7 @@ export interface FeedbackPoint {
   updated_at: string | null;
   status: FeedbackStatus;
   element_target?: ElementTarget;
-  device_type?: DeviceType;
+  device_info?: DeviceInfo;
 }
 
 export interface FeedbackReaction {

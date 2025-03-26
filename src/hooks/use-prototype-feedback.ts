@@ -1,50 +1,8 @@
-
 import { useState, useEffect } from 'react';
-import { FeedbackPoint, FeedbackUser, ElementTarget } from '@/types/feedback';
+import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
-
-// Helper function to safely convert attributes to Record<string, string>
-function safelyConvertAttributes(attributes: any): Record<string, string> | undefined {
-  if (!attributes || typeof attributes !== 'object') {
-    return undefined;
-  }
-  
-  // If it's an array, we can't convert it to Record<string, string>
-  if (Array.isArray(attributes)) {
-    return undefined;
-  }
-  
-  // Convert all values to strings
-  const result: Record<string, string> = {};
-  for (const key in attributes) {
-    if (Object.prototype.hasOwnProperty.call(attributes, key)) {
-      const value = attributes[key];
-      // Skip null or undefined values
-      if (value != null) {
-        // Convert any value to string
-        result[key] = String(value);
-      }
-    }
-  }
-  
-  return Object.keys(result).length > 0 ? result : undefined;
-}
-
-// Helper function to safely convert element metadata
-function safelyConvertElementMetadata(metadata: any): ElementTarget['metadata'] {
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-    return null;
-  }
-  
-  return {
-    tagName: typeof metadata.tagName === 'string' ? metadata.tagName : undefined,
-    text: typeof metadata.text === 'string' ? metadata.text : undefined,
-    attributes: safelyConvertAttributes(metadata.attributes),
-    elementType: typeof metadata.elementType === 'string' ? metadata.elementType : undefined,
-    displayName: typeof metadata.displayName === 'string' ? metadata.displayName : undefined
-  };
-}
+import { safelyConvertElementMetadata, safelyConvertDeviceInfo } from '@/utils/feedback-utils';
 
 export function usePrototypeFeedback(prototypeId: string) {
   const [feedbackPoints, setFeedbackPoints] = useState<FeedbackPoint[]>([]);
@@ -82,6 +40,12 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
+            // Create device_info if device_metadata exists
+            let device_info: DeviceInfo | undefined = undefined;
+            if (feedback.device_metadata) {
+              device_info = safelyConvertDeviceInfo(feedback.device_metadata);
+            }
+            
             // Return the feedback point with our structure
             return {
               id: feedback.id,
@@ -93,7 +57,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               updated_at: feedback.updated_at,
               status: feedback.status,
               element_target,
-              device_type: feedback.device_type
+              device_info
             } as FeedbackPoint;
           });
           
@@ -165,6 +129,12 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
+            // Create device_info if device_metadata exists
+            let device_info: DeviceInfo | undefined = undefined;
+            if (newData.device_metadata) {
+              device_info = safelyConvertDeviceInfo(newData.device_metadata);
+            }
+            
             const newFeedback: FeedbackPoint = {
               id: newData.id,
               prototype_id: newData.prototype_id,
@@ -175,7 +145,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               updated_at: newData.updated_at,
               status: newData.status,
               element_target,
-              device_type: newData.device_type
+              device_info
             };
             
             setFeedbackPoints(prev => [...prev, newFeedback]);
@@ -208,6 +178,12 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
+            // Create device_info if device_metadata exists
+            let device_info: DeviceInfo | undefined = undefined;
+            if (updatedData.device_metadata) {
+              device_info = safelyConvertDeviceInfo(updatedData.device_metadata);
+            }
+            
             const updatedFeedback: FeedbackPoint = {
               id: updatedData.id,
               prototype_id: updatedData.prototype_id,
@@ -218,7 +194,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               updated_at: updatedData.updated_at,
               status: updatedData.status,
               element_target,
-              device_type: updatedData.device_type
+              device_info
             };
             
             setFeedbackPoints(prev => 

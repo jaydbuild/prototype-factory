@@ -1,10 +1,7 @@
 
-import { ElementTarget } from '@/types/feedback';
+import { ElementTarget, DeviceInfo } from '@/types/feedback';
 
-/**
- * Safely converts arbitrary attributes to a Record<string, string>
- * ensuring all values are strings as required by the ElementTarget type
- */
+// Helper function to safely convert attributes to Record<string, string>
 export function safelyConvertAttributes(attributes: any): Record<string, string> | undefined {
   if (!attributes || typeof attributes !== 'object') {
     return undefined;
@@ -31,10 +28,7 @@ export function safelyConvertAttributes(attributes: any): Record<string, string>
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-/**
- * Safely converts element metadata object to the expected ElementTarget metadata structure
- * ensuring all properties have the correct types
- */
+// Helper function to safely convert element metadata
 export function safelyConvertElementMetadata(metadata: any): ElementTarget['metadata'] {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return null;
@@ -49,43 +43,39 @@ export function safelyConvertElementMetadata(metadata: any): ElementTarget['meta
   };
 }
 
-/**
- * Extracts displayed text from an element, handling various element types
- */
-export function getElementDisplayText(element: Element): string {
-  if (!element) return '';
-  
-  // For form elements, try to get descriptive attributes
-  if (element.tagName === 'INPUT' || element.tagName === 'BUTTON' || element.tagName === 'SELECT' || element.tagName === 'TEXTAREA') {
-    const placeholder = element.getAttribute('placeholder');
-    const value = (element as HTMLInputElement).value;
-    const ariaLabel = element.getAttribute('aria-label');
-    const title = element.getAttribute('title');
-    
-    return placeholder || value || ariaLabel || title || element.textContent || '';
+// Helper function to safely convert device info
+export function safelyConvertDeviceInfo(deviceInfo: any): DeviceInfo | undefined {
+  if (!deviceInfo || typeof deviceInfo !== 'object' || Array.isArray(deviceInfo)) {
+    return undefined;
   }
   
-  // For image elements, use alt text
-  if (element.tagName === 'IMG') {
-    return element.getAttribute('alt') || 'Image';
+  // Ensure we have the required fields with correct types
+  if (
+    typeof deviceInfo.type !== 'string' || 
+    typeof deviceInfo.width !== 'number' || 
+    typeof deviceInfo.height !== 'number' || 
+    typeof deviceInfo.orientation !== 'string'
+  ) {
+    return undefined;
   }
   
-  // For most elements, get text content
-  return element.textContent || '';
-}
-
-/**
- * Gets a concise description of an element for display
- */
-export function getElementDescription(element: Element): string {
-  if (!element) return '';
+  // Validate device type
+  const validDeviceTypes = ['desktop', 'tablet', 'mobile', 'custom'];
+  if (!validDeviceTypes.includes(deviceInfo.type)) {
+    return undefined;
+  }
   
-  const tagName = element.tagName.toLowerCase();
-  const id = element.id ? `#${element.id}` : '';
-  const className = element.className ? `.${element.className.split(' ')[0]}` : '';
-  const text = getElementDisplayText(element);
+  // Validate orientation
+  const validOrientations = ['portrait', 'landscape'];
+  if (!validOrientations.includes(deviceInfo.orientation)) {
+    return undefined;
+  }
   
-  const textPreview = text ? ` "${text.substring(0, 15)}${text.length > 15 ? '...' : ''}"` : '';
-  
-  return `${tagName}${id}${className}${textPreview}`;
+  return {
+    type: deviceInfo.type,
+    width: deviceInfo.width,
+    height: deviceInfo.height,
+    orientation: deviceInfo.orientation,
+    scale: typeof deviceInfo.scale === 'number' ? deviceInfo.scale : undefined
+  };
 }

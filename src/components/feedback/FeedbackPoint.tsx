@@ -1,9 +1,10 @@
 
 import React from 'react';
-import { FeedbackPoint as FeedbackPointType, FeedbackStatus } from '@/types/feedback';
+import { FeedbackPoint as FeedbackPointType, FeedbackStatus, DeviceType } from '@/types/feedback';
 import { Badge } from '@/components/ui/badge';
 import { 
-  AlertCircle, CheckCircle, Clock, XCircle, Target, MessageCircle
+  AlertCircle, CheckCircle, Clock, XCircle, Target, MessageCircle,
+  Smartphone, Tablet, Monitor, Laptop
 } from 'lucide-react';
 
 interface FeedbackPointProps {
@@ -13,6 +14,7 @@ interface FeedbackPointProps {
   commentCount: number;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  isMatchingCurrentDevice?: boolean;
 }
 
 export function FeedbackPoint({ 
@@ -21,9 +23,10 @@ export function FeedbackPoint({
   isSelected,
   commentCount = 0,
   onMouseEnter,
-  onMouseLeave
+  onMouseLeave,
+  isMatchingCurrentDevice = true
 }: FeedbackPointProps) {
-  const { position, status, element_target } = feedback;
+  const { position, status, element_target, device_info } = feedback;
   
   const getStatusIcon = (status: FeedbackStatus) => {
     switch (status) {
@@ -35,6 +38,21 @@ export function FeedbackPoint({
         return <CheckCircle className="h-3 w-3 text-green-500" />;
       case 'closed':
         return <XCircle className="h-3 w-3 text-gray-500" />;
+    }
+  };
+
+  const getDeviceIcon = (deviceType?: DeviceType) => {
+    switch (deviceType) {
+      case 'mobile':
+        return <Smartphone className="h-2 w-2" />;
+      case 'tablet':
+        return <Tablet className="h-2 w-2" />;
+      case 'desktop':
+        return <Monitor className="h-2 w-2" />;
+      case 'custom':
+        return <Laptop className="h-2 w-2" />;
+      default:
+        return null;
     }
   };
 
@@ -53,6 +71,7 @@ export function FeedbackPoint({
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,
+        opacity: isMatchingCurrentDevice ? 1 : 0.5
       }}
       onClick={handleClick}
       onMouseEnter={onMouseEnter}
@@ -66,9 +85,9 @@ export function FeedbackPoint({
               ? 'bg-primary text-primary-foreground scale-125'
               : 'bg-background text-foreground hover:bg-primary/20 hover:scale-110'
           } shadow-md border-2 ${
-            isSelected ? 'border-primary' : 'border-border'
+            isSelected ? 'border-primary' : isMatchingCurrentDevice ? 'border-border' : 'border-muted'
           }`}
-          title={element_target?.metadata?.displayName || "View feedback"}
+          title={element_target?.metadata?.displayName || device_info?.type ? `${device_info?.type || ''} ${device_info?.width || ''}×${device_info?.height || ''}` : "View feedback"}
         >
           {getStatusIcon(status)}
           
@@ -76,6 +95,13 @@ export function FeedbackPoint({
           {element_target && (
             <span className="absolute -left-1.5 -bottom-1.5 bg-blue-500 text-white rounded-full p-0.5 w-3 h-3 flex items-center justify-center">
               <Target className="h-2 w-2" />
+            </span>
+          )}
+          
+          {/* Device type indicator */}
+          {device_info && (
+            <span className={`absolute -right-1.5 -bottom-1.5 ${isMatchingCurrentDevice ? 'bg-green-500' : 'bg-amber-500'} text-white rounded-full p-0.5 w-3 h-3 flex items-center justify-center`}>
+              {getDeviceIcon(device_info.type)}
             </span>
           )}
           

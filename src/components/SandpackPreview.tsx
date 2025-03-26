@@ -789,6 +789,20 @@ if (typeof window.menuitemfn === 'undefined') {
                     deviceType={deviceType}
                     orientation={orientation}
                     scale={scale}
+                    originalDimensions={
+                      deviceType === 'custom' 
+                        ? customDimensions 
+                        : deviceType === 'desktop' 
+                          ? { width: 1920, height: 1080 } 
+                          : selectedDevice && deviceConfigs[selectedDevice] 
+                            ? { 
+                                width: orientation === 'portrait' ? deviceConfigs[selectedDevice].width : deviceConfigs[selectedDevice].height, 
+                                height: orientation === 'portrait' ? deviceConfigs[selectedDevice].height : deviceConfigs[selectedDevice].width 
+                              }
+                            : deviceType === 'mobile'
+                              ? { width: 375, height: 667 }
+                              : { width: 768, height: 1024 }
+                    }
                   />
                 </div>
               </div>
