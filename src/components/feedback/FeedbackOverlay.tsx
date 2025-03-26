@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIframeStability } from '@/hooks/use-iframe-stability';
 import { useElementTargeting } from '@/hooks/use-element-targeting';
 import { Crosshair, X, ChevronUp, ChevronDown, Smartphone, Tablet, Monitor } from 'lucide-react';
-import { safelyConvertElementMetadata } from '@/utils/feedback-utils';
+import { safelyConvertElementMetadata, safelyConvertDeviceInfo } from '@/utils/feedback-utils';
 
 interface FeedbackOverlayProps {
   prototypeId: string;
@@ -138,13 +138,6 @@ export function FeedbackOverlay({
     
     return true;
   }, [deviceType, orientation, originalDimensions]);
-
-  useEffect(() => {
-    console.log("Feedback mode:", isFeedbackMode, "Iframe ready:", isIframeReady);
-    if (isFeedbackMode) {
-      refreshCheck();
-    }
-  }, [isFeedbackMode, refreshCheck]);
 
   const handleOverlayClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isFeedbackMode || !overlayRef.current || !isIframeReady) return;
@@ -335,7 +328,13 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_info: data.device_info
+          device_info: data.device_info || (data.device_type ? {
+            type: data.device_type as DeviceType,
+            width: originalDimensions.width,
+            height: originalDimensions.height,
+            orientation: 'portrait',
+            scale: 1
+          } : undefined)
         };
         
         onFeedbackAdded(feedback);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,9 +38,19 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
+            // Handle both device_info (new) and device_type (old) formats
             let device_info: DeviceInfo | undefined = undefined;
             if (feedback.device_info) {
               device_info = safelyConvertDeviceInfo(feedback.device_info);
+            } else if (feedback.device_type) {
+              // Create a basic device_info object from device_type
+              device_info = {
+                type: feedback.device_type,
+                width: 1920, // Default values
+                height: 1080,
+                orientation: 'portrait',
+                scale: 1
+              };
             }
             
             return {
@@ -120,9 +131,18 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
+            // Handle both device_info (new) and device_type (old) formats for realtime updates
             let device_info: DeviceInfo | undefined = undefined;
             if (newData.device_info) {
               device_info = safelyConvertDeviceInfo(newData.device_info);
+            } else if (newData.device_type) {
+              device_info = {
+                type: newData.device_type,
+                width: 1920, // Default values
+                height: 1080,
+                orientation: 'portrait',
+                scale: 1
+              };
             }
             
             const newFeedback: FeedbackPoint = {
@@ -166,9 +186,18 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
+            // Handle both device_info (new) and device_type (old) formats for updates
             let device_info: DeviceInfo | undefined = undefined;
             if (updatedData.device_info) {
               device_info = safelyConvertDeviceInfo(updatedData.device_info);
+            } else if (updatedData.device_type) {
+              device_info = {
+                type: updatedData.device_type,
+                width: 1920,
+                height: 1080,
+                orientation: 'portrait',
+                scale: 1
+              };
             }
             
             const updatedFeedback: FeedbackPoint = {
