@@ -328,13 +328,17 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_info: data.device_info || (data.device_type ? {
-            type: data.device_type as DeviceType,
-            width: originalDimensions.width,
-            height: originalDimensions.height,
-            orientation: 'portrait',
-            scale: 1
-          } : undefined)
+          device_info: data.device_info 
+            ? safelyConvertDeviceInfo(data.device_info)
+            : data.device_type 
+              ? {
+                  type: data.device_type as DeviceType,
+                  width: originalDimensions.width,
+                  height: originalDimensions.height,
+                  orientation: 'portrait',
+                  scale: 1
+                } 
+              : undefined
         };
         
         onFeedbackAdded(feedback);
@@ -415,7 +419,17 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_info: data.device_info
+          device_info: data.device_info 
+            ? safelyConvertDeviceInfo(data.device_info)
+            : data.device_type 
+              ? {
+                  type: data.device_type as DeviceType,
+                  width: originalDimensions.width,
+                  height: originalDimensions.height,
+                  orientation: 'portrait',
+                  scale: 1
+                } 
+              : undefined
         };
         
         onFeedbackUpdated(updatedFeedback);
@@ -433,7 +447,7 @@ export function FeedbackOverlay({
         description: "Failed to update status. Please try again."
       });
     }
-  }, [selectedFeedback, currentUser, onFeedbackUpdated, toast]);
+  }, [selectedFeedback, currentUser, onFeedbackUpdated, toast, originalDimensions]);
 
   const handleAddReply = useCallback((content: string, e?: React.MouseEvent) => {
     if (e) {
@@ -700,4 +714,3 @@ export function FeedbackOverlay({
     </div>
   );
 }
-
