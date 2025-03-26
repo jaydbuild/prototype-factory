@@ -285,7 +285,7 @@ export function FeedbackOverlay({
         };
       }
       
-      const deviceMetadata = {
+      const deviceInfo = {
         type: deviceType,
         width: originalDimensions.width,
         height: originalDimensions.height,
@@ -299,7 +299,7 @@ export function FeedbackOverlay({
         content: newFeedbackContent,
         position: feedbackPosition,
         status: 'open',
-        device_metadata: deviceMetadata
+        device_info: deviceInfo
       };
       
       if (targetData) {
@@ -335,15 +335,7 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
             : undefined,
-          device_info: data.device_metadata
-            ? {
-                type: data.device_metadata.type,
-                width: data.device_metadata.width,
-                height: data.device_metadata.height,
-                orientation: data.device_metadata.orientation,
-                scale: data.device_metadata.scale
-              }
-            : undefined
+          device_info: data.device_info
         };
         
         onFeedbackAdded(feedback);
@@ -423,7 +415,8 @@ export function FeedbackOverlay({
                 xpath: data.element_xpath,
                 metadata: safelyConvertElementMetadata(data.element_metadata)
               }
-            : undefined
+            : undefined,
+          device_info: data.device_info
         };
         
         onFeedbackUpdated(updatedFeedback);
@@ -708,3 +701,4 @@ export function FeedbackOverlay({
     </div>
   );
 }
+

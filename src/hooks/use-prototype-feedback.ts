@@ -11,7 +11,6 @@ export function usePrototypeFeedback(prototypeId: string) {
   const [currentUser, setCurrentUser] = useState<FeedbackUser | undefined>(undefined);
   const { toast } = useToast();
 
-  // Fetch feedback points
   useEffect(() => {
     const fetchFeedback = async () => {
       setIsLoading(true);
@@ -26,11 +25,9 @@ export function usePrototypeFeedback(prototypeId: string) {
         }
 
         if (data) {
-          // Convert the DB structure to our FeedbackPoint type with element_target
           const feedbackWithElementTargets = data.map(item => {
             const feedback = item as any;
             
-            // Create element_target if any of the fields exist
             let element_target: ElementTarget | undefined = undefined;
             if (feedback.element_selector || feedback.element_xpath || feedback.element_metadata) {
               element_target = {
@@ -40,13 +37,11 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
-            // Create device_info if device_metadata exists
             let device_info: DeviceInfo | undefined = undefined;
-            if (feedback.device_metadata) {
-              device_info = safelyConvertDeviceInfo(feedback.device_metadata);
+            if (feedback.device_info) {
+              device_info = safelyConvertDeviceInfo(feedback.device_info);
             }
             
-            // Return the feedback point with our structure
             return {
               id: feedback.id,
               prototype_id: feedback.prototype_id,
@@ -63,10 +58,8 @@ export function usePrototypeFeedback(prototypeId: string) {
           
           setFeedbackPoints(feedbackWithElementTargets);
           
-          // Extract unique user IDs
           const userIds = [...new Set(data.map(item => item.created_by))];
           
-          // Fetch user details
           if (userIds.length > 0) {
             const { data: userData, error: userError } = await supabase
               .from('profiles')
@@ -101,7 +94,6 @@ export function usePrototypeFeedback(prototypeId: string) {
     }
   }, [prototypeId, toast]);
 
-  // Set up realtime subscription
   useEffect(() => {
     if (!prototypeId) return;
 
@@ -119,7 +111,6 @@ export function usePrototypeFeedback(prototypeId: string) {
           if (payload.eventType === 'INSERT') {
             const newData = payload.new as any;
             
-            // Create element_target from database fields
             let element_target: ElementTarget | undefined = undefined;
             if (newData.element_selector || newData.element_xpath || newData.element_metadata) {
               element_target = {
@@ -129,10 +120,9 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
-            // Create device_info if device_metadata exists
             let device_info: DeviceInfo | undefined = undefined;
-            if (newData.device_metadata) {
-              device_info = safelyConvertDeviceInfo(newData.device_metadata);
+            if (newData.device_info) {
+              device_info = safelyConvertDeviceInfo(newData.device_info);
             }
             
             const newFeedback: FeedbackPoint = {
@@ -150,7 +140,6 @@ export function usePrototypeFeedback(prototypeId: string) {
             
             setFeedbackPoints(prev => [...prev, newFeedback]);
             
-            // Fetch user if not already in cache
             if (!feedbackUsers[newFeedback.created_by]) {
               const { data, error } = await supabase
                 .from('profiles')
@@ -168,7 +157,6 @@ export function usePrototypeFeedback(prototypeId: string) {
           } else if (payload.eventType === 'UPDATE') {
             const updatedData = payload.new as any;
             
-            // Create element_target from database fields
             let element_target: ElementTarget | undefined = undefined;
             if (updatedData.element_selector || updatedData.element_xpath || updatedData.element_metadata) {
               element_target = {
@@ -178,10 +166,9 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
-            // Create device_info if device_metadata exists
             let device_info: DeviceInfo | undefined = undefined;
-            if (updatedData.device_metadata) {
-              device_info = safelyConvertDeviceInfo(updatedData.device_metadata);
+            if (updatedData.device_info) {
+              device_info = safelyConvertDeviceInfo(updatedData.device_info);
             }
             
             const updatedFeedback: FeedbackPoint = {
@@ -215,7 +202,6 @@ export function usePrototypeFeedback(prototypeId: string) {
     };
   }, [prototypeId, feedbackUsers]);
 
-  // Get current user
   useEffect(() => {
     const fetchCurrentUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -230,7 +216,6 @@ export function usePrototypeFeedback(prototypeId: string) {
         if (!error && userData) {
           setCurrentUser(userData as FeedbackUser);
         } else {
-          // If we can't get the profile but have a user, create a minimal user object
           setCurrentUser({
             id: data.session.user.id,
             name: data.session.user.email || null,

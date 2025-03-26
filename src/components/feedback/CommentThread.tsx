@@ -79,13 +79,13 @@ export function CommentThread({
             {statusIcons[feedback.status]}
             {statusTexts[feedback.status]}
           </Badge>
-          {feedback.device_type && (
+          {feedback.device_info?.type && (
             <Badge
               className="text-xs px-1.5 py-0 h-5 bg-gray-100 text-gray-800 border-gray-200 ml-1 flex items-center"
               variant="outline"
             >
-              {getDeviceIcon(feedback.device_type)}
-              {feedback.device_type.charAt(0).toUpperCase() + feedback.device_type.slice(1)}
+              {getDeviceIcon(feedback.device_info.type)}
+              {feedback.device_info.type.charAt(0).toUpperCase() + feedback.device_info.type.slice(1)}
             </Badge>
           )}
           <Button 
