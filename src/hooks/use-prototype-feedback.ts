@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo } from '@/types/feedback';
+import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 import { safelyConvertElementMetadata, safelyConvertDeviceInfo } from '@/utils/feedback-utils';
@@ -19,6 +20,16 @@ interface SupabaseFeedbackResponse {
   device_type?: string;
   device_info?: any;
 }
+
+// Helper function to ensure status is a valid FeedbackStatus
+const ensureValidFeedbackStatus = (status: string | null | undefined): FeedbackStatus => {
+  if (!status) return 'open';
+  
+  const validStatuses: FeedbackStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
+  return validStatuses.includes(status as FeedbackStatus) 
+    ? (status as FeedbackStatus) 
+    : 'open';
+};
 
 export function usePrototypeFeedback(prototypeId: string) {
   const [feedbackPoints, setFeedbackPoints] = useState<FeedbackPoint[]>([]);
@@ -74,7 +85,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               position: feedback.position,
               created_at: feedback.created_at,
               updated_at: feedback.updated_at,
-              status: feedback.status,
+              status: ensureValidFeedbackStatus(feedback.status),
               element_target,
               device_info
             } as FeedbackPoint;
@@ -165,7 +176,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               position: newData.position,
               created_at: newData.created_at,
               updated_at: newData.updated_at,
-              status: newData.status,
+              status: ensureValidFeedbackStatus(newData.status),
               element_target,
               device_info
             };
@@ -219,7 +230,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               position: updatedData.position,
               created_at: updatedData.created_at,
               updated_at: updatedData.updated_at,
-              status: updatedData.status,
+              status: ensureValidFeedbackStatus(updatedData.status),
               element_target,
               device_info
             };
