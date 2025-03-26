@@ -1,9 +1,24 @@
-
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 import { safelyConvertElementMetadata, safelyConvertDeviceInfo } from '@/utils/feedback-utils';
+
+interface SupabaseFeedbackResponse {
+  id: string;
+  prototype_id: string;
+  created_by: string;
+  content: string;
+  position: any;
+  created_at: string;
+  updated_at: string | null;
+  status: string;
+  element_selector?: string | null;
+  element_xpath?: string | null;
+  element_metadata?: any;
+  device_type?: string;
+  device_info?: any;
+}
 
 export function usePrototypeFeedback(prototypeId: string) {
   const [feedbackPoints, setFeedbackPoints] = useState<FeedbackPoint[]>([]);
@@ -27,7 +42,7 @@ export function usePrototypeFeedback(prototypeId: string) {
 
         if (data) {
           const feedbackWithElementTargets = data.map(item => {
-            const feedback = item as any;
+            const feedback = item as SupabaseFeedbackResponse;
             
             let element_target: ElementTarget | undefined = undefined;
             if (feedback.element_selector || feedback.element_xpath || feedback.element_metadata) {
@@ -38,15 +53,13 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
-            // Handle both device_info (new) and device_type (old) formats
             let device_info: DeviceInfo | undefined = undefined;
-            if (feedback.device_info) {
+            if ('device_info' in feedback && feedback.device_info) {
               device_info = safelyConvertDeviceInfo(feedback.device_info);
             } else if (feedback.device_type) {
-              // Create a basic device_info object from device_type
               device_info = {
-                type: feedback.device_type,
-                width: 1920, // Default values
+                type: feedback.device_type as any,
+                width: 1920,
                 height: 1080,
                 orientation: 'portrait',
                 scale: 1
@@ -120,7 +133,7 @@ export function usePrototypeFeedback(prototypeId: string) {
         },
         async (payload) => {
           if (payload.eventType === 'INSERT') {
-            const newData = payload.new as any;
+            const newData = payload.new as SupabaseFeedbackResponse;
             
             let element_target: ElementTarget | undefined = undefined;
             if (newData.element_selector || newData.element_xpath || newData.element_metadata) {
@@ -131,14 +144,13 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
-            // Handle both device_info (new) and device_type (old) formats for realtime updates
             let device_info: DeviceInfo | undefined = undefined;
-            if (newData.device_info) {
+            if ('device_info' in newData && newData.device_info) {
               device_info = safelyConvertDeviceInfo(newData.device_info);
             } else if (newData.device_type) {
               device_info = {
-                type: newData.device_type,
-                width: 1920, // Default values
+                type: newData.device_type as any,
+                width: 1920,
                 height: 1080,
                 orientation: 'portrait',
                 scale: 1
@@ -175,7 +187,7 @@ export function usePrototypeFeedback(prototypeId: string) {
               }
             }
           } else if (payload.eventType === 'UPDATE') {
-            const updatedData = payload.new as any;
+            const updatedData = payload.new as SupabaseFeedbackResponse;
             
             let element_target: ElementTarget | undefined = undefined;
             if (updatedData.element_selector || updatedData.element_xpath || updatedData.element_metadata) {
@@ -186,13 +198,12 @@ export function usePrototypeFeedback(prototypeId: string) {
               };
             }
             
-            // Handle both device_info (new) and device_type (old) formats for updates
             let device_info: DeviceInfo | undefined = undefined;
-            if (updatedData.device_info) {
+            if ('device_info' in updatedData && updatedData.device_info) {
               device_info = safelyConvertDeviceInfo(updatedData.device_info);
             } else if (updatedData.device_type) {
               device_info = {
-                type: updatedData.device_type,
+                type: updatedData.device_type as any,
                 width: 1920,
                 height: 1080,
                 orientation: 'portrait',

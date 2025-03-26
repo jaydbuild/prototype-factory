@@ -31,6 +31,22 @@ interface FeedbackOverlayProps {
   };
 }
 
+interface SupabaseFeedbackResponse {
+  id: string;
+  prototype_id: string;
+  created_by: string;
+  content: string;
+  position: any;
+  created_at: string;
+  updated_at: string | null;
+  status: string;
+  element_selector?: string | null;
+  element_xpath?: string | null;
+  element_metadata?: any;
+  device_type?: string;
+  device_info?: any;
+}
+
 export function FeedbackOverlay({
   prototypeId,
   isFeedbackMode,
@@ -301,7 +317,7 @@ export function FeedbackOverlay({
         feedbackData.element_metadata = targetData.metadata || null;
       }
 
-      const { data, error } = await supabase
+      const { data: resultData, error } = await supabase
         .from('prototype_feedback')
         .insert(feedbackData)
         .select()
@@ -309,30 +325,32 @@ export function FeedbackOverlay({
 
       if (error) throw error;
 
-      if (data) {
+      if (resultData) {
+        const supabaseData = resultData as SupabaseFeedbackResponse;
+        
         const feedback: FeedbackPointType = {
-          id: data.id,
-          prototype_id: data.prototype_id,
-          created_by: data.created_by,
-          content: data.content,
-          position: typeof data.position === 'string' 
-            ? JSON.parse(data.position) 
-            : data.position,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-          status: data.status as FeedbackPointType['status'],
-          element_target: data.element_selector || data.element_xpath || data.element_metadata
+          id: supabaseData.id,
+          prototype_id: supabaseData.prototype_id,
+          created_by: supabaseData.created_by,
+          content: supabaseData.content,
+          position: typeof supabaseData.position === 'string' 
+            ? JSON.parse(supabaseData.position) 
+            : supabaseData.position,
+          created_at: supabaseData.created_at,
+          updated_at: supabaseData.updated_at,
+          status: supabaseData.status as FeedbackPointType['status'],
+          element_target: supabaseData.element_selector || supabaseData.element_xpath || supabaseData.element_metadata
             ? {
-                selector: data.element_selector,
-                xpath: data.element_xpath,
-                metadata: safelyConvertElementMetadata(data.element_metadata)
+                selector: supabaseData.element_selector,
+                xpath: supabaseData.element_xpath,
+                metadata: safelyConvertElementMetadata(supabaseData.element_metadata)
               }
             : undefined,
-          device_info: data.device_info 
-            ? safelyConvertDeviceInfo(data.device_info)
-            : data.device_type 
+          device_info: 'device_info' in supabaseData && supabaseData.device_info
+            ? safelyConvertDeviceInfo(supabaseData.device_info)
+            : supabaseData.device_type 
               ? {
-                  type: data.device_type as DeviceType,
+                  type: supabaseData.device_type as DeviceType,
                   width: originalDimensions.width,
                   height: originalDimensions.height,
                   orientation: 'portrait',
@@ -391,7 +409,7 @@ export function FeedbackOverlay({
     if (!selectedFeedback || !currentUser) return;
     
     try {
-      const { data, error } = await supabase
+      const { data: resultData, error } = await supabase
         .from('prototype_feedback')
         .update({ status })
         .eq('id', selectedFeedback.id)
@@ -400,30 +418,32 @@ export function FeedbackOverlay({
 
       if (error) throw error;
 
-      if (data) {
+      if (resultData) {
+        const supabaseData = resultData as SupabaseFeedbackResponse;
+        
         const updatedFeedback: FeedbackPointType = {
-          id: data.id,
-          prototype_id: data.prototype_id,
-          created_by: data.created_by,
-          content: data.content,
-          position: typeof data.position === 'string' 
-            ? JSON.parse(data.position) 
-            : data.position,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-          status: data.status as FeedbackPointType['status'],
-          element_target: data.element_selector || data.element_xpath || data.element_metadata
+          id: supabaseData.id,
+          prototype_id: supabaseData.prototype_id,
+          created_by: supabaseData.created_by,
+          content: supabaseData.content,
+          position: typeof supabaseData.position === 'string' 
+            ? JSON.parse(supabaseData.position) 
+            : supabaseData.position,
+          created_at: supabaseData.created_at,
+          updated_at: supabaseData.updated_at,
+          status: supabaseData.status as FeedbackPointType['status'],
+          element_target: supabaseData.element_selector || supabaseData.element_xpath || supabaseData.element_metadata
             ? {
-                selector: data.element_selector,
-                xpath: data.element_xpath,
-                metadata: safelyConvertElementMetadata(data.element_metadata)
+                selector: supabaseData.element_selector,
+                xpath: supabaseData.element_xpath,
+                metadata: safelyConvertElementMetadata(supabaseData.element_metadata)
               }
             : undefined,
-          device_info: data.device_info 
-            ? safelyConvertDeviceInfo(data.device_info)
-            : data.device_type 
+          device_info: 'device_info' in supabaseData && supabaseData.device_info
+            ? safelyConvertDeviceInfo(supabaseData.device_info)
+            : supabaseData.device_type 
               ? {
-                  type: data.device_type as DeviceType,
+                  type: supabaseData.device_type as DeviceType,
                   width: originalDimensions.width,
                   height: originalDimensions.height,
                   orientation: 'portrait',
