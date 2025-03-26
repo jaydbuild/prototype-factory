@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +20,6 @@ interface SupabaseFeedbackResponse {
   device_info?: any;
 }
 
-// Helper function to ensure status is a valid FeedbackStatus
 const ensureValidFeedbackStatus = (status: string | null | undefined): FeedbackStatus => {
   if (!status) return 'open';
   

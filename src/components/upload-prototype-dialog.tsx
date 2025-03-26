@@ -37,9 +37,9 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
       await validatePrototypeZip(file);
 
       // Get current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       
-      if (sessionError || !session?.user) {
+      if (!data.session?.user) {
         toast({
           title: "Error",
           description: "Please sign in to upload prototypes",
@@ -54,7 +54,7 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         .from('prototypes')
         .insert({
           name: name.trim(),
-          created_by: session.user.id,
+          created_by: data.session.user.id,
           url: null,
           deployment_status: 'pending',
           figma_url: figmaUrl.trim() || null

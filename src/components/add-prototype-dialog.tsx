@@ -135,14 +135,14 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
     setUploadStep("Getting session...");
     
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       console.log('Auth Session:', { 
-        hasSession: !!sessionData?.session,
-        userId: sessionData?.session?.user?.id,
-        sessionError 
+        hasSession: !!data.session,
+        userId: data.session?.user?.id,
+        sessionError: !data.session 
       });
 
-      if (!sessionData?.session?.user) {
+      if (!data.session?.user) {
         toast({
           title: 'Error',
           description: 'Please sign in to upload prototypes',
@@ -155,14 +155,14 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       setUploadStep("Creating prototype entry...");
       console.log('Creating prototype:', { 
         name: name.trim(),
-        userId: sessionData.session.user.id 
+        userId: data.session.user.id 
       });
 
       const { data: prototype, error: prototypeError } = await supabase
         .from('prototypes')
         .insert({
           name: name.trim(),
-          created_by: sessionData.session.user.id,
+          created_by: data.session.user.id,
           url: 'pending',
           deployment_status: 'processing',
           figma_url: figmaUrl.trim() || null

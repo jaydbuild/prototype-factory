@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,7 +11,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { PrototypeDetail } from "@/components/PrototypeDetail";
 import { SupabaseProvider } from "@/lib/supabase-provider";
-import { Session } from "@supabase/supabase-js";
+import type { Session } from '@supabase/supabase-js';
 import LoginPage from './components/login-page';
 
 const queryClient = new QueryClient({
@@ -37,8 +38,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
       } catch (error) {
         console.error('Error fetching session:', error);
       } finally {
