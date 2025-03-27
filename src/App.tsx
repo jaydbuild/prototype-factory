@@ -11,7 +11,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { PrototypeDetail } from "@/components/PrototypeDetail";
 import { SupabaseProvider } from "@/lib/supabase-provider";
-import type { Session } from '@supabase/supabase-js';
+import type { User, Session } from '@supabase/supabase-js';
 import LoginPage from './components/login-page';
 
 const queryClient = new QueryClient({

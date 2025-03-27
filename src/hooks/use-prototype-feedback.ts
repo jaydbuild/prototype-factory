@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
