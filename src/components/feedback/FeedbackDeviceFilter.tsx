@@ -45,7 +45,7 @@ export function FeedbackDeviceFilter({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1 max-w-[180px]">
+        <Button variant="outline" size="sm" className="h-8 gap-1 flex-shrink-0 w-auto min-w-24">
           <Filter className="h-3.5 w-3.5" />
           <span className="truncate">
             {selectedDeviceType === 'all' ? 'All Devices' : (
