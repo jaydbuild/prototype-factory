@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget, DeviceType, DeviceInfo } from '@/types/feedback';
+import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget, DeviceType, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
 import { FeedbackDeviceFilter } from './FeedbackDeviceFilter';
 import { CommentThread } from './CommentThread';
@@ -307,9 +307,13 @@ export function FeedbackOverlay({
         created_by: currentUser.id,
         content: newFeedbackContent,
         position: feedbackPosition,
-        status: 'open',
-        device_info: deviceInfo
+        status: 'open'
       };
+      
+      if (deviceInfo) {
+        feedbackData.device_info = deviceInfo;
+        feedbackData.device_type = deviceInfo.type;
+      }
       
       if (targetData) {
         feedbackData.element_selector = targetData.selector || null;
@@ -317,13 +321,18 @@ export function FeedbackOverlay({
         feedbackData.element_metadata = targetData.metadata || null;
       }
 
+      console.log('Submitting feedback:', feedbackData);
+
       const { data: resultData, error } = await supabase
         .from('prototype_feedback')
         .insert(feedbackData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       if (resultData) {
         const supabaseData = resultData as SupabaseFeedbackResponse;

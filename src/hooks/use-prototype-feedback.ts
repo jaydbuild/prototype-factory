@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from './use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { safelyConvertElementMetadata, safelyConvertDeviceInfo } from '@/utils/feedback-utils';
 
 interface SupabaseFeedbackResponse {
@@ -51,6 +50,8 @@ export function usePrototypeFeedback(prototypeId: string) {
         }
 
         if (data) {
+          console.log('Received feedback data:', data);
+          
           const feedbackWithElementTargets = data.map(item => {
             const feedback = item as SupabaseFeedbackResponse;
             
@@ -64,7 +65,7 @@ export function usePrototypeFeedback(prototypeId: string) {
             }
             
             let device_info: DeviceInfo | undefined = undefined;
-            if ('device_info' in feedback && feedback.device_info) {
+            if (feedback.device_info) {
               device_info = safelyConvertDeviceInfo(feedback.device_info);
             } else if (feedback.device_type) {
               device_info = {
@@ -129,8 +130,40 @@ export function usePrototypeFeedback(prototypeId: string) {
   }, [prototypeId, toast]);
 
   useEffect(() => {
-    if (!prototypeId) return;
+    const fetchCurrentUser = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session?.user) {
+          const { data: userData, error } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .eq('id', data.session.user.id)
+            .single();
+          
+          if (!error && userData) {
+            console.log('Current user profile:', userData);
+            setCurrentUser(userData as FeedbackUser);
+          } else {
+            console.log('Creating default user from session:', data.session.user);
+            setCurrentUser({
+              id: data.session.user.id,
+              name: data.session.user.email || 'Anonymous',
+              avatar_url: null
+            });
+          }
+        } else {
+          console.log('No session found');
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
+    };
 
+    fetchCurrentUser();
+  }, []);
+
+  useEffect(() => {
     const channel = supabase
       .channel('feedback-changes')
       .on(
@@ -251,32 +284,6 @@ export function usePrototypeFeedback(prototypeId: string) {
       supabase.removeChannel(channel);
     };
   }, [prototypeId, feedbackUsers]);
-
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      
-      if (data.session?.user) {
-        const { data: userData, error } = await supabase
-          .from('profiles')
-          .select('id, name, avatar_url')
-          .eq('id', data.session.user.id)
-          .single();
-        
-        if (!error && userData) {
-          setCurrentUser(userData as FeedbackUser);
-        } else {
-          setCurrentUser({
-            id: data.session.user.id,
-            name: data.session.user.email || null,
-            avatar_url: null
-          });
-        }
-      }
-    };
-
-    fetchCurrentUser();
-  }, []);
 
   const addFeedbackPoint = (feedback: FeedbackPoint) => {
     setFeedbackPoints(prev => [...prev, feedback]);
