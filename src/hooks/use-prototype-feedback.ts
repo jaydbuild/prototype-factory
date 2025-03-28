@@ -17,7 +17,6 @@ interface SupabaseFeedbackResponse {
   element_xpath?: string | null;
   element_metadata?: any;
   device_type?: string;
-  device_info?: any;
 }
 
 const ensureValidFeedbackStatus = (status: string | null | undefined): FeedbackStatus => {
@@ -65,9 +64,7 @@ export function usePrototypeFeedback(prototypeId: string) {
             }
             
             let device_info: DeviceInfo | undefined = undefined;
-            if (feedback.device_info) {
-              device_info = safelyConvertDeviceInfo(feedback.device_info);
-            } else if (feedback.device_type) {
+            if (feedback.device_type) {
               device_info = {
                 type: feedback.device_type as any,
                 width: 1920,
@@ -188,9 +185,7 @@ export function usePrototypeFeedback(prototypeId: string) {
             }
             
             let device_info: DeviceInfo | undefined = undefined;
-            if ('device_info' in newData && newData.device_info) {
-              device_info = safelyConvertDeviceInfo(newData.device_info);
-            } else if (newData.device_type) {
+            if (newData.device_type) {
               device_info = {
                 type: newData.device_type as any,
                 width: 1920,
@@ -242,9 +237,7 @@ export function usePrototypeFeedback(prototypeId: string) {
             }
             
             let device_info: DeviceInfo | undefined = undefined;
-            if ('device_info' in updatedData && updatedData.device_info) {
-              device_info = safelyConvertDeviceInfo(updatedData.device_info);
-            } else if (updatedData.device_type) {
+            if (updatedData.device_type) {
               device_info = {
                 type: updatedData.device_type as any,
                 width: 1920,

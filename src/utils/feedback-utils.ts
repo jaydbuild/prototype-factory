@@ -19,6 +19,18 @@ export function safelyConvertDeviceInfo(deviceInfo: any): DeviceInfo | undefined
   if (!deviceInfo) return undefined;
   
   try {
+    // If it's just a string type, create a basic device info object
+    if (typeof deviceInfo === 'string') {
+      return {
+        type: deviceInfo as any,
+        width: 1920,
+        height: 1080,
+        orientation: 'portrait',
+        scale: 1
+      };
+    }
+    
+    // If it's an object, parse it or use it directly
     let parsedDeviceInfo: any;
     
     if (typeof deviceInfo === 'string') {

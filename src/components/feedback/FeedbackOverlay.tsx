@@ -294,26 +294,14 @@ export function FeedbackOverlay({
         };
       }
       
-      const deviceInfo = {
-        type: deviceType,
-        width: originalDimensions.width,
-        height: originalDimensions.height,
-        orientation: orientation,
-        scale: scale
-      };
-      
       const feedbackData: any = {
         prototype_id: prototypeId,
         created_by: currentUser.id,
         content: newFeedbackContent,
         position: feedbackPosition,
-        status: 'open'
+        status: 'open',
+        device_type: deviceType
       };
-      
-      if (deviceInfo) {
-        feedbackData.device_info = deviceInfo;
-        feedbackData.device_type = deviceInfo.type;
-      }
       
       if (targetData) {
         feedbackData.element_selector = targetData.selector || null;
@@ -355,9 +343,7 @@ export function FeedbackOverlay({
                 metadata: safelyConvertElementMetadata(supabaseData.element_metadata)
               }
             : undefined,
-          device_info: 'device_info' in supabaseData && supabaseData.device_info
-            ? safelyConvertDeviceInfo(supabaseData.device_info)
-            : supabaseData.device_type 
+          device_info: supabaseData.device_type 
               ? {
                   type: supabaseData.device_type as DeviceType,
                   width: originalDimensions.width,
@@ -404,9 +390,7 @@ export function FeedbackOverlay({
     highlightElement,
     elementTarget,
     deviceType,
-    originalDimensions,
-    orientation,
-    scale
+    originalDimensions
   ]);
 
   const handleUpdateFeedbackStatus = useCallback(async (status: FeedbackPointType['status'], e?: React.MouseEvent) => {
