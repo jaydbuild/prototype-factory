@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -109,6 +110,7 @@ export function PreviewControls({
   const navigate = useNavigate();
   const location = useLocation();
   const [showScaleControls, setShowScaleControls] = useState(false);
+  const [backAttempts, setBackAttempts] = useState(0);
 
   // Group devices by category for the dropdown menu
   const mobileDevices = Object.entries(deviceConfigs).filter(([id]) => 
@@ -136,19 +138,56 @@ export function PreviewControls({
     return deviceType.charAt(0).toUpperCase() + deviceType.slice(1);
   };
 
-  // Handle back navigation properly
+  // Enhanced back button handling with debug logging
   const handleBackClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Check if we can go back in history
+    const pathParts = location.pathname.split('/');
+    const isInPrototypeDetail = pathParts[1] === 'prototype';
+    
+    console.log('Back button clicked. Current location:', location.pathname);
+    console.log('History state:', history.state);
+    console.log('Window history length:', window.history.length);
+    
+    // If we're on a prototype detail page, always navigate to dashboard
+    if (isInPrototypeDetail) {
+      console.log('In prototype detail view, navigating to dashboard');
+      navigate('/dashboard');
+      return;
+    }
+    
+    // Try going back in history
     if (window.history.length > 1) {
+      console.log('Going back in history');
       navigate(-1);
+      
+      // Increment back attempts to track potential issues
+      setBackAttempts(prev => prev + 1);
+      
+      // If we've tried multiple times and are still on the same page,
+      // fallback to dashboard (safety measure)
+      if (backAttempts > 1) {
+        // Reset the counter and navigate to dashboard
+        setBackAttempts(0);
+        setTimeout(() => {
+          if (location.pathname === window.location.pathname) {
+            console.log('Multiple back attempts with no change, falling back to dashboard');
+            navigate('/dashboard');
+          }
+        }, 100);
+      }
     } else {
-      // Fallback to dashboard if no history
+      // No history, go straight to dashboard
+      console.log('No history found, navigating to dashboard');
       navigate('/dashboard');
     }
   };
+
+  // Reset back attempts counter when location changes
+  useEffect(() => {
+    setBackAttempts(0);
+  }, [location.pathname]);
 
   return (
     <div className="flex items-center gap-2 p-1 rounded-lg backdrop-blur-sm bg-background/80 shadow-md">

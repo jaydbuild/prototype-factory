@@ -14,31 +14,6 @@ export const PrototypeDetail = () => {
   const navigate = useNavigate();
   const [processingTimeout, setProcessingTimeout] = useState(false);
 
-  // Handle browser navigation events
-  useEffect(() => {
-    // Save current page to session history with state
-    window.history.replaceState(
-      { prototypeId: id, fromPrototypeDetail: true },
-      "",
-      window.location.href
-    );
-
-    // Event listener for history navigation
-    const handlePopState = (event: PopStateEvent) => {
-      // If navigating back and there's no state, likely going back to dashboard
-      if (!event.state) {
-        navigate('/dashboard');
-        return;
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [id, navigate]);
-
   const { 
     data: prototype, 
     isLoading, 
