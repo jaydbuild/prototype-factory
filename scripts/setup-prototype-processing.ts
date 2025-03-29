@@ -30,7 +30,7 @@ async function setupPrototypeProcessing() {
     // Create prototype-files bucket (private)
     await supabase.storage.createBucket('prototype-files', {
       public: false,
-      fileSizeLimit: 314572800, // 300MB (increased from 50MB)
+      fileSizeLimit: 1073741824, // 1GB (increased from 300MB)
       allowedMimeTypes: [
         'text/html',
         'text/css',
@@ -44,7 +44,7 @@ async function setupPrototypeProcessing() {
     // Create prototype-deployments bucket (public)
     await supabase.storage.createBucket('prototype-deployments', {
       public: true,
-      fileSizeLimit: 314572800, // 300MB (increased from 50MB)
+      fileSizeLimit: 1073741824, // 1GB (increased from 300MB)
       allowedMimeTypes: [
         'text/html',
         'text/css',

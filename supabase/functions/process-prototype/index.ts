@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -59,8 +58,8 @@ serve(async (req) => {
 
       console.log(`File downloaded: ${fileData.size} bytes`);
 
-      // For very large files (>100MB), add a warning log
-      if (fileData.size > 100 * 1024 * 1024) {
+      // For very large files (>500MB), add a warning log
+      if (fileData.size > 500 * 1024 * 1024) {
         console.log(`Warning: Processing large file (${Math.round(fileData.size / (1024 * 1024))}MB). This may take longer.`);
       }
 
