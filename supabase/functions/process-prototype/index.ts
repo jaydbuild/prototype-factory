@@ -66,13 +66,16 @@ serve(async (req) => {
 
       // Process based on file type
       if (fileName.endsWith('.zip')) {
-        console.log('Processing ZIP file as a simple HTML prototype');
+        console.log('Processing ZIP file containing web files (HTML, React, etc.)');
         await processZipFile(supabase, prototypeId, fileName, fileData);
       } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
         console.log('Processing HTML file');
         await processHtmlFile(supabase, prototypeId, fileData);
+      } else if (fileName.endsWith('.jsx') || fileName.endsWith('.tsx') || fileName.endsWith('.js') || fileName.endsWith('.ts')) {
+        console.log('Processing JavaScript/React file');
+        await processReactFile(supabase, prototypeId, fileName, fileData);
       } else {
-        throw new Error(`Unsupported file type: ${fileName}. Please upload an HTML file or ZIP archive.`);
+        throw new Error(`Unsupported file type: ${fileName}. Please upload an HTML, React, or ZIP archive.`);
       }
       
       // Get the deployment URL
@@ -191,16 +194,75 @@ async function processHtmlFile(supabase, prototypeId, fileData) {
   }
 }
 
+// Helper function to process React files
+async function processReactFile(supabase, prototypeId, fileName, fileData) {
+  // Create a simple HTML wrapper for React files
+  const reactWrapper = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>React App Preview</title>
+        <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <style>
+            body { font-family: system-ui, sans-serif; padding: 20px; }
+            #root { border: 1px solid #eee; padding: 20px; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="text/babel">
+        ${new TextDecoder().decode(fileData)}
+        </script>
+    </body>
+    </html>
+  `;
+  
+  // Upload the React wrapper HTML file
+  const { error: uploadError } = await supabase.storage
+    .from('prototype-deployments')
+    .upload(`${prototypeId}/index.html`, new TextEncoder().encode(reactWrapper), {
+      contentType: 'text/html',
+      upsert: true
+    });
+    
+  if (uploadError) {
+    console.error('Error uploading React wrapper file:', uploadError);
+    throw new Error(`Failed to upload React wrapper file: ${uploadError.message}`);
+  }
+
+  // Upload the original React file as well
+  const { error: reactFileError } = await supabase.storage
+    .from('prototype-deployments')
+    .upload(`${prototypeId}/${fileName}`, fileData, {
+      contentType: fileName.endsWith('.jsx') || fileName.endsWith('.tsx') ? 'text/jsx' : 'application/javascript',
+      upsert: true
+    });
+    
+  if (reactFileError) {
+    console.error('Error uploading original React file:', reactFileError);
+    // Non-blocking: continue even if original file upload fails
+  }
+}
+
 // Helper function to process ZIP files
 async function processZipFile(supabase, prototypeId, fileName, fileData) {
+  console.log(`Processing ZIP file: ${fileName} (${Math.round(fileData.size / 1024)} KB)`);
+  
+  // For a comprehensive ZIP processing, we would unzip the file and look for React/HTML files
   // For now, we create a simple HTML file as a placeholder for ZIP files
+  // In the future, this should be enhanced to extract React components and create appropriate index.html
+  
   const simpleHtml = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Prototype Preview</title>
+        <title>Project Preview</title>
         <style>
             body {
                 font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -243,12 +305,12 @@ async function processZipFile(supabase, prototypeId, fileName, fileData) {
     </head>
     <body>
         <div class="container">
-            <h1>Prototype Successfully Deployed</h1>
+            <h1>Project Successfully Deployed</h1>
             <p>
-                Your prototype file "${fileName}" has been processed successfully.
+                Your project file "${fileName}" has been processed successfully.
             </p>
             <div class="info">
-                <strong>ZIP File Contents</strong>: ZIP file processing provides a simple preview. For complex projects, consider using HTML files directly.
+                <strong>ZIP File Contents</strong>: For more complex projects, consider using our SandpackPreview component which can handle React and other modern frameworks.
             </div>
         </div>
     </body>
@@ -266,5 +328,18 @@ async function processZipFile(supabase, prototypeId, fileName, fileData) {
   if (uploadError) {
     console.error('Error uploading HTML file:', uploadError);
     throw new Error(`Failed to upload HTML file: ${uploadError.message}`);
+  }
+  
+  // Upload the original ZIP file as well for potential download
+  const { error: zipFileError } = await supabase.storage
+    .from('prototype-deployments')
+    .upload(`${prototypeId}/${fileName}`, fileData, {
+      contentType: 'application/zip',
+      upsert: true
+    });
+    
+  if (zipFileError) {
+    console.error('Error uploading original ZIP file:', zipFileError);
+    // Non-blocking: continue even if zip file upload fails
   }
 }

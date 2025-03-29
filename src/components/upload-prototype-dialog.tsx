@@ -44,8 +44,18 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         return;
       }
 
-      // Validate ZIP structure first
-      await validatePrototypeZip(file);
+      // Only validate ZIP files, other files will be handled directly
+      if (file.name.toLowerCase().endsWith('.zip')) {
+        // Validate ZIP structure
+        await validatePrototypeZip(file);
+      } else if (!file.name.toLowerCase().match(/\.(html|htm|jsx|tsx|js|ts)$/)) {
+        toast({
+          title: "Error",
+          description: "Please upload an HTML, React/JS file, or a ZIP archive",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Get current session
       const { data } = await supabase.auth.getSession();
@@ -75,52 +85,87 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
 
       if (prototypeError) throw prototypeError;
 
-      // Upload file
+      // Upload file with progress tracking
       const filePath = `${prototype.id}/${file.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('prototype-uploads')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Ensure upload is complete before processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Process prototype
-      const { data: processData, error: processError } = await supabase.functions
-        .invoke('process-prototype', {
-          body: { 
-            prototypeId: prototype.id,
-            fileName: file.name
+      
+      // Start tracking upload progress
+      const fileReader = new FileReader();
+      
+      // Set up progress tracking
+      let uploadProgressInterval: number | undefined;
+      
+      fileReader.onload = async () => {
+        const fileData = new Uint8Array(fileReader.result as ArrayBuffer);
+        
+        // Simulate upload progress (actual progress tracking not supported by Supabase JS client)
+        let progress = 0;
+        uploadProgressInterval = window.setInterval(() => {
+          progress += 5;
+          if (progress <= 95) {
+            setUploadProgress(progress);
           }
-        });
+        }, 300) as unknown as number;
+        
+        try {
+          console.log(`Uploading file: ${file.name} (${Math.round(file.size / 1024 / 1024)}MB)`);
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('prototype-uploads')
+            .upload(filePath, fileData, {
+              contentType: file.type || 'application/octet-stream'
+            });
 
-      if (processError) {
-        console.error('Process error details:', processError);
-        throw new Error(processError.message || 'Failed to process prototype');
-      }
+          if (uploadError) throw uploadError;
+          
+          // Complete progress
+          setUploadProgress(100);
+          
+          // Process prototype
+          const { data: processData, error: processError } = await supabase.functions
+            .invoke('process-prototype', {
+              body: { 
+                prototypeId: prototype.id,
+                fileName: file.name
+              }
+            });
 
-      // Update status to reflect processing started
-      const { error: updateError } = await supabase
-        .from('prototypes')
-        .update({ 
-          file_path: filePath,
-          deployment_status: 'processing'
-        })
-        .eq('id', prototype.id);
+          if (processError) {
+            console.error('Process error details:', processError);
+            throw new Error(processError.message || 'Failed to process prototype');
+          }
 
-      if (updateError) throw updateError;
+          // Update status to reflect processing started
+          const { error: updateError } = await supabase
+            .from('prototypes')
+            .update({ 
+              file_path: filePath,
+              deployment_status: 'processing'
+            })
+            .eq('id', prototype.id);
 
-      // Use correct invalidate query format
-      queryClient.invalidateQueries({
-        queryKey: ['prototypes']
-      });
+          if (updateError) throw updateError;
 
-      toast({
-        title: "Success",
-        description: "Prototype uploaded successfully",
-      });
-      onOpenChange(false);
+          // Use correct invalidate query format
+          queryClient.invalidateQueries({
+            queryKey: ['prototypes']
+          });
+
+          toast({
+            title: "Success",
+            description: "Prototype uploaded successfully",
+          });
+          onOpenChange(false);
+          
+          // Redirect to the prototype preview
+          navigate(`/prototype/${prototype.id}`);
+        } catch (error) {
+          throw error;
+        } finally {
+          clearInterval(uploadProgressInterval);
+        }
+      };
+      
+      fileReader.readAsArrayBuffer(file);
     } catch (error: any) {
       console.error('Error uploading prototype:', error);
       const errorMessage = error.message || "Failed to upload prototype";
@@ -133,6 +178,8 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         description: description,
         variant: "destructive",
       });
+      
+      setUploadProgress(0);
     }
   };
 
@@ -141,9 +188,11 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
     maxFiles: 1,
     accept: {
       'application/zip': ['.zip'],
-      'text/html': ['.html'],
-      'text/css': ['.css'],
-      'application/javascript': ['.js']
+      'text/html': ['.html', '.htm'],
+      'text/jsx': ['.jsx'],
+      'text/typescript': ['.tsx'],
+      'application/javascript': ['.js'],
+      'application/typescript': ['.ts']
     },
     maxSize: 1024 * 1024 * 1024, // 1GB size limit
   });
@@ -154,7 +203,7 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         <DialogHeader>
           <DialogTitle>Add New Prototype</DialogTitle>
           <DialogDescription>
-            Upload your prototype files or a ZIP archive containing your prototype.
+            Upload your prototype files (HTML, React components) or a ZIP archive containing your project.
           </DialogDescription>
         </DialogHeader>
         
@@ -201,13 +250,16 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
                   {isDragActive ? 'Drop to upload' : 'Drag files here or click to select'}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Required: index.html
+                  Supported formats:
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Optional: CSS and JavaScript files
+                  <strong>HTML:</strong> .html, .htm
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Or upload everything as a ZIP (max 1GB)
+                  <strong>React/JS:</strong> .jsx, .tsx, .js, .ts
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Archive:</strong> .zip (max 1GB)
                 </p>
               </div>
               {uploadProgress > 0 && (

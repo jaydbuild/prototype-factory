@@ -24,6 +24,23 @@ async function setupPrototypeProcessing() {
   console.log('🚀 Setting up prototype processing...')
 
   try {
+    // First, check if buckets already exist and delete them if needed for reconfiguration
+    console.log('\n🔍 Checking existing buckets...')
+    
+    const { data: existingBuckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error('Error checking buckets:', bucketsError);
+    } else {
+      // Delete and recreate buckets to apply new settings
+      for (const bucket of existingBuckets || []) {
+        if (['prototype-files', 'prototype-deployments', 'prototype-uploads'].includes(bucket.name)) {
+          console.log(`Removing existing bucket: ${bucket.name} to apply new settings...`);
+          await supabase.storage.deleteBucket(bucket.name);
+        }
+      }
+    }
+
     // 1. Create storage buckets
     console.log('\n📦 Creating storage buckets...')
     
@@ -36,7 +53,10 @@ async function setupPrototypeProcessing() {
         'text/css',
         'text/javascript',
         'application/javascript',
-        'application/zip'
+        'application/zip',
+        'text/jsx',
+        'text/typescript',
+        'application/typescript'
       ]
     })
     console.log('✅ Created prototype-files bucket')
@@ -53,7 +73,10 @@ async function setupPrototypeProcessing() {
         'image/jpeg',
         'image/png',
         'image/gif',
-        'image/svg+xml'
+        'image/svg+xml',
+        'text/jsx',
+        'text/typescript',
+        'application/typescript'
       ]
     })
     console.log('✅ Created prototype-deployments bucket')
@@ -67,7 +90,10 @@ async function setupPrototypeProcessing() {
         'text/css',
         'text/javascript',
         'application/javascript',
-        'application/zip'
+        'application/zip',
+        'text/jsx',
+        'text/typescript',
+        'application/typescript'
       ]
     })
     console.log('✅ Created prototype-uploads bucket')

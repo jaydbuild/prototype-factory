@@ -1,19 +1,37 @@
+
 import JSZip from 'jszip';
 
 export async function validatePrototypeZip(file: File) {
-  const zip = new JSZip();
-  const content = await zip.loadAsync(file);
+  try {
+    const zip = new JSZip();
+    const content = await zip.loadAsync(file);
+    
+    // Check if the ZIP file contains any valid web-related files
+    const hasValidFile = Object.keys(content.files).some(filePath => {
+      const lowerPath = filePath.toLowerCase();
+      
+      // Check for web-related files (HTML, JS, CSS, React)
+      return (
+        lowerPath.endsWith('.html') || 
+        lowerPath.endsWith('.htm') || 
+        lowerPath.endsWith('.js') || 
+        lowerPath.endsWith('.jsx') || 
+        lowerPath.endsWith('.tsx') || 
+        lowerPath.endsWith('.ts') || 
+        lowerPath.endsWith('.css')
+      );
+    });
 
-  // Check for index.html in any location (root or subdirectory)
-  const hasIndex = Object.keys(content.files).some(filePath => {
-    const normalizedPath = filePath.toLowerCase();
-    // Check for both root level and subdirectory index.html
-    return normalizedPath === 'index.html' || normalizedPath.endsWith('/index.html');
-  });
+    if (!hasValidFile) {
+      throw new Error('ZIP file must contain at least one web-related file (HTML, JS, JSX, TSX, CSS)');
+    }
 
-  if (!hasIndex) {
-    throw new Error('ZIP file must contain an index.html file (at root or in a subdirectory)');
+    console.log('ZIP file validation passed');
+    return true;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to validate ZIP file');
   }
-
-  return true;
 }
