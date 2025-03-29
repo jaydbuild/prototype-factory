@@ -58,6 +58,20 @@ async function setupPrototypeProcessing() {
     })
     console.log('✅ Created prototype-deployments bucket')
 
+    // Create prototype-uploads bucket (private) - this is the one actually used in the upload dialogs
+    await supabase.storage.createBucket('prototype-uploads', {
+      public: false,
+      fileSizeLimit: 1073741824, // 1GB
+      allowedMimeTypes: [
+        'text/html',
+        'text/css',
+        'text/javascript',
+        'application/javascript',
+        'application/zip'
+      ]
+    })
+    console.log('✅ Created prototype-uploads bucket')
+
     // 2. Set up storage policies
     console.log('\n🔒 Setting up storage policies...')
     
@@ -78,6 +92,15 @@ async function setupPrototypeProcessing() {
       operation: 'READ'
     })
     console.log('✅ Created policy for prototype-deployments bucket')
+
+    // Policy for prototype-uploads bucket
+    await supabase.rpc('create_storage_policy', {
+      bucket_name: 'prototype-uploads',
+      policy_name: 'authenticated_access',
+      definition: `(role() = 'authenticated'::text)`,
+      operation: 'ALL'
+    })
+    console.log('✅ Created policy for prototype-uploads bucket')
 
     console.log('\n✨ Storage setup completed successfully!')
     console.log('\nNext steps:')
