@@ -59,6 +59,11 @@ serve(async (req) => {
 
       console.log(`File downloaded: ${fileData.size} bytes`);
 
+      // For very large files (>100MB), add a warning log
+      if (fileData.size > 100 * 1024 * 1024) {
+        console.log(`Warning: Processing large file (${Math.round(fileData.size / (1024 * 1024))}MB). This may take longer.`);
+      }
+
       // Process based on file type
       if (fileName.endsWith('.zip')) {
         console.log('Processing ZIP file as a simple HTML prototype');

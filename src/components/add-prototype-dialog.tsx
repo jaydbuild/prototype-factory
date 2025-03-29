@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,17 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       toast({
         title: 'Error',
         description: 'Please provide both a name and a file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check file size (300MB limit)
+    const maxFileSize = 300 * 1024 * 1024; // 300MB in bytes
+    if (file.size > maxFileSize) {
+      toast({
+        title: 'Error',
+        description: 'File size exceeds the 300MB limit',
         variant: 'destructive',
       });
       return;
@@ -242,6 +254,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
       'application/zip': ['.zip']
     },
     maxFiles: 1,
+    maxSize: 300 * 1024 * 1024, // 300MB size limit
     disabled: isUploading
   });
 
@@ -313,7 +326,7 @@ export function AddPrototypeDialog({ open, onOpenChange }: AddPrototypeDialogPro
               <p>Drag 'n' drop a file here, or click to select</p>
             )}
             <p className="text-sm text-muted-foreground mt-2">
-              Supports HTML files or ZIP archives containing web content
+              Supports HTML files or ZIP archives containing web content (max 300MB)
             </p>
           </div>
         </div>

@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
@@ -29,7 +30,7 @@ async function setupPrototypeProcessing() {
     // Create prototype-files bucket (private)
     await supabase.storage.createBucket('prototype-files', {
       public: false,
-      fileSizeLimit: 52428800, // 50MB
+      fileSizeLimit: 314572800, // 300MB (increased from 50MB)
       allowedMimeTypes: [
         'text/html',
         'text/css',
@@ -43,7 +44,7 @@ async function setupPrototypeProcessing() {
     // Create prototype-deployments bucket (public)
     await supabase.storage.createBucket('prototype-deployments', {
       public: true,
-      fileSizeLimit: 52428800, // 50MB
+      fileSizeLimit: 314572800, // 300MB (increased from 50MB)
       allowedMimeTypes: [
         'text/html',
         'text/css',

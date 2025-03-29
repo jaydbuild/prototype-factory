@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,17 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
         toast({
           title: "Error",
           description: "Please enter a name for the prototype",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check file size (300MB limit)
+      const maxFileSize = 300 * 1024 * 1024; // 300MB in bytes
+      if (file.size > maxFileSize) {
+        toast({
+          title: "Error",
+          description: "File size exceeds the 300MB limit",
           variant: "destructive",
         });
         return;
@@ -134,6 +146,7 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
       'text/css': ['.css'],
       'application/javascript': ['.js']
     },
+    maxSize: 300 * 1024 * 1024, // 300MB size limit
   });
 
   return (
@@ -195,7 +208,7 @@ export function UploadPrototypeDialog({ open, onOpenChange }: { open: boolean; o
                   Optional: CSS and JavaScript files
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Or upload everything as a ZIP (max 50MB)
+                  Or upload everything as a ZIP (max 300MB)
                 </p>
               </div>
               {uploadProgress > 0 && (
