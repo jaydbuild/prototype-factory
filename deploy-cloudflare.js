@@ -2,6 +2,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // Configuration
 const config = {
@@ -80,7 +81,7 @@ function initializeProject() {
     return true;
   } catch (error) {
     // If project already exists, this is fine
-    if (error.message.includes('already exists')) {
+    if (error.message && error.message.includes('already exists')) {
       console.log(`ℹ️ Project ${config.projectName} already exists, continuing...`);
       return true;
     }
@@ -127,9 +128,6 @@ function deployToEnvironment(environment) {
 
 // Main deployment function
 async function deploy() {
-  // Add missing os import
-  const os = require('os');
-  
   // Setup and login
   ensureWranglerConfig();
   

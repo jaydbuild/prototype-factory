@@ -1,6 +1,8 @@
 
 const { exec } = require('child_process');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 // Get environment from command line arguments
 const args = process.argv.slice(2);
@@ -12,6 +14,9 @@ if (!['staging', 'production'].includes(env)) {
 }
 
 console.log(`Deploying to ${env} environment...`);
+
+// Set Cloudflare API token
+process.env.CLOUDFLARE_API_TOKEN = 'J3qVAC6cQI0fFpH_zBJVoZ_mP3YCBdsvUO4_Kbsu';
 
 // Build for the specified environment
 exec(`npm run build:${env}`, (error, stdout, stderr) => {
@@ -41,6 +46,8 @@ exec(`npm run build:${env}`, (error, stdout, stderr) => {
       }
       
       console.log(`Successfully deployed to ${env} environment!`);
+      
+      console.log('\n⚠️ SECURITY REMINDER: Remember to revoke or change the tokens used in this script!');
     }
   );
 });
