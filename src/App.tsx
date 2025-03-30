@@ -13,6 +13,7 @@ import { PrototypeDetail } from "@/components/PrototypeDetail";
 import { SupabaseProvider } from "@/lib/supabase-provider";
 import type { User, Session } from '@supabase/supabase-js';
 import LoginPage from './components/login-page';
+import { EnvironmentBadge } from "./components/environment-badge";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,6 +114,7 @@ const AppContent = () => {
         </Routes>
         <Toaster />
         <Sonner />
+        <EnvironmentBadge />
       </NavigationWrapper>
     </BrowserRouter>
   );

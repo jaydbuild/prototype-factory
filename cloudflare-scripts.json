@@ -1,0 +1,15 @@
+
+{
+  "scripts": {
+    "dev": "vite --mode development",
+    "build": "tsc && vite build",
+    "build:staging": "tsc && vite build --mode staging",
+    "build:production": "tsc && vite build --mode production",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "cloudflare:login": "npx wrangler login",
+    "cloudflare:init": "npx wrangler pages project create prototype-app --production-branch=main",
+    "deploy:staging": "node cloudflare-deploy.js staging",
+    "deploy:prod": "node cloudflare-deploy.js production"
+  }
+}
