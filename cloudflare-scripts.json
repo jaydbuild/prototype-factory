@@ -10,6 +10,7 @@
     "cloudflare:login": "npx wrangler login",
     "cloudflare:init": "npx wrangler pages project create prototype-app --production-branch=main",
     "deploy:staging": "node cloudflare-deploy.js staging",
-    "deploy:prod": "node cloudflare-deploy.js production"
+    "deploy:prod": "node cloudflare-deploy.js production",
+    "deploy:all": "node deploy-cloudflare.js"
   }
 }
