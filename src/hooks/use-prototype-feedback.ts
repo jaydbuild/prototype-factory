@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { safelyConvertElementMetadata, safelyConvertDeviceInfo } from '@/utils/feedback-utils';
+import { notifyNewComment, notifyCommentReply, notifyCommentResolved } from "@/utils/notification-utils";
 
 interface SupabaseFeedbackResponse {
   id: string;
@@ -40,7 +40,6 @@ export function usePrototypeFeedback(prototypeId: string) {
     const fetchFeedback = async () => {
       setIsLoading(true);
       try {
-        // First check if the user has access to this prototype
         const { data: session } = await supabase.auth.getSession();
         if (session.session) {
           const { data: prototype, error: prototypeError } = await supabase
@@ -52,9 +51,7 @@ export function usePrototypeFeedback(prototypeId: string) {
           if (prototypeError) {
             console.error("Error checking prototype access:", prototypeError);
           } else if (prototype && prototype.created_by !== session.session.user.id) {
-            // User doesn't own this prototype, check if they have explicit access
             console.warn("User doesn't own this prototype - would check for sharing permissions here");
-            // For now, we're just warning in the console
           }
         }
         
@@ -165,7 +162,7 @@ export function usePrototypeFeedback(prototypeId: string) {
             console.log('Current user profile:', userData);
             setCurrentUser({
               id: userData.id,
-              name: userData.name || 'Anonymous', // Default to 'Anonymous' if no name
+              name: userData.name || 'Anonymous',
               avatar_url: userData.avatar_url
             } as FeedbackUser);
           } else {
@@ -305,14 +302,90 @@ export function usePrototypeFeedback(prototypeId: string) {
     };
   }, [prototypeId, feedbackUsers]);
 
-  const addFeedbackPoint = (feedback: FeedbackPoint) => {
+  const addFeedbackPoint = async (feedback: FeedbackPoint) => {
+    try {
+      const { data: prototypeData, error: prototypeError } = await supabase
+        .from('prototypes')
+        .select('name, created_by')
+        .eq('id', prototypeId)
+        .single();
+      
+      if (!prototypeError && prototypeData) {
+        notifyNewComment(
+          prototypeData.created_by,
+          feedback.created_by,
+          prototypeId,
+          prototypeData.name,
+          feedback.id,
+          feedback.content
+        );
+      }
+    } catch (err) {
+      console.error("Error in notification flow:", err);
+    }
+    
     setFeedbackPoints(prev => [...prev, feedback]);
   };
 
-  const updateFeedbackPoint = (feedback: FeedbackPoint) => {
+  const updateFeedbackPoint = async (feedback: FeedbackPoint) => {
+    const prevFeedback = feedbackPoints.find(item => item.id === feedback.id);
+    
+    if (prevFeedback && prevFeedback.status !== 'resolved' && feedback.status === 'resolved') {
+      try {
+        const { data: prototypeData, error: prototypeError } = await supabase
+          .from('prototypes')
+          .select('name')
+          .eq('id', prototypeId)
+          .single();
+        
+        if (!prototypeError && prototypeData) {
+          notifyCommentResolved(
+            feedback.created_by,
+            currentUser?.id || '',
+            prototypeId,
+            prototypeData.name,
+            feedback.id
+          );
+        }
+      } catch (err) {
+        console.error("Error in notification flow:", err);
+      }
+    }
+    
     setFeedbackPoints(prev => 
       prev.map(item => item.id === feedback.id ? feedback : item)
     );
+  };
+
+  const addReplyToFeedback = async (
+    parentId: string,
+    replyContent: string,
+    replyId: string
+  ) => {
+    try {
+      const parentFeedback = feedbackPoints.find(item => item.id === parentId);
+      
+      if (parentFeedback) {
+        const { data: prototypeData, error: prototypeError } = await supabase
+          .from('prototypes')
+          .select('name')
+          .eq('id', prototypeId)
+          .single();
+        
+        if (!prototypeError && prototypeData) {
+          notifyCommentReply(
+            parentFeedback.created_by,
+            currentUser?.id || '',
+            prototypeId,
+            prototypeData.name,
+            parentId,
+            replyContent
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Error in notification flow:", err);
+    }
   };
 
   return {
@@ -321,6 +394,7 @@ export function usePrototypeFeedback(prototypeId: string) {
     feedbackUsers,
     currentUser,
     addFeedbackPoint,
-    updateFeedbackPoint
+    updateFeedbackPoint,
+    addReplyToFeedback
   };
 }
