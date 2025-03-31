@@ -1,66 +1,47 @@
 
-import { Bell, BellDot } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell } from "lucide-react";
+import { useNotifications } from "@/hooks/use-notifications";
+import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { NotificationList } from "./notification-list";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { NotificationList } from "./notification-list";
-import { NotificationPreferences } from "./notification-preferences";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNotifications } from "@/hooks/use-notifications";
 
 export function NotificationBell() {
   const { unreadCount, markAllAsRead } = useNotifications();
+  const [open, setOpen] = useState(false);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen && unreadCount > 0) {
+      // Mark all as read when opening the notification list
+      markAllAsRead();
+    }
+  };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-9 w-9">
-          {unreadCount > 0 ? (
-            <>
-              <BellDot className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 flex items-center justify-center h-4 min-w-4 rounded-full bg-primary text-[10px] text-primary-foreground">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            </>
-          ) : (
-            <Bell className="h-5 w-5" />
-          )}
-          <span className="sr-only">Toggle notifications</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="p-2 flex items-center justify-between">
-          <h4 className="font-medium text-sm">Notifications</h4>
+        <button
+          className="relative p-2 rounded-full hover:bg-accent transition-colors"
+          aria-label="Notifications"
+        >
+          <Bell size={20} />
           {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8 text-xs"
-              onClick={() => markAllAsRead()}
+            <Badge
+              className="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px]"
+              variant="destructive"
             >
-              Mark all as read
-            </Button>
+              {unreadCount}
+            </Badge>
           )}
-        </div>
-        <Separator />
-        <Tabs defaultValue="notifications">
-          <div className="px-2 pt-2">
-            <TabsList className="w-full">
-              <TabsTrigger value="notifications" className="flex-1 text-xs">Notifications</TabsTrigger>
-              <TabsTrigger value="preferences" className="flex-1 text-xs">Preferences</TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="notifications" className="mt-0 max-h-[350px] overflow-y-auto">
-            <NotificationList />
-          </TabsContent>
-          <TabsContent value="preferences" className="mt-0 p-3">
-            <NotificationPreferences />
-          </TabsContent>
-        </Tabs>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <NotificationList onClose={() => setOpen(false)} />
       </PopoverContent>
     </Popover>
   );

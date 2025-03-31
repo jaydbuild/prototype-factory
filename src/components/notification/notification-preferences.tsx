@@ -1,7 +1,9 @@
 
-import { useNotifications, NotificationPreferences } from "@/hooks/use-notifications";
-import { Switch } from "@/components/ui/switch";
+import { useNotifications } from "@/hooks/use-notifications";
+import type { NotificationPreferences as NotificationPrefsType } from "@/hooks/use-notifications";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function NotificationPreferences() {
@@ -9,86 +11,120 @@ export function NotificationPreferences() {
 
   if (!preferences) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <Skeleton className="h-5 w-10" />
-            <div className="space-y-2 flex-1">
-              <Skeleton className="h-4 w-full" />
-            </div>
-          </div>
-        ))}
+      <div className="p-4 space-y-3">
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
       </div>
     );
   }
 
-  const handleToggleChange = (field: keyof NotificationPreferences) => {
-    updatePreferences({
-      [field]: !preferences[field],
-    });
+  const handleToggleChange = (key: keyof NotificationPrefsType, value: boolean) => {
+    updatePreferences({ [key]: value });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium">Notification Channels</h3>
+    <ScrollArea className="h-[300px]">
+      <div className="p-4 space-y-6">
         <div className="space-y-2">
+          <h4 className="font-medium">Delivery Methods</h4>
+          <p className="text-sm text-muted-foreground">
+            Choose how you want to receive notifications
+          </p>
+        </div>
+        
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="in-app" className="flex-1 text-sm">In-app notifications</Label>
+            <div className="space-y-0.5">
+              <Label className="text-base">In-app notifications</Label>
+              <p className="text-xs text-muted-foreground">
+                Receive notifications within the application
+              </p>
+            </div>
             <Switch 
-              id="in-app" 
               checked={preferences.in_app_enabled} 
-              onCheckedChange={() => handleToggleChange('in_app_enabled')}
+              onCheckedChange={(value) => handleToggleChange('in_app_enabled', value)}
             />
           </div>
+          
           <div className="flex items-center justify-between">
-            <Label htmlFor="email" className="flex-1 text-sm">Email notifications</Label>
+            <div className="space-y-0.5">
+              <Label className="text-base">Email notifications</Label>
+              <p className="text-xs text-muted-foreground">
+                Receive notifications via email
+              </p>
+            </div>
             <Switch 
-              id="email" 
               checked={preferences.email_enabled} 
-              onCheckedChange={() => handleToggleChange('email_enabled')}
+              onCheckedChange={(value) => handleToggleChange('email_enabled', value)}
             />
           </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="push" className="flex-1 text-sm">Push notifications</Label>
-            <Switch 
-              id="push" 
-              checked={preferences.push_enabled} 
-              onCheckedChange={() => handleToggleChange('push_enabled')}
-            />
-          </div>
-        </div>
-      </div>
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium">Notification Types</h3>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Push notifications</Label>
+              <p className="text-xs text-muted-foreground">
+                Receive push notifications (coming soon)
+              </p>
+            </div>
+            <Switch 
+              checked={preferences.push_enabled} 
+              onCheckedChange={(value) => handleToggleChange('push_enabled', value)}
+              disabled={true}
+            />
+          </div>
+        </div>
+        
         <div className="space-y-2">
+          <h4 className="font-medium">Notification Types</h4>
+          <p className="text-sm text-muted-foreground">
+            Select which types of notifications you want to receive
+          </p>
+        </div>
+        
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="comment-replies" className="flex-1 text-sm">Comment replies</Label>
+            <div className="space-y-0.5">
+              <Label className="text-base">Prototype comments</Label>
+              <p className="text-xs text-muted-foreground">
+                When someone comments on your prototype
+              </p>
+            </div>
             <Switch 
-              id="comment-replies" 
-              checked={preferences.comment_replies} 
-              onCheckedChange={() => handleToggleChange('comment_replies')}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="comment-resolved" className="flex-1 text-sm">Comment resolutions</Label>
-            <Switch 
-              id="comment-resolved" 
-              checked={preferences.comment_resolved} 
-              onCheckedChange={() => handleToggleChange('comment_resolved')}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="prototype-comments" className="flex-1 text-sm">New prototype comments</Label>
-            <Switch 
-              id="prototype-comments" 
               checked={preferences.prototype_comments} 
-              onCheckedChange={() => handleToggleChange('prototype_comments')}
+              onCheckedChange={(value) => handleToggleChange('prototype_comments', value)}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Comment replies</Label>
+              <p className="text-xs text-muted-foreground">
+                When someone replies to your comment
+              </p>
+            </div>
+            <Switch 
+              checked={preferences.comment_replies} 
+              onCheckedChange={(value) => handleToggleChange('comment_replies', value)}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Resolved comments</Label>
+              <p className="text-xs text-muted-foreground">
+                When your comment is marked as resolved
+              </p>
+            </div>
+            <Switch 
+              checked={preferences.comment_resolved} 
+              onCheckedChange={(value) => handleToggleChange('comment_resolved', value)}
             />
           </div>
         </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 }

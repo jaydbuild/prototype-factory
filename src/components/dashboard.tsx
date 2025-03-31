@@ -1,85 +1,122 @@
 import { useState } from "react";
-import { PrototypeCard } from "@/components/prototype-card";
-import { NewPrototypeDialog } from "@/components/new-prototype-dialog";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AddPrototypeDialog } from "@/components/upload-prototype-dialog";
+import { useSupabase } from "@/lib/supabase-provider";
+import { PrototypeGrid } from "./prototype-grid";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { useEffect } from "react";
+import { Skeleton } from "./ui/skeleton";
+import { toast } from "./ui/sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { NotificationBell } from "./notification/notification-bell";
 
 const Dashboard = () => {
-  const [selectedPrototypeId, setSelectedPrototypeId] = useState<string | null>(null);
-  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [prototypeCount, setPrototypeCount] = useState(0);
+  const { supabase, session } = useSupabase();
+  const queryClient = useQueryClient();
 
-  const { data: prototypes, isLoading } = useQuery({
-    queryKey: ['prototypes'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('prototypes')
-        .select('*')
-        .order('created_at', { ascending: false });
+  useEffect(() => {
+    const fetchPrototypeCount = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error, count } = await supabase
+          .from("prototypes")
+          .select("*", { count: "exact", head: false })
+          .eq("created_by", session?.user.id);
 
-      if (error) {
-        throw error;
+        if (error) {
+          console.error("Error fetching prototype count:", error);
+          toast({
+            title: "Error fetching prototypes",
+            description: "Please try again later",
+            variant: "destructive",
+          });
+        }
+
+        setPrototypeCount(count || 0);
+      } catch (error) {
+        console.error("Unexpected error fetching prototype count:", error);
+        toast({
+          title: "Unexpected error",
+          description: "Please try again later",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      return data;
+    if (session?.user) {
+      fetchPrototypeCount();
     }
-  });
+  }, [session?.user, supabase, queryClient]);
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container flex items-center justify-between h-14">
-          <div className="font-semibold">Prototype Playground</div>
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <Button size="sm" asChild onClick={() => setShowNewDialog(true)}>
-              <Link to="#">
-                <Plus className="w-4 h-4 mr-2" />
-                New Prototype
-              </Link>
+    <div className="container py-10">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Your Prototypes</h1>
+          <p className="text-muted-foreground">
+            Manage and showcase your interactive prototypes.
+          </p>
+        </div>
+        <div className="flex gap-4 items-center">
+          <NotificationBell />
+          <AddPrototypeDialog
+            onUpload={() => {
+              queryClient.invalidateQueries({ queryKey: ["prototypes"] });
+            }}
+          />
+        </div>
+      </div>
+
+      <Card className="p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Prototype Overview</h2>
+            <p className="text-muted-foreground">
+              A summary of your prototype activity.
+            </p>
+          </div>
+          <div className="space-x-2">
+            <Button variant="outline" size="sm">
+              Last 7 Days
+            </Button>
+            <Button variant="outline" size="sm">
+              Last Month
             </Button>
           </div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 container py-6">
-        <h2 className="text-2xl font-bold mb-4">Your Prototypes</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="h-40 w-full rounded-t-lg" />
-                <div className="p-5 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
-            ))
-          ) : prototypes && prototypes.length > 0 ? (
-            prototypes.map(prototype => (
-              <PrototypeCard
-                key={prototype.id}
-                prototype={prototype}
-                onSelect={() => setSelectedPrototypeId(prototype.id)}
-                isSelected={selectedPrototypeId === prototype.id}
-              />
-            ))
-          ) : (
-            <div className="col-span-full text-center py-12">
-              <p className="text-muted-foreground">No prototypes yet. Create one to get started!</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          <div className="flex items-center gap-4">
+            <div>
+              <span className="text-2xl font-bold">
+                {isLoading ? <Skeleton className="h-6 w-12" /> : prototypeCount}
+              </span>
+              <p className="text-muted-foreground">Total Prototypes</p>
             </div>
-          )}
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <span className="text-2xl font-bold">
+                {isLoading ? <Skeleton className="h-6 w-12" /> : "0"}
+              </span>
+              <p className="text-muted-foreground">Active Users</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <span className="text-2xl font-bold">
+                {isLoading ? <Skeleton className="h-6 w-12" /> : "0"}
+              </span>
+              <p className="text-muted-foreground">Total Comments</p>
+            </div>
+          </div>
         </div>
-      </main>
+      </Card>
 
-      {/* New Prototype Dialog */}
-      <NewPrototypeDialog open={showNewDialog} onOpenChange={setShowNewDialog} />
+      <PrototypeGrid />
     </div>
   );
 };

@@ -62,7 +62,7 @@ export function useNotifications() {
     enabled: !!userId
   });
 
-  // Fetch notifications from Novu (this would typically connect to your Novu API)
+  // Fetch notifications from Novu
   const fetchNotifications = async () => {
     if (!userId) {
       setIsLoading(false);
@@ -71,10 +71,6 @@ export function useNotifications() {
     
     try {
       setIsLoading(true);
-      
-      // This is a placeholder for the Novu API call
-      // In a real implementation, you would call the Novu API to get notifications
-      // For now, we'll simulate this with a Supabase function call
       
       const { data, error } = await supabase.functions.invoke("get-notifications", {
         body: { userId }
@@ -103,7 +99,6 @@ export function useNotifications() {
     if (!userId) return;
     
     try {
-      // This is a placeholder for the Novu API call
       await supabase.functions.invoke("mark-notification-read", {
         body: { notificationId, userId }
       });
@@ -125,7 +120,6 @@ export function useNotifications() {
     if (!userId) return;
     
     try {
-      // This is a placeholder for the Novu API call
       await supabase.functions.invoke("mark-all-notifications-read", {
         body: { userId }
       });
