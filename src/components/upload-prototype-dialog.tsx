@@ -155,7 +155,7 @@ export function UploadPrototypeDialog({ onUpload }: { onUpload?: () => void }) {
             title: "Success",
             description: "Prototype uploaded successfully",
           });
-          onOpenChange(false);
+          setOpen(false);
           
           // Redirect to the prototype preview
           navigate(`/prototype/${prototype.id}`);

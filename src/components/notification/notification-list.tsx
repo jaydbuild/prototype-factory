@@ -67,10 +67,10 @@ export function NotificationList({ onClose }: NotificationListProps) {
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <ProfileAvatar
-                    userId={notification.payload.actorUserId}
                     fallbackUrl={notification.payload.actorAvatar}
                     size="sm"
                     className="mt-0.5"
+                    editable={false}
                   />
                   <div className="flex-1 overflow-hidden">
                     <p className="text-sm font-medium line-clamp-2">

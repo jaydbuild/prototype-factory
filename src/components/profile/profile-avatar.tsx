@@ -5,19 +5,25 @@ import { User } from "lucide-react";
 
 interface ProfileAvatarProps {
   url?: string | null;
+  userId?: string;
+  fallbackUrl?: string | null;
   onFileChange?: (file: File | null) => void;
   size?: "sm" | "md" | "lg";
   editable?: boolean;
+  className?: string;
 }
 
 export function ProfileAvatar({
   url,
+  userId,
+  fallbackUrl,
   onFileChange,
   size = "lg",
   editable = true,
+  className = "",
 }: ProfileAvatarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(url || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(url || fallbackUrl || null);
 
   const sizeClasses = {
     sm: "h-10 w-10",
@@ -48,7 +54,7 @@ export function ProfileAvatar({
   return (
     <div className="relative group">
       <Avatar 
-        className={`${sizeClasses[size]} ${editable ? 'cursor-pointer' : ''} border-2 border-muted-foreground/10`} 
+        className={`${sizeClasses[size]} ${editable ? 'cursor-pointer' : ''} border-2 border-muted-foreground/10 ${className}`} 
         onClick={handleClick}
       >
         <AvatarImage src={previewUrl || undefined} alt="Profile picture" />
