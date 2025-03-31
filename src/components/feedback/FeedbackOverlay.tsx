@@ -540,7 +540,7 @@ export function FeedbackOverlay({
       )}
       
       {isIframeReady && (
-        <div className="absolute top-4 right-4 z-50">
+        <div className="absolute top-1 right-40 z-50">
           <FeedbackDeviceFilter
             selectedDeviceType={selectedDeviceType}
             onSelectDeviceType={setSelectedDeviceType}
