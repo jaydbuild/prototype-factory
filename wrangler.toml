@@ -1,4 +1,3 @@
-
 name = "prototype-app"
 
 [env.staging]
@@ -15,3 +14,4 @@ compatibility_date = "2023-10-02"
 
 [site]
 bucket = "./dist"
+pages_build_output_dir = "dist"
