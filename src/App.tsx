@@ -27,13 +27,14 @@ const queryClient = new QueryClient({
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  skipOnboardingCheck?: boolean; // New prop to allow skipping the onboarding check
 }
 
 const NavigationWrapper = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, skipOnboardingCheck = false }: ProtectedRouteProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
@@ -45,8 +46,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         const { data } = await supabase.auth.getSession();
         setSession(data.session);
         
-        // Check if profile is complete
-        if (data.session?.user) {
+        // Check if profile is complete, but only if we're not skipping onboarding check
+        if (data.session?.user && !skipOnboardingCheck) {
           const { data: profileData } = await supabase
             .from('profiles')
             .select('name')
@@ -73,8 +74,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Reset loading state when auth state changes
       if (!session) {
         setLoading(false);
-      } else {
-        // Check if profile is complete when session changes
+      } else if (!skipOnboardingCheck) {
+        // Check if profile is complete when session changes, but only if not skipping check
         const checkProfile = async () => {
           try {
             const { data: profileData } = await supabase
@@ -92,11 +93,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         };
         
         checkProfile();
+      } else {
+        setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [skipOnboardingCheck, navigate]);
 
   if (loading) {
     return (
@@ -113,7 +116,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/auth" replace />;
   }
 
-  if (needsOnboarding) {
+  // Only redirect to onboarding if needed AND we're not skipping the check
+  if (needsOnboarding && !skipOnboardingCheck) {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -132,7 +136,14 @@ const AppContent = () => {
       <NavigationWrapper>
         <Routes>
           <Route path="/auth" element={<Auth />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute skipOnboardingCheck={true}>
+                <Onboarding />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/"
             element={hasSkippedLogin ? <Navigate to="/dashboard" /> : <LoginPage />}
