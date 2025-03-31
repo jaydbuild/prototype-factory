@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { FeedbackPoint, FeedbackUser, ElementTarget, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,24 @@ export function usePrototypeFeedback(prototypeId: string) {
     const fetchFeedback = async () => {
       setIsLoading(true);
       try {
+        // First check if the user has access to this prototype
+        const { data: session } = await supabase.auth.getSession();
+        if (session.session) {
+          const { data: prototype, error: prototypeError } = await supabase
+            .from('prototypes')
+            .select('created_by')
+            .eq('id', prototypeId)
+            .single();
+          
+          if (prototypeError) {
+            console.error("Error checking prototype access:", prototypeError);
+          } else if (prototype && prototype.created_by !== session.session.user.id) {
+            // User doesn't own this prototype, check if they have explicit access
+            console.warn("User doesn't own this prototype - would check for sharing permissions here");
+            // For now, we're just warning in the console
+          }
+        }
+        
         const { data, error } = await supabase
           .from('prototype_feedback')
           .select('*')
@@ -103,7 +122,11 @@ export function usePrototypeFeedback(prototypeId: string) {
             } else if (userData) {
               const userMap: Record<string, FeedbackUser> = {};
               userData.forEach(user => {
-                userMap[user.id] = user as FeedbackUser;
+                userMap[user.id] = {
+                  id: user.id,
+                  name: user.name || 'Anonymous',
+                  avatar_url: user.avatar_url
+                } as FeedbackUser;
               });
               setFeedbackUsers(userMap);
             }
@@ -140,7 +163,11 @@ export function usePrototypeFeedback(prototypeId: string) {
           
           if (!error && userData) {
             console.log('Current user profile:', userData);
-            setCurrentUser(userData as FeedbackUser);
+            setCurrentUser({
+              id: userData.id,
+              name: userData.name || 'Anonymous', // Default to 'Anonymous' if no name
+              avatar_url: userData.avatar_url
+            } as FeedbackUser);
           } else {
             console.log('Creating default user from session:', data.session.user);
             setCurrentUser({

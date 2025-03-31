@@ -5,26 +5,32 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewWindow } from "./PreviewWindow";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, AlertTriangle } from "lucide-react";
+import { RefreshCw, AlertTriangle, User } from "lucide-react";
 import { Button } from "./ui/button";
+import { useSupabase } from "@/lib/supabase-provider";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 export const PrototypeDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [processingTimeout, setProcessingTimeout] = useState(false);
+  const { session } = useSupabase();
+  
+  const currentUserId = session?.user?.id;
 
   const { 
     data: prototype, 
     isLoading, 
     refetch,
-    isRefetching
+    isRefetching,
+    error
   } = useQuery({
     queryKey: ['prototype', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('prototypes')
-        .select('*')
+        .select('*, profiles:created_by(name, avatar_url)')
         .eq('id', id)
         .single();
 
@@ -37,9 +43,27 @@ export const PrototypeDetail = () => {
         throw error;
       }
 
+      // Security check: Make sure the user can only view their own prototypes
+      if (data && currentUserId && data.created_by !== currentUserId) {
+        toast({
+          variant: "destructive",
+          title: "Access denied",
+          description: "You don't have permission to view this prototype"
+        });
+        throw new Error("Access denied");
+      }
+
       return data;
-    }
+    },
+    enabled: !!id && !!currentUserId
   });
+
+  // If not logged in, redirect to auth
+  useEffect(() => {
+    if (!session && !isLoading) {
+      navigate('/auth');
+    }
+  }, [session, isLoading, navigate]);
 
   // Handle share action
   const handleShare = useCallback(() => {
@@ -82,20 +106,37 @@ export const PrototypeDetail = () => {
     );
   }
 
-  if (!prototype) {
+  if (error || !prototype) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="bg-card p-6 rounded-lg shadow-sm border">
           <h2 className="text-xl font-semibold mb-2">Prototype not found</h2>
-          <p className="text-muted-foreground mb-4">The prototype you're looking for doesn't exist or has been deleted.</p>
+          <p className="text-muted-foreground mb-4">The prototype you're looking for doesn't exist, has been deleted, or you don't have permission to access it.</p>
           <Button variant="outline" onClick={() => navigate('/dashboard')}>Go Back</Button>
         </div>
       </div>
     );
   }
 
+  const creatorName = prototype.profiles?.name || 'Anonymous';
+  const creatorAvatar = prototype.profiles?.avatar_url;
+
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden">
+      <div className="bg-background p-2 flex items-center border-b">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-7 w-7">
+            {creatorAvatar ? (
+              <AvatarImage src={creatorAvatar} alt={creatorName} />
+            ) : (
+              <AvatarFallback>
+                <User className="h-4 w-4" />
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <span className="text-sm font-medium">Created by {creatorName}</span>
+        </div>
+      </div>
       <div className="flex-1 min-h-0 relative">
         <div className="absolute inset-0">
           {id && <PreviewWindow prototypeId={id} url={prototype?.deployment_url} onShare={handleShare} />}

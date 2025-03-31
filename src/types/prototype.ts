@@ -4,6 +4,8 @@ export interface Prototype {
   name: string;
   created_at: string;
   created_by: string;
+  creator_name?: string;
+  creator_avatar?: string | null;
   url: string;
   preview_url: string | null;
   preview_title: string | null;
