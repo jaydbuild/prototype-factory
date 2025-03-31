@@ -5,17 +5,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { formatDistanceToNow } from "date-fns";
-import { Settings, Bell, Inbox } from "lucide-react";
+import { Settings, Bell, Inbox, AlertCircle } from "lucide-react";
 import { NotificationPreferences } from "./notification-preferences";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 
 interface NotificationListProps {
   onClose?: () => void;
 }
 
 export function NotificationList({ onClose }: NotificationListProps) {
-  const { notifications, isLoading, markAsRead } = useNotifications();
+  const { notifications, isLoading, error, markAsRead } = useNotifications();
   const [activeTab, setActiveTab] = useState("notifications");
 
   const handleNotificationClick = (notification: Notification) => {
@@ -55,6 +56,12 @@ export function NotificationList({ onClose }: NotificationListProps) {
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="h-5 w-5 border-t-2 border-b-2 border-primary rounded-full animate-spin"></div>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+              <AlertCircle className="h-8 w-8 text-destructive mb-2" />
+              <p className="text-sm font-medium text-destructive">Error fetching notifications</p>
+              <p className="text-xs text-muted-foreground mt-1">Please try again later</p>
             </div>
           ) : notifications && notifications.length > 0 ? (
             <div className="flex flex-col">

@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Plus } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -204,8 +205,8 @@ export function UploadPrototypeDialog({ onUpload }: { onUpload?: () => void }) {
         onClick={() => setOpen(true)}
         className="flex items-center gap-2"
       >
-        <span className="hidden md:inline">Add Prototype</span>
-        <span className="md:hidden">Add</span>
+        <Plus size={16} />
+        <span>Add Prototype</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">

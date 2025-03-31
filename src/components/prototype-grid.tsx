@@ -95,6 +95,7 @@ export const PrototypeGrid = () => {
       <PrototypeCollections 
         selectedCollection={selectedCollection}
         onSelectCollection={setSelectedCollection}
+        hideHeadline={true}
       />
 
       <PrototypeToolbar 

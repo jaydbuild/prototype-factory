@@ -11,12 +11,14 @@ import { PrototypeCollectionTag } from "./PrototypeCollectionTag";
 
 interface PrototypeCollectionsProps {
   selectedCollection: string | null;
-  onSelectCollection: (collectionId: string | null) => void;
+  onSelectCollection: (id: string | null) => void;
+  hideHeadline?: boolean;
 }
 
 export function PrototypeCollections({ 
   selectedCollection, 
-  onSelectCollection 
+  onSelectCollection,
+  hideHeadline = false
 }: PrototypeCollectionsProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -67,33 +69,29 @@ export function PrototypeCollections({
   });
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium">Collections</h3>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-8 px-2"
-          onClick={() => setIsCreateDialogOpen(true)}
+    <div className="mb-6">
+      {!hideHeadline && (
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-medium">Collections</h2>
+          <CreateCollectionDialog />
+        </div>
+      )}
+      
+      <div className="flex flex-wrap gap-2">
+        <CollectionTag 
+          isSelected={selectedCollection === null}
+          onClick={() => onSelectCollection(null)}
         >
-          <Plus className="h-4 w-4 mr-1" />
-          New
-        </Button>
+          All Prototypes
+        </CollectionTag>
+        
+        <CollectionList 
+          selectedCollection={selectedCollection} 
+          onSelectCollection={onSelectCollection} 
+        />
       </div>
-
-      <CollectionList 
-        collections={collections}
-        selectedCollection={selectedCollection}
-        onSelectCollection={onSelectCollection}
-      />
-
-      <CreateCollectionDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={setIsCreateDialogOpen} 
-      />
     </div>
   );
 }
 
-// Export the tag component for reuse
 export { PrototypeCollectionTag };
