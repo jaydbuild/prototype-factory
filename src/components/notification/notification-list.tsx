@@ -3,7 +3,7 @@ import { useNotifications, Notification } from "@/hooks/use-notifications";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserAvatar } from "@/components/profile/profile-avatar";
+import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { formatDistanceToNow } from "date-fns";
 import { Settings, Bell, Inbox } from "lucide-react";
 import { NotificationPreferences } from "./notification-preferences";
@@ -66,7 +66,7 @@ export function NotificationList({ onClose }: NotificationListProps) {
                   }`}
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  <UserAvatar
+                  <ProfileAvatar
                     userId={notification.payload.actorUserId}
                     fallbackUrl={notification.payload.actorAvatar}
                     size="sm"

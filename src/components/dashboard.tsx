@@ -1,12 +1,13 @@
+
 import { useState } from "react";
-import { AddPrototypeDialog } from "@/components/upload-prototype-dialog";
+import { UploadPrototypeDialog } from "@/components/upload-prototype-dialog";
 import { useSupabase } from "@/lib/supabase-provider";
 import { PrototypeGrid } from "./prototype-grid";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useEffect } from "react";
 import { Skeleton } from "./ui/skeleton";
-import { toast } from "./ui/sonner";
+import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { NotificationBell } from "./notification/notification-bell";
 
@@ -63,7 +64,7 @@ const Dashboard = () => {
         </div>
         <div className="flex gap-4 items-center">
           <NotificationBell />
-          <AddPrototypeDialog
+          <UploadPrototypeDialog
             onUpload={() => {
               queryClient.invalidateQueries({ queryKey: ["prototypes"] });
             }}
