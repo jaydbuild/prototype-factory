@@ -1,6 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Prototype } from "@/types/prototype";
+import { useIframeStability } from "@/hooks/use-iframe-stability";
 
 interface PrototypePreviewThumbnailProps {
   prototype: Prototype;
@@ -11,7 +12,20 @@ export function PrototypePreviewThumbnail({ prototype, className = "" }: Prototy
   const [isLoading, setIsLoading] = useState(true);
   const [previewError, setPreviewError] = useState(false);
 
-  const hasValidPreview = prototype.deployment_url && prototype.deployment_status === 'deployed';
+  // More permissive check - if we have any URL, try to load it
+  const previewUrl = prototype.deployment_url || prototype.preview_url || null;
+  const hasValidPreview = !!previewUrl;
+  
+  // Add debug logging to help troubleshoot
+  useEffect(() => {
+    if (prototype.id && !hasValidPreview) {
+      console.debug(`Prototype ${prototype.id} has no valid preview URL:`, { 
+        deployment_url: prototype.deployment_url,
+        deployment_status: prototype.deployment_status,
+        preview_url: prototype.preview_url
+      });
+    }
+  }, [prototype, hasValidPreview]);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -20,6 +34,7 @@ export function PrototypePreviewThumbnail({ prototype, className = "" }: Prototy
   const handleError = () => {
     setIsLoading(false);
     setPreviewError(true);
+    console.debug(`Preview load error for prototype ${prototype.id}:`, previewUrl);
   };
 
   return (
@@ -32,7 +47,7 @@ export function PrototypePreviewThumbnail({ prototype, className = "" }: Prototy
             </div>
           )}
           <iframe 
-            src={prototype.deployment_url}
+            src={previewUrl}
             title={`Preview of ${prototype.name}`}
             className="w-full h-full border-none"
             style={{ opacity: isLoading ? 0 : 1, transition: "opacity 0.3s ease" }}

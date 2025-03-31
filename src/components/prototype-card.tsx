@@ -1,4 +1,3 @@
-
 import { format, parseISO } from "date-fns";
 import { MessageSquare, Edit, ArrowUpRight, Check } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -67,7 +66,7 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
             <PrototypePreviewThumbnail prototype={prototype} />
           </div>
 
-          {/* Selection Check - Only visible when hovering or selected */}
+          {/* Selection Check and Edit Button section */}
           {onSelect && (isHovering || isSelected) && (
             <div 
               className={cn(
@@ -130,7 +129,7 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
               </div>
               
               {/* View Link */}
-              {prototype.deployment_url && prototype.deployment_status === 'deployed' && (
+              {prototype.deployment_url && (
                 <div className="flex-shrink-0">
                   <button
                     onClick={(e) => {
