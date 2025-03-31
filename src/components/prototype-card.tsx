@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Prototype } from "@/types/prototype";
 import { cn } from "@/lib/utils";
+import { PrototypePreviewThumbnail } from "./prototype-preview-thumbnail";
 
 interface PrototypeCardProps {
   prototype: Prototype;
@@ -59,8 +60,13 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
       >
         <Link 
           to={`/prototype/${prototype.id}${collectionId ? `?fromCollection=${collectionId}` : ''}`}
-          className="block relative p-5"
+          className="block relative"
         >
+          {/* Preview Thumbnail */}
+          <div className="relative w-full h-40 rounded-t-lg overflow-hidden">
+            <PrototypePreviewThumbnail prototype={prototype} />
+          </div>
+
           {/* Selection Check - Only visible when hovering or selected */}
           {onSelect && (isHovering || isSelected) && (
             <div 
@@ -93,7 +99,7 @@ export function PrototypeCard({ prototype, onSelect, isSelected, collectionId }:
           )}
 
           {/* Main Card Content */}
-          <div className="space-y-4">
+          <div className="p-5 space-y-4">
             {/* Header Section */}
             <div className="flex items-start justify-between">
               <h3 className="font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
