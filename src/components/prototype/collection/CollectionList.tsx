@@ -14,16 +14,12 @@ export function CollectionList({
   selectedCollection,
   onSelectCollection
 }: CollectionListProps) {
+  if (!collections.length) {
+    return null;
+  }
+
   return (
-    <div className="flex flex-wrap gap-2 mb-2">
-      <Badge 
-        variant={selectedCollection === null ? "default" : "outline"}
-        className="cursor-pointer"
-        onClick={() => onSelectCollection(null)}
-      >
-        All Uncategorized
-      </Badge>
-      
+    <>
       {collections.map((collection) => (
         <Badge
           key={collection.id}
@@ -39,6 +35,6 @@ export function CollectionList({
           </span>
         </Badge>
       ))}
-    </div>
+    </>
   );
 }

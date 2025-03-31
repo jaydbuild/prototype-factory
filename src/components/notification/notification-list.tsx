@@ -16,8 +16,9 @@ interface NotificationListProps {
 }
 
 export function NotificationList({ onClose }: NotificationListProps) {
-  const { notifications, isLoading, error, markAsRead } = useNotifications();
+  const { notifications, isLoading, markAsRead } = useNotifications();
   const [activeTab, setActiveTab] = useState("notifications");
+  const { toast } = useToast();
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.seen) {
@@ -57,13 +58,12 @@ export function NotificationList({ onClose }: NotificationListProps) {
             <div className="flex items-center justify-center h-full">
               <div className="h-5 w-5 border-t-2 border-b-2 border-primary rounded-full animate-spin"></div>
             </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <AlertCircle className="h-8 w-8 text-destructive mb-2" />
-              <p className="text-sm font-medium text-destructive">Error fetching notifications</p>
-              <p className="text-xs text-muted-foreground mt-1">Please try again later</p>
+          ) : !notifications || notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full">
+              <Inbox className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
             </div>
-          ) : notifications && notifications.length > 0 ? (
+          ) : (
             <div className="flex flex-col">
               {notifications.map((notification) => (
                 <button
@@ -95,11 +95,6 @@ export function NotificationList({ onClose }: NotificationListProps) {
                   )}
                 </button>
               ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full">
-              <Inbox className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No notifications yet</p>
             </div>
           )}
         </ScrollArea>

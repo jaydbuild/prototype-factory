@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
 
-interface CreateCollectionDialogProps {
+export interface CreateCollectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }

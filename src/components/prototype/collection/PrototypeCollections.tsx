@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -8,6 +9,7 @@ import { CollectionWithCount } from "@/types/prototype";
 import { CollectionList } from "./CollectionList";
 import { CreateCollectionDialog } from "./CreateCollectionDialog";
 import { PrototypeCollectionTag } from "./PrototypeCollectionTag";
+import { Badge } from "@/components/ui/badge";
 
 interface PrototypeCollectionsProps {
   selectedCollection: string | null;
@@ -73,23 +75,37 @@ export function PrototypeCollections({
       {!hideHeadline && (
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-medium">Collections</h2>
-          <CreateCollectionDialog />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New
+          </Button>
         </div>
       )}
       
       <div className="flex flex-wrap gap-2">
-        <CollectionTag 
-          isSelected={selectedCollection === null}
+        <Badge 
+          variant={selectedCollection === null ? "default" : "outline"}
+          className="cursor-pointer"
           onClick={() => onSelectCollection(null)}
         >
           All Prototypes
-        </CollectionTag>
+        </Badge>
         
         <CollectionList 
+          collections={collections}
           selectedCollection={selectedCollection} 
-          onSelectCollection={onSelectCollection} 
+          onSelectCollection={onSelectCollection}
         />
       </div>
+
+      <CreateCollectionDialog 
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
     </div>
   );
 }
