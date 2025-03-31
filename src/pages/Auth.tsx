@@ -10,7 +10,7 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Auth() {
@@ -25,7 +25,12 @@ export default function Auth() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate('/', { replace: true });
+        // On sign-in/up, redirect to dashboard or onboarding based on event type
+        if (event === 'SIGNED_UP') {
+          navigate('/onboarding', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
       }
     });
 
@@ -54,13 +59,14 @@ export default function Auth() {
           title: "Account created!",
           description: "Please check your email to verify your account.",
         });
+        // The redirect to onboarding will happen via the onAuthStateChange listener
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        navigate("/");
+        // The redirect to dashboard will happen via the onAuthStateChange listener
       }
     } catch (error: any) {
       toast({
@@ -79,6 +85,7 @@ export default function Auth() {
         provider: 'github',
       });
       if (error) throw error;
+      // The redirect to dashboard will happen via the onAuthStateChange listener
     } catch (error) {
       console.error('Error signing in:', error);
     }

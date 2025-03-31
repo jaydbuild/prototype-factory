@@ -14,6 +14,7 @@ import { SupabaseProvider } from "@/lib/supabase-provider";
 import type { User, Session } from '@supabase/supabase-js';
 import LoginPage from './components/login-page';
 import { EnvironmentBadge } from "./components/environment-badge";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,12 +36,26 @@ const NavigationWrapper = ({ children }: { children: React.ReactNode }) => {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         setSession(data.session);
+        
+        // Check if profile is complete
+        if (data.session?.user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', data.session.user.id)
+            .single();
+            
+          // If name is missing, user needs onboarding
+          setNeedsOnboarding(!profileData?.name);
+        }
       } catch (error) {
         console.error('Error fetching session:', error);
       } finally {
@@ -54,7 +69,30 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setLoading(false);
+      
+      // Reset loading state when auth state changes
+      if (!session) {
+        setLoading(false);
+      } else {
+        // Check if profile is complete when session changes
+        const checkProfile = async () => {
+          try {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('id', session.user.id)
+              .single();
+              
+            setNeedsOnboarding(!profileData?.name);
+            setLoading(false);
+          } catch (error) {
+            console.error('Error checking profile:', error);
+            setLoading(false);
+          }
+        };
+        
+        checkProfile();
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -75,6 +113,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/auth" replace />;
   }
 
+  if (needsOnboarding) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return (
     <SupabaseProvider session={session}>
       {children}
@@ -90,6 +132,7 @@ const AppContent = () => {
       <NavigationWrapper>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route
             path="/"
             element={hasSkippedLogin ? <Navigate to="/dashboard" /> : <LoginPage />}
