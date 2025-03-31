@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,8 +48,8 @@ export function ProfileUpdateForm({ onComplete }: ProfileUpdateFormProps) {
     },
   });
 
-  // Load existing profile data if available
-  useState(() => {
+  // Fixed: Changed useState to useEffect with proper dependency array
+  useEffect(() => {
     const loadProfile = async () => {
       if (!session?.user) return;
       

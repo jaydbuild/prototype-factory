@@ -25,8 +25,9 @@ export default function Auth() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        // On sign-in/up, redirect to dashboard or onboarding based on event type
-        if (event === 'SIGNED_UP') {
+        // Fix: Using type-safe string comparison
+        // For Supabase v2.x, valid auth events are string literals
+        if (event.toString() === 'SIGNED_UP') {
           navigate('/onboarding', { replace: true });
         } else {
           navigate('/', { replace: true });
