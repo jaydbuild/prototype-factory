@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FeedbackDeviceFilter } from "@/components/feedback/FeedbackDeviceFilter";
+import { DeviceInfo } from "@/types/feedback";
 import { 
   Eye, 
   Code, 
@@ -78,6 +80,11 @@ interface PreviewControlsProps {
   // New props for download and share
   filesUrl?: string;
   onDownload?: () => void;
+  // Feedback device filter props
+  selectedDeviceType?: DeviceType | 'all';
+  onSelectDeviceType?: (deviceType: DeviceType | 'all') => void;
+  deviceCounts?: Record<DeviceType | 'all', number>;
+  currentDevice?: DeviceInfo;
 }
 
 export function PreviewControls({
@@ -104,7 +111,12 @@ export function PreviewControls({
   // Figma design availability
   hasFigmaDesign = false,
   filesUrl,
-  onDownload
+  onDownload,
+  // Feedback device filter props
+  selectedDeviceType = 'all',
+  onSelectDeviceType,
+  deviceCounts = { all: 0, desktop: 0, tablet: 0, mobile: 0, custom: 0 },
+  currentDevice = { type: 'desktop', width: 1920, height: 1080, orientation: 'portrait', scale: 1 }
 }: PreviewControlsProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -454,6 +466,25 @@ export function PreviewControls({
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
+      )}
+
+      {/* Feedback Device Filter - Only show in feedback mode */}
+      {isFeedbackMode && onSelectDeviceType && (
+        <div className="flex-shrink-0 mx-2">
+          <FeedbackDeviceFilter
+            selectedDeviceType={selectedDeviceType || 'all'}
+            onSelectDeviceType={onSelectDeviceType}
+            deviceCounts={deviceCounts}
+            currentDevice={currentDevice}
+            deviceType={deviceType}
+            selectedDevice={selectedDevice}
+            onDeviceChange={onDeviceChange}
+            onDeviceSelection={onDeviceSelection}
+            deviceConfigs={deviceConfigs}
+            onOrientationChange={onOrientationChange}
+            orientation={orientation}
+          />
+        </div>
       )}
 
       <div className="flex-1" /> {/* Spacer */}
