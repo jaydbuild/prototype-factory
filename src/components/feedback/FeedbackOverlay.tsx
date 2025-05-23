@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FeedbackPoint as FeedbackPointType, FeedbackUser, ElementTarget, DeviceType, DeviceInfo, FeedbackStatus } from '@/types/feedback';
 import { FeedbackPoint } from './FeedbackPoint';
-import { FeedbackDeviceFilter } from './FeedbackDeviceFilter';
 import { CommentThread } from './CommentThread';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -69,7 +68,7 @@ export function FeedbackOverlay({
   const [isInteractingWithComment, setIsInteractingWithComment] = useState(false);
   const [currentHoveredElements, setCurrentHoveredElements] = useState<Element[]>([]);
   const [currentElementIndex, setCurrentElementIndex] = useState(0);
-  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | 'all'>('all');
+
   
   const { isIframeReady, refreshCheck } = useIframeStability({
     containerSelector: '.sp-preview',
@@ -98,39 +97,9 @@ export function FeedbackOverlay({
     scale: scale
   };
 
-  const deviceCounts = useMemo(() => {
-    const counts: Record<DeviceType | 'all', number> = {
-      all: feedbackPoints.length,
-      desktop: 0,
-      tablet: 0,
-      mobile: 0,
-      custom: 0
-    };
-    
-    feedbackPoints.forEach(feedback => {
-      if (feedback.device_info?.type) {
-        counts[feedback.device_info.type] = (counts[feedback.device_info.type] || 0) + 1;
-      } else {
-        counts.desktop += 1;
-      }
-    });
-    
-    return counts;
-  }, [feedbackPoints]);
 
-  const filteredFeedbackPoints = useMemo(() => {
-    if (selectedDeviceType === 'all') {
-      return feedbackPoints;
-    }
-    
-    return feedbackPoints.filter(feedback => {
-      if (!feedback.device_info) {
-        return selectedDeviceType === 'desktop';
-      }
-      
-      return feedback.device_info.type === selectedDeviceType;
-    });
-  }, [feedbackPoints, selectedDeviceType]);
+
+  const filteredFeedbackPoints = useMemo(() => feedbackPoints, [feedbackPoints]);
 
   const isMatchingCurrentDevice = useCallback((feedback: FeedbackPointType) => {
     if (!feedback.device_info) {
@@ -536,17 +505,6 @@ export function FeedbackOverlay({
       {!isIframeReady && isFeedbackMode && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/30 z-10">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-        </div>
-      )}
-      
-      {isIframeReady && (
-        <div className="absolute top-1 right-40 z-50">
-          <FeedbackDeviceFilter
-            selectedDeviceType={selectedDeviceType}
-            onSelectDeviceType={setSelectedDeviceType}
-            deviceCounts={deviceCounts}
-            currentDevice={currentDeviceInfo}
-          />
         </div>
       )}
       

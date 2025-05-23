@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
+import type { DeviceType, FeedbackPoint as FeedbackPointType } from '@/types/feedback';
 import { 
   SandpackProvider, 
   SandpackCodeEditor,
@@ -18,12 +19,11 @@ import { Loader2, Eye, AlertCircle, RefreshCw, Smartphone, Tablet, Monitor, Rota
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrototypeFeedback } from '@/hooks/use-prototype-feedback';
-import { FeedbackPoint as FeedbackPointType } from '@/types/feedback';
 import { useIframeStability } from '@/hooks/use-iframe-stability';
 import JSZip from 'jszip';
 import '@/styles/sandpack-fix.css';
 
-type DeviceType = 'desktop' | 'tablet' | 'mobile' | 'custom';
+// Device preview types
 type Orientation = 'portrait' | 'landscape';
 
 interface DeviceConfig {
@@ -198,6 +198,38 @@ export function SandpackPreview({ prototypeId, url, deploymentUrl, figmaUrl, fil
   const updateFeedbackPoint = useCallback((updatedFeedback: FeedbackPointType) => {
     updateFeedbackPointFromHook(updatedFeedback);
   }, [updateFeedbackPointFromHook]);
+
+  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | 'all'>('all');
+
+  // Calculate device counts from feedback points
+  const deviceCounts = useMemo(() => {
+    const counts: Record<DeviceType | 'all', number> = {
+      all: feedbackPoints.length,
+      desktop: 0,
+      tablet: 0,
+      mobile: 0,
+      custom: 0
+    };
+    
+    feedbackPoints.forEach(feedback => {
+      if (feedback.device_info?.type) {
+        counts[feedback.device_info.type] = (counts[feedback.device_info.type] || 0) + 1;
+      } else {
+        counts.desktop += 1;
+      }
+    });
+    
+    return counts;
+  }, [feedbackPoints]);
+
+  // Current device info for the filter
+  const currentDeviceInfo = useMemo(() => ({
+    type: deviceType,
+    width: customDimensions.width,
+    height: customDimensions.height,
+    orientation,
+    scale
+  }), [deviceType, customDimensions, orientation, scale]);
 
   useEffect(() => {
     if (figmaUrl !== undefined) {
@@ -668,6 +700,10 @@ if (typeof window.menuitemfn === 'undefined') {
           hasFigmaDesign={!!figmaUrlState}
           filesUrl={filesUrl}
           onDownload={handleDownload}
+          selectedDeviceType={selectedDeviceType}
+          onSelectDeviceType={setSelectedDeviceType}
+          deviceCounts={deviceCounts}
+          currentDevice={currentDeviceInfo}
         />
         
         <div className="flex items-center gap-2">
