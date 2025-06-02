@@ -24,6 +24,11 @@ import {
   Download
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { useCallback, useRef } from 'react';
+import { VersionSelector } from "@/components/version/VersionSelector";
+import { VersionUploadModal } from "@/components/version/VersionUploadModal";
+import { useVersionControl } from "@/hooks/use-version-control";
+import { PrototypeVersion } from "@/lib/version-control";
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
   DropdownMenu, 
@@ -85,6 +90,10 @@ interface PreviewControlsProps {
   onSelectDeviceType?: (deviceType: DeviceType | 'all') => void;
   deviceCounts?: Record<DeviceType | 'all', number>;
   currentDevice?: DeviceInfo;
+  // Version control props
+  prototypeId?: string;
+  onVersionChange?: (versionId: string, previewUrl: string, version: PrototypeVersion) => void;
+  currentVersionId?: string;
 }
 
 export function PreviewControls({
@@ -116,9 +125,40 @@ export function PreviewControls({
   selectedDeviceType = 'all',
   onSelectDeviceType,
   deviceCounts = { all: 0, desktop: 0, tablet: 0, mobile: 0, custom: 0 },
-  currentDevice = { type: 'desktop', width: 1920, height: 1080, orientation: 'portrait', scale: 1 }
+  currentDevice = { type: 'desktop', width: 1920, height: 1080, orientation: 'portrait', scale: 1 },
+  // Version control props
+  prototypeId,
+  onVersionChange,
+  currentVersionId,
 }: PreviewControlsProps) {
   const { toast } = useToast();
+  const [showVersionUploadModal, setShowVersionUploadModal] = useState(false);
+  const { isInternalTester, versionUiEnabled, versionUploadEnabled } = useVersionControl();
+  
+  // Debounce toast notifications for version switching to prevent spam
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedToast = useCallback((title: string, description: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    
+    toastTimeoutRef.current = setTimeout(() => {
+      toast({
+        title,
+        description
+      });
+      toastTimeoutRef.current = null;
+    }, 300);
+  }, [toast]);
+  
+  // Handle version changes with debounced toast
+  const handleVersionChange = useCallback((versionId: string, previewUrl: string, version: PrototypeVersion) => {
+    onVersionChange?.(versionId, previewUrl, version);
+    debouncedToast(
+      `Switched to v${version.version_number}`,
+      version.title ? version.title : `Created ${new Date(version.created_at).toLocaleDateString()}`
+    );
+  }, [onVersionChange, debouncedToast]);
   const navigate = useNavigate();
   const location = useLocation();
   const [showScaleControls, setShowScaleControls] = useState(false);
@@ -489,6 +529,17 @@ export function PreviewControls({
 
       <div className="flex-1" /> {/* Spacer */}
 
+      {/* Version selector - Only show for internal testers when flag is enabled */}
+      {versionUiEnabled && isInternalTester && prototypeId && (
+        <VersionSelector
+          prototypeId={prototypeId}
+          onVersionSelect={handleVersionChange}
+          onAddVersion={versionUploadEnabled ? () => setShowVersionUploadModal(true) : undefined}
+          currentVersionId={currentVersionId}
+          isInternalTester={isInternalTester}
+        />
+      )}
+
       {/* Action buttons */}
       <div className="flex items-center gap-2">
         {/* Download button */}
@@ -527,6 +578,21 @@ export function PreviewControls({
         >
           {showUI ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </Button>
+      )}
+      
+      {/* Version upload modal */}
+      {versionUploadEnabled && isInternalTester && (
+        <VersionUploadModal
+          open={showVersionUploadModal}
+          onOpenChange={setShowVersionUploadModal}
+          prototypeId={prototypeId || ''}
+          onSuccess={(version: PrototypeVersion) => {
+            toast({
+              title: 'Processing version',
+              description: `Version ${version.version_number} is being processed.`,
+            });
+          }}
+        />
       )}
     </div>
   );

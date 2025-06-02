@@ -4,6 +4,8 @@ import { useSupabaseClient } from '@supabase/auth-helpers-react'
 import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PreviewControls } from '@/components/preview/PreviewControls'
+import { getLatestReadyVersion, PrototypeVersion } from '@/lib/version-control'
+import { useVersionControl } from '@/hooks/use-version-control'
 
 interface PrototypePreviewProps {
   prototypeId: string
@@ -15,15 +17,126 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
   const [filesUrl, setFilesUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({})
+  const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
+  const [currentVersion, setCurrentVersion] = useState<PrototypeVersion | null>(null)
   const supabase = useSupabaseClient()
   const { toast } = useToast()
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const { isInternalTester, versionUiEnabled, versionUploadEnabled } = useVersionControl()
 
-  const loadPreview = async (showToast = false) => {
+  // Load feature flags from Supabase
+  const loadFeatureFlags = async () => {
+    try {
+      const { data: flags, error } = await supabase
+        .from('feature_flags')
+        .select('key, enabled')
+        .in('key', ['version_control_enabled', 'version_ui_ro', 'version_upload_beta'])
+      
+      if (error) throw error
+      
+      // Transform to key-value object
+      const flagMap = flags.reduce((acc, flag) => {
+        acc[flag.key] = flag.enabled
+        return acc
+      }, {} as Record<string, boolean>)
+      
+      setFeatureFlags(flagMap)
+      return flagMap
+    } catch (err) {
+      console.error('Error loading feature flags:', err)
+      return {}
+    }
+  }
+
+  const loadPreview = async (showToast = false, versionId?: string) => {
     try {
       setIsRefreshing(true)
       
-      // Get prototype data including file_path
+      // Get feature flags if not loaded yet
+      const flags = Object.keys(featureFlags).length > 0 ? featureFlags : await loadFeatureFlags()
+      
+      // Check localStorage for saved version preference
+      const localStorageVersionId = localStorage.getItem(`prototype_version_${prototypeId}`)
+      const targetVersionId = versionId || localStorageVersionId || null
+      
+      // If version control is enabled and we have a version ID (either passed or from localStorage)
+      if (flags.version_control_enabled && isInternalTester && versionUiEnabled && targetVersionId) {
+        try {
+          // Fetch specific version
+          const { data: version, error: versionError } = await supabase
+            .from('prototype_versions')
+            .select('*')
+            .eq('id', targetVersionId)
+            .eq('status', 'ready') // Only load ready versions
+            .single()
+          
+          if (versionError) throw versionError
+          
+          if (version) {
+            setPreviewUrl(version.preview_url)
+            setFilesUrl(version.files_url)
+            setCurrentVersionId(version.id)
+            setCurrentVersion(version)
+            setIsLoading(false)
+            setIsRefreshing(false)
+            
+            if (showToast) {
+              toast({
+                title: `Loaded version ${version.version_number}`,
+                description: version.title || 'Version loaded successfully',
+              })
+            }
+            return
+          }
+        } catch (err) {
+          console.error('Error loading specific version:', err)
+          // Fall back to latest version or legacy URL
+        }
+      }
+      
+      // If version control is enabled but no specific version requested, or if fetching specific version failed,
+      // try to get latest ready version
+      if (flags.version_control_enabled) {
+        try {
+          const versionInfo = await getLatestReadyVersion(supabase, prototypeId, flags)
+          
+          if (versionInfo.version_id) {
+            // We have a version, use it
+            setPreviewUrl(versionInfo.preview_url)
+            setFilesUrl(versionInfo.files_url)
+            setCurrentVersionId(versionInfo.version_id)
+            
+            // Also fetch the full version details
+            const { data: version } = await supabase
+              .from('prototype_versions')
+              .select('*')
+              .eq('id', versionInfo.version_id)
+              .single()
+              
+            if (version) {
+              setCurrentVersion(version)
+            }
+            
+            setIsLoading(false)
+            setIsRefreshing(false)
+            
+            if (showToast) {
+              toast({
+                title: 'Preview Updated',
+                description: 'The preview has been refreshed with the latest changes.',
+              })
+            }
+            
+            return
+          }
+        } catch (err) {
+          console.error('Error getting latest version:', err)
+          // Fall back to legacy URL
+        }
+      }
+      
+      // Fall back to legacy URLs if version control is disabled or fails
       const { data: prototypeData, error: prototypeError } = await supabase
         .from('prototypes')
         .select('preview_url, files_url, file_path')
@@ -115,6 +228,22 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
     }
   }
 
+  // Handle version change
+  const handleVersionChange = (versionId: string, previewUrl: string, version: PrototypeVersion) => {
+    // Update iframe source without full reload
+    if (iframeRef.current && iframeRef.current.src !== previewUrl) {
+      iframeRef.current.src = previewUrl;
+    }
+    
+    setPreviewUrl(previewUrl);
+    setFilesUrl(version.files_url);
+    setCurrentVersionId(versionId);
+    setCurrentVersion(version);
+    
+    // Store selected version in localStorage
+    localStorage.setItem(`prototype_version_${prototypeId}`, versionId);
+  };
+  
   useEffect(() => {
     loadPreview()
 
@@ -141,6 +270,10 @@ export function PrototypePreview({ prototypeId, className = '' }: PrototypePrevi
           filesUrl={filesUrl || undefined}
           onDownload={handleDownload}
           onShare={handleShare}
+          // Version control props
+          prototypeId={prototypeId}
+          onVersionChange={handleVersionChange}
+          currentVersionId={currentVersionId || undefined}
         />
       </div>
       

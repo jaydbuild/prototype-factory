@@ -1,5 +1,22 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
+export interface PrototypeVersion {
+  id: string;
+  prototype_id: string;
+  version_number: number;
+  title?: string;
+  description?: string;
+  figma_url?: string;
+  preview_url: string;
+  files_url: string;
+  status: 'ready' | 'processing' | 'failed';
+  created_at: string;
+  created_by: string;
+}
+
+// Maximum number of versions per prototype
+export const VERSION_SOFT_CAP = 20;
+
 /**
  * Get the storage path for a specific prototype version
  * @param prototypeId The prototype UUID
@@ -110,4 +127,33 @@ export async function getLatestReadyVersion(
     version_number: latestVersion.version_number,
     version_id: latestVersion.id
   };
+}
+
+/**
+ * Checks if a prototype has reached the version soft cap
+ * @param supabase Supabase client
+ * @param prototypeId The prototype UUID
+ * @returns True if the prototype has reached or exceeded the soft cap
+ */
+export async function hasReachedVersionSoftCap(
+  supabase: SupabaseClient,
+  prototypeId: string
+): Promise<boolean> {
+  try {
+    // Count versions for this prototype using exact count
+    const { count, error } = await supabase
+      .from('prototype_versions')
+      .select('id', { count: 'exact' })
+      .eq('prototype_id', prototypeId);
+      
+    if (error) {
+      throw error;
+    }
+    
+    return (count || 0) >= VERSION_SOFT_CAP;
+  } catch (err) {
+    console.error('Error checking version soft cap:', err);
+    // In case of error, assume cap not reached to prevent blocking upload
+    return false;
+  }
 }
