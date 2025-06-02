@@ -52,13 +52,42 @@ npm run dev
 
 ## What technologies are used for this project?
 
-This project is built with .
+This project is built with:
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (Database & Storage)
+
+## Version Control System
+
+### Phase 0: Groundwork
+
+The project now includes foundational support for per-prototype versioning. 
+This initial phase includes:
+
+- Database table `prototype_versions` for tracking versions
+- Storage structure `/prototypes/{prototype_id}/v{n}/`
+- Feature flag `version_control_enabled` (default: false)
+
+#### Migration
+
+Existing prototypes have been migrated to create `v1` entries in the version 
+control system. No user-facing changes are visible until the feature flag
+is enabled.
+
+#### Rollback Steps
+
+If rollback is needed:
+
+1. Execute the rollback migration script:
+   ```
+   psql -f supabase/migrations/rollbacks/20250602_version_control_phase0.sql
+   ```
+
+2. No storage cleanup is needed in Phase 0 as no files were moved
 
 ## How can I deploy this project?
 
