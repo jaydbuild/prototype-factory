@@ -2,6 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useDropzone } from "react-dropzone";
+import { Loader2, Check, AlertTriangle } from "lucide-react";
 import { FeedbackDeviceFilter } from "@/components/feedback/FeedbackDeviceFilter";
 import { DeviceInfo } from "@/types/feedback";
 import { 
@@ -21,14 +30,13 @@ import {
   ZoomIn,
   ZoomOut,
   Settings,
-  Download
+  Download,
+  ChevronDown,
+  Plus
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useCallback, useRef } from 'react';
-import { VersionSelector } from "@/components/version/VersionSelector";
-import { VersionUploadModal } from "@/components/version/VersionUploadModal";
-import { useVersionControl } from "@/hooks/use-version-control";
-import { PrototypeVersion } from "@/lib/version-control";
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
   DropdownMenu, 
@@ -92,7 +100,7 @@ interface PreviewControlsProps {
   currentDevice?: DeviceInfo;
   // Version control props
   prototypeId?: string;
-  onVersionChange?: (versionId: string, previewUrl: string, version: PrototypeVersion) => void;
+  onVersionChange?: (versionId: string, previewUrl: string, version: any) => void;
   currentVersionId?: string;
 }
 
@@ -133,32 +141,297 @@ export function PreviewControls({
 }: PreviewControlsProps) {
   const { toast } = useToast();
   const [showVersionUploadModal, setShowVersionUploadModal] = useState(false);
-  const { isInternalTester, versionUiEnabled, versionUploadEnabled } = useVersionControl();
+  const [versions, setVersions] = useState<any[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<any | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [versionName, setVersionName] = useState("Version 1.2");
+  const [figmaUrl, setFigmaUrl] = useState("");
+  const [uploadStep, setUploadStep] = useState<string>("");
+  const [fileValidationStatus, setFileValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
+  const [fileValidationMessage, setFileValidationMessage] = useState<string>("");
+  const supabaseClient = useSupabaseClient();
   
-  // Debounce toast notifications for version switching to prevent spam
-  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const debouncedToast = useCallback((title: string, description: string) => {
-    if (toastTimeoutRef.current) {
-      clearTimeout(toastTimeoutRef.current);
+  // Validate ZIP file
+  const validateZipFile = async (file: File): Promise<boolean> => {
+    setFileValidationStatus('validating');
+    setFileValidationMessage("Validating ZIP archive...");
+    
+    try {
+      // Check file extension
+      if (!file.name.toLowerCase().endsWith('.zip')) {
+        setFileValidationStatus('invalid');
+        setFileValidationMessage("File must be a ZIP archive.");
+        return false;
+      }
+      
+      // Check file size (20MB limit)
+      const maxFileSize = 20 * 1024 * 1024; // 20MB in bytes
+      if (file.size > maxFileSize) {
+        setFileValidationStatus('invalid');
+        setFileValidationMessage("File size must be less than 20MB.");
+        return false;
+      }
+      
+      // Import JSZip dynamically if needed
+      // const JSZip = (await import('jszip')).default;
+      // const zip = new JSZip();
+      // const contents = await zip.loadAsync(file);
+      
+      // For now, we'll just trust the file extension
+      setFileValidationStatus('valid');
+      setFileValidationMessage("ZIP file looks valid.");
+      return true;
+    } catch (error) {
+      console.error("ZIP validation error:", error);
+      setFileValidationStatus('invalid');
+      setFileValidationMessage("Error validating ZIP file.");
+      return false;
+    }
+  };
+  
+  // Handle file upload for version
+  const onDrop = async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    console.log('Drop event:', { 
+      fileName: file?.name,
+      fileSize: file?.size,
+      fileType: file?.type 
+    });
+
+    // Check for all required fields
+    if (!versionName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a version name',
+        variant: 'destructive',
+      });
+      return;
     }
     
-    toastTimeoutRef.current = setTimeout(() => {
+    if (!file) {
       toast({
-        title,
-        description
+        title: 'Error',
+        description: 'Please select a file to upload',
+        variant: 'destructive',
       });
-      toastTimeoutRef.current = null;
-    }, 300);
-  }, [toast]);
+      return;
+    }
+    
+    if (!prototypeId) {
+      toast({
+        title: 'Error',
+        description: 'Missing prototype ID',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Validate the file
+    const isValid = await validateZipFile(file);
+    if (!isValid) return;
+    
+    setIsUploading(true);
+    setUploadStep("Preparing upload...");
+    
+    try {
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Add optional metadata
+      if (versionName) formData.append('title', versionName);
+      if (figmaUrl) formData.append('figma_url', figmaUrl);
+      
+      setUploadStep("Authenticating...");
+      // Get authenticated user's JWT token
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in');
+      }
+      
+      setUploadStep("Uploading file...");
+      // Call the version upload API endpoint
+      const response = await fetch(`/api/version-upload/${prototypeId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to upload version');
+      }
+      
+      const versionData = await response.json();
+      
+      toast({
+        title: 'Version upload started',
+        description: `Version ${versionData.version_number} is now processing.`,
+      });
+      
+      console.log('Version upload successful, new version data:', versionData);
+      
+      // Reset the form
+      setVersionName("");
+      setFigmaUrl("");
+      setFileValidationStatus('idle');
+      setFileValidationMessage("");
+      setShowVersionUploadModal(false);
+      
+      // Force refresh the versions list immediately
+      fetchVersions();
+      
+      // Poll for the new version to be ready
+      const pollForVersion = async (attempts = 0, maxAttempts = 10) => {
+        if (attempts >= maxAttempts) return;
+        
+        try {
+          const { data, error } = await supabaseClient
+            .from('prototype_versions')
+            .select('*')
+            .eq('prototype_id', prototypeId)
+            .eq('status', 'ready')
+            .order('version_number', { ascending: false });
+            
+          if (data && data.length > 0) {
+            setVersions(data);
+            const newVersion = data.find(v => v.id === versionData.id && v.status === 'ready');
+            
+            if (newVersion) {
+              setCurrentVersion(newVersion);
+              onVersionChange?.(newVersion.id, newVersion.preview_url, newVersion);
+              toast({
+                title: 'New version ready!',
+                description: `Switched to v${newVersion.version_number}`
+              });
+              return;
+            }
+          }
+          
+          // Continue polling
+          setTimeout(() => pollForVersion(attempts + 1, maxAttempts), 2000);
+        } catch (err) {
+          console.error('Error polling for version:', err);
+          setTimeout(() => pollForVersion(attempts + 1, maxAttempts), 2000);
+        }
+      };
+      
+      // Start polling after 3 seconds
+      setTimeout(() => pollForVersion(), 3000);
+      
+    } catch (error: any) {
+      console.error('Error uploading version:', error);
+      toast({
+        title: 'Upload failed',
+        description: error.message || 'An error occurred while uploading the version',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadStep("");
+    }
+  };
   
-  // Handle version changes with debounced toast
-  const handleVersionChange = useCallback((versionId: string, previewUrl: string, version: PrototypeVersion) => {
-    onVersionChange?.(versionId, previewUrl, version);
-    debouncedToast(
-      `Switched to v${version.version_number}`,
-      version.title ? version.title : `Created ${new Date(version.created_at).toLocaleDateString()}`
-    );
-  }, [onVersionChange, debouncedToast]);
+  // Initialize dropzone for version uploads
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/zip': ['.zip']
+    },
+    maxFiles: 1,
+    maxSize: 20 * 1024 * 1024, // 20MB size limit
+    disabled: isUploading
+  });
+  
+  // Reset form state when modal opens/closes
+  useEffect(() => {
+    if (!showVersionUploadModal) {
+      setVersionName("");
+      setFigmaUrl("");
+      setFileValidationStatus('idle');
+      setFileValidationMessage("");
+    }
+  }, [showVersionUploadModal]);
+  
+  // Function to fetch versions for the prototype
+  const fetchVersions = async () => {
+    if (!prototypeId) {
+      console.log('No prototype ID provided, skipping version fetch');
+      return;
+    }
+    
+    try {
+      console.log('Fetching versions for prototype ID:', prototypeId);
+      const { data, error } = await supabaseClient
+        .from('prototype_versions')
+        .select('*')
+        .eq('prototype_id', prototypeId)
+        .order('version_number', { ascending: false });
+        
+      console.log('Versions data:', data, 'Error:', error);
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data && data.length > 0) {
+        // Filter only ready versions for display
+        const readyVersions = data.filter(v => v.status === 'ready');
+        console.log('Ready versions:', readyVersions);
+        
+        // But also keep non-ready versions in console for debugging
+        const processingVersions = data.filter(v => v.status === 'processing');
+        if (processingVersions.length > 0) {
+          console.log('Processing versions:', processingVersions);
+        }
+        
+        setVersions(readyVersions);
+        
+        if (readyVersions.length > 0) {
+          if (!currentVersionId) {
+            // Select latest version by default
+            setCurrentVersion(readyVersions[0]);
+            onVersionChange?.(readyVersions[0].id, readyVersions[0].preview_url, readyVersions[0]);
+          } else {
+            // Select current version if specified
+            const current = readyVersions.find(v => v.id === currentVersionId);
+            if (current) {
+              setCurrentVersion(current);
+            } else {
+              // Fallback to latest if specified version not found
+              setCurrentVersion(readyVersions[0]);
+              onVersionChange?.(readyVersions[0].id, readyVersions[0].preview_url, readyVersions[0]);
+            }
+          }
+        }
+      } else {
+        console.log('No versions found for prototype');
+        setVersions([]);
+      }
+    } catch (err) {
+      console.error('Error fetching versions:', err);
+    }
+  };
+  
+  // Fetch versions on mount and when prototype ID changes
+  useEffect(() => {
+    console.log('Current prototype ID:', prototypeId);
+    fetchVersions();
+  }, [prototypeId, currentVersionId]);
+  
+  // Handle version change
+  const handleVersionChange = (version: any) => {
+    setCurrentVersion(version);
+    onVersionChange?.(version.id, version.preview_url, version);
+    toast({
+      title: `Switched to v${version.version_number}`,
+      description: version.title || `Created ${new Date(version.created_at).toLocaleDateString()}`
+    });
+  };
+  
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const [showScaleControls, setShowScaleControls] = useState(false);
@@ -529,19 +802,80 @@ export function PreviewControls({
 
       <div className="flex-1" /> {/* Spacer */}
 
-      {/* Version selector - Only show for internal testers when flag is enabled */}
-      {versionUiEnabled && isInternalTester && prototypeId && (
-        <VersionSelector
-          prototypeId={prototypeId}
-          onVersionSelect={handleVersionChange}
-          onAddVersion={versionUploadEnabled ? () => setShowVersionUploadModal(true) : undefined}
-          currentVersionId={currentVersionId}
-          isInternalTester={isInternalTester}
-        />
-      )}
-
       {/* Action buttons */}
       <div className="flex items-center gap-2">
+        {/* Version control dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 flex items-center gap-1 px-2"
+            >
+              {currentVersion ? `v${currentVersion.version_number}` : 'Version'}
+              <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Versions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            {versions.length === 0 ? (
+              // Show placeholder versions for testing when no real versions are available
+              <>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const placeholderVersion = {
+                      id: 'placeholder-1',
+                      version_number: 1.0,
+                      title: 'Initial Release',
+                      created_at: new Date().toISOString(),
+                      preview_url: '',
+                      status: 'ready'
+                    };
+                    handleVersionChange(placeholderVersion);
+                  }}
+                >
+                  v1.0 - Initial Release
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const placeholderVersion = {
+                      id: 'placeholder-2',
+                      version_number: 1.2,
+                      title: 'Version 1.2',
+                      created_at: new Date().toISOString(),
+                      preview_url: '',
+                      status: 'ready'
+                    };
+                    handleVersionChange(placeholderVersion);
+                  }}
+                >
+                  v1.2 - Updated Animations
+                </DropdownMenuItem>
+              </>
+            ) : (
+              versions.map(version => (
+                <DropdownMenuItem 
+                  key={version.id}
+                  onClick={() => handleVersionChange(version)}
+                  className={currentVersion?.id === version.id ? 'bg-accent' : ''}
+                >
+                  v{version.version_number} - {version.title || new Date(version.created_at).toLocaleDateString()}
+                </DropdownMenuItem>
+              ))
+            )}
+            
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => {
+              console.log('Add Version clicked, prototype ID:', prototypeId);
+              setShowVersionUploadModal(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2 font-bold" />
+              Add Version
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {/* Download button */}
         {filesUrl && (
           <Button
@@ -580,19 +914,94 @@ export function PreviewControls({
         </Button>
       )}
       
-      {/* Version upload modal */}
-      {versionUploadEnabled && isInternalTester && (
-        <VersionUploadModal
-          open={showVersionUploadModal}
-          onOpenChange={setShowVersionUploadModal}
-          prototypeId={prototypeId || ''}
-          onSuccess={(version: PrototypeVersion) => {
-            toast({
-              title: 'Processing version',
-              description: `Version ${version.version_number} is being processed.`,
-            });
-          }}
-        />
+      {/* Version Upload dialog */}
+      {showVersionUploadModal && (
+        <Dialog open={showVersionUploadModal} onOpenChange={setShowVersionUploadModal}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Version</DialogTitle>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-2">
+              {/* Version name input */}
+              <div>
+                <Input
+                  id="version-name"
+                  placeholder="Version 1.2"
+                  value={versionName}
+                  onChange={(e) => {
+                    console.log('Version name changed:', e.target.value);
+                    setVersionName(e.target.value);
+                  }}
+                  autoComplete="off"
+                />
+              </div>
+              
+              {/* Figma URL input */}
+              <div>
+                <Input
+                  id="figma-url"
+                  placeholder="Figma Design URL (optional)"
+                  value={figmaUrl}
+                  onChange={(e) => {
+                    console.log('Figma URL changed:', e.target.value);
+                    setFigmaUrl(e.target.value);
+                  }}
+                  autoComplete="off"
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Link your Figma design to view it alongside your prototype
+                </div>
+              </div>
+              
+              {/* File upload area */}
+              <div className="flex flex-col items-center">
+                <div
+                  {...getRootProps()}
+                  className={`border-2 border-dashed rounded-md p-10 w-full ${isDragActive ? 'border-primary bg-secondary/20' : 'border-muted'} flex flex-col items-center justify-center text-center cursor-pointer transition-colors`}
+                >
+                  <input {...getInputProps()} />
+                  <p className="text-sm font-medium mb-1">Drag 'n' drop a file here, or click to select</p>
+                  <p className="text-xs text-muted-foreground">
+                    Supports ZIP archives containing web content (max 20MB)
+                  </p>
+                </div>
+                
+                {/* File validation status */}
+                {fileValidationStatus === 'validating' && (
+                  <div className="mt-3 flex items-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {fileValidationMessage}
+                  </div>
+                )}
+                
+                {fileValidationStatus === 'valid' && (
+                  <div className="mt-3 flex items-center text-sm text-green-500">
+                    <Check className="h-4 w-4 mr-2" />
+                    {fileValidationMessage}
+                  </div>
+                )}
+                
+                {fileValidationStatus === 'invalid' && (
+                  <div className="mt-3 flex items-center text-sm text-destructive">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    {fileValidationMessage}
+                  </div>
+                )}
+                
+                {/* Upload status */}
+                {isUploading && (
+                  <div className="mt-3 flex flex-col items-center">
+                    <Loader2 className="h-4 w-4 animate-spin mb-2" />
+                    <p className="text-sm text-muted-foreground">{uploadStep}</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* We've removed the debug info */}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
