@@ -167,7 +167,7 @@ export function VersionUploadModal({
       // Make API call to upload version
       // Use Supabase Functions URL in production or API proxy path in dev
       const apiUrl = process.env.NODE_ENV === 'production'
-        ? `https://lilukmlnbrzyjrksteay.functions.supabase.co/version-upload-api`
+        ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-version-upload`
         : `/api/prototypes/${prototypeId}/versions`;
         
       const response = await fetch(apiUrl, {
